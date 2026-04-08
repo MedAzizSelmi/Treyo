@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="db9c8ad5-87db-4caf-bab0-4454e7ceae47" name="Changes" comment="second commit">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.json" beforeDir="false" afterPath="$PROJECT_DIR$/app.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(student-tabs)/chatbot.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(student-tabs)/chatbot.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(student-tabs)/home.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(student-tabs)/home.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(student-tabs)/messages.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(student-tabs)/messages.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(student-tabs)/notifications.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(student-tabs)/notifications.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(student-tabs)/profile.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(student-tabs)/profile.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(student-tabs)/trainers.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(student-tabs)/trainers.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(trainer-tabs)/home.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(trainer-tabs)/home.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(trainer-tabs)/messages.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(trainer-tabs)/messages.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(trainer-tabs)/notifications.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(trainer-tabs)/notifications.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(trainer-tabs)/profile.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(trainer-tabs)/profile.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(trainer-tabs)/students.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(trainer-tabs)/students.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/_layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/_layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/certificates.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/certificates.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/edit-profile.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/edit-profile.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/help-support.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/help-support.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/index.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/index.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/login.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/login.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/notification-settings.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/notification-settings.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/onboarding/student/step1.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/onboarding/student/step1.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/onboarding/student/step2.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/onboarding/student/step2.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/onboarding/trainer/step1.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/onboarding/trainer/step1.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/onboarding/trainer/step2.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/onboarding/trainer/step2.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/onboarding/trainer/step3.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/onboarding/trainer/step3.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/onboarding/trainer/step4.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/onboarding/trainer/step4.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/signup.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/signup.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/images/Treyo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/images/adaptive-icon.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/images/favicon.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/images/icon.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/images/logo.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/assets/images/splash-icon.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/StudentTabBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/StudentTabBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/TrainerTabBar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/TrainerTabBar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/contexts/ThemeContext.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/contexts/ThemeContext.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/api.ts" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="TypeScript File" />
+        <option value="TypeScript JSX File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="3AqCUFbHAQBABEoA67cTioyDd4c" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "C:/Users/1/BYB_Match/treyo-mobile/assets/images",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "ts.external.directory.path": "C:\\Users\\1\\BYB_Match\\treyo-mobile\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\1\BYB_Match\treyo-mobile\assets\images" />
+      <recent name="C:\Users\1\BYB_Match\treyo-mobile\assets\Tabs" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\1\BYB_Match\treyo-mobile\assets\images" />
+      <recent name="C:\Users\1\BYB_Match\treyo-mobile\components\splash-screens" />
+      <recent name="C:\Users\1\BYB_Match\treyo-mobile\components" />
+      <recent name="C:\Users\1\BYB_Match\treyo-mobile\assets" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-WS-252.26830.93" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="db9c8ad5-87db-4caf-bab0-4454e7ceae47" name="Changes" comment="" />
+      <created>1773310730180</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1773310730180</updated>
+      <workItem from="1773310733227" duration="1809000" />
+      <workItem from="1773312565279" duration="11552000" />
+      <workItem from="1773653169806" duration="366000" />
+      <workItem from="1773661254646" duration="21274000" />
+      <workItem from="1774257740205" duration="4181000" />
+      <workItem from="1774275310641" duration="31740000" />
+      <workItem from="1774447739296" duration="4059000" />
+      <workItem from="1774517086444" duration="3172000" />
+      <workItem from="1774521363773" duration="2330000" />
+      <workItem from="1774866972652" duration="966000" />
+      <workItem from="1774867972359" duration="19224000" />
+      <workItem from="1775478188892" duration="17074000" />
+    </task>
+    <task id="LOCAL-00001" summary="first commit">
+      <option name="closed" value="true" />
+      <created>1774358032392</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1774358032392</updated>
+    </task>
+    <task id="LOCAL-00002" summary="second commit">
+      <option name="closed" value="true" />
+      <created>1774358059658</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1774358059658</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="first commit" />
+    <MESSAGE value="second commit" />
+    <option name="LAST_COMMIT_MESSAGE" value="second commit" />
+  </component>
+</project>
