@@ -1,0 +1,22 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="python-multipart" />
+          <option value="pickle5" />
+          <option value="pytest" />
+          <option value="pytest-asyncio" />
+          <option value="httpx" />
+          <option value="gunicorn" />
+          <option value="python-dotenv" />
+          <option value="python-jose" />
+          <option value="passlib" />
+          <option value="prometheus-client" />
+          <option value="structlog" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

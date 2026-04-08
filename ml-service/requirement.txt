@@ -1,0 +1,17 @@
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Database
+psycopg2-binary==2.9.9
+
+# Environment variables
+python-dotenv==1.0.0
+
+# Optional but useful
+python-multipart==0.0.6
+
+# Note: pandas, numpy, scikit-learn should already be installed
+# If not, install them with: pip install pandas numpy scikit-learn
