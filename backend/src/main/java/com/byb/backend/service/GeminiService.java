@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +18,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GeminiService {
@@ -96,6 +98,7 @@ public class GeminiService {
 
         for (String model : FALLBACK_MODELS) {
             try {
+                log.info("Trying Gemini model: {}", model);
                 String url = "/v1beta/models/" + model + ":generateContent?key=" + geminiApiKey;
                 String response = client.post()
                         .uri(url)
@@ -105,32 +108,42 @@ public class GeminiService {
                         .bodyToMono(String.class)
                         .block();
 
-                // Check for API-level error in the response body
+                // Check for API-level error embedded in the 200 response body
                 JsonNode root = objectMapper.readTree(response);
                 if (root.has("error")) {
                     int code = root.path("error").path("code").asInt();
                     String message = root.path("error").path("message").asText();
+                    log.warn("Gemini model {} returned error {}: {}", model, code, message);
                     if (code == 429) {
-                        // Try next model
                         lastError = new RuntimeException("429: " + message);
-                        continue;
+                        continue; // try next model
                     }
                     throw new RuntimeException(code + ": " + message);
                 }
 
+                log.info("Gemini model {} succeeded", model);
                 return response;
 
             } catch (WebClientResponseException e) {
+                log.warn("Gemini model {} HTTP error {}: {}", model, e.getStatusCode().value(), e.getResponseBodyAsString());
                 if (e.getStatusCode().value() == 429) {
                     lastError = e;
-                    continue; // Try next model
+                    continue; // try next model
+                }
+                throw e;
+            } catch (RuntimeException e) {
+                if (e.getMessage() != null && e.getMessage().startsWith("429:")) {
+                    lastError = e;
+                    continue;
                 }
                 throw e;
             }
         }
 
-        throw lastError != null ? lastError
-                : new RuntimeException("All models exhausted");
+        String exhaustedMsg = "All Gemini models quota-exceeded. Last error: "
+                + (lastError != null ? lastError.getMessage() : "unknown");
+        log.error(exhaustedMsg);
+        throw new RuntimeException(exhaustedMsg);
     }
 
     // ── Extract text from Gemini response ─────────────────────────────────────
@@ -160,11 +173,13 @@ public class GeminiService {
 
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            log.error("Gemini chat error: {}", msg);
             if (msg.contains("429") || msg.contains("quota")) {
                 return new ChatResponse(null, false,
                         "All AI models are currently busy. Please wait a minute and try again.");
             }
-            return new ChatResponse(null, false, "AI service error. Please try again.");
+            // Return the real error so it shows in the app during development
+            return new ChatResponse(null, false, "AI error: " + msg);
         }
     }
 

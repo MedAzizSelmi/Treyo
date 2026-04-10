@@ -111,8 +111,10 @@ export default function ChatbotScreen() {
                 throw new Error(data.error || 'No reply from AI');
             }
         } catch (err: any) {
-            console.error('Chatbot error:', err);
+            // Log full details so we can diagnose from Metro console
+            console.error('Chatbot error:', err?.response?.data || err?.message || err);
             const errorText = err?.response?.data?.error
+                || err?.response?.data?.message
                 || err?.message
                 || "Sorry, I couldn't reach the AI right now. Please try again.";
             const errMsg: Message = {
