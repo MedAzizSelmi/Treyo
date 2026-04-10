@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
@@ -22,10 +24,15 @@ public class GeminiService {
     @Value("${gemini.api.key}")
     private String geminiApiKey;
 
-    @Value("${gemini.api.model:gemini-2.0-flash}")
-    private String geminiModel;
-
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+
+    // Models tried in order — first one that works wins
+    private static final List<String> FALLBACK_MODELS = Arrays.asList(
+            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-flash-lite-latest",
+            "gemini-flash-latest"
+    );
 
     private static final String SYSTEM_PROMPT = """
             You are Treyo AI, a friendly and knowledgeable assistant built into the Treyo app — a platform that connects students with professional trainers.
@@ -47,108 +54,127 @@ public class GeminiService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // ── Build the contents array shared by chat and transcribe ────────────────
+    private ArrayNode buildContents(List<ChatRequest.ChatMessage> history, String newMessage) {
+        ArrayNode contents = objectMapper.createArrayNode();
+
+        // System prompt turn
+        contents.add(textTurn("user", SYSTEM_PROMPT));
+        contents.add(textTurn("model", "Understood! I'm Treyo AI, ready to assist students."));
+
+        // Chat history
+        if (history != null) {
+            for (ChatRequest.ChatMessage msg : history) {
+                contents.add(textTurn(msg.getRole(), msg.getText()));
+            }
+        }
+
+        // New message
+        contents.add(textTurn("user", newMessage));
+        return contents;
+    }
+
+    private ObjectNode textTurn(String role, String text) {
+        ObjectNode turn = objectMapper.createObjectNode();
+        turn.put("role", role);
+        ArrayNode parts = objectMapper.createArrayNode();
+        ObjectNode part = objectMapper.createObjectNode();
+        part.put("text", text);
+        parts.add(part);
+        turn.set("parts", parts);
+        return turn;
+    }
+
+    // ── Call Gemini with automatic model fallback on 429 ─────────────────────
+    private String callGemini(String bodyJson) throws Exception {
+        WebClient client = WebClient.builder()
+                .baseUrl(GEMINI_BASE_URL)
+                .codecs(c -> c.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
+                .build();
+
+        Exception lastError = null;
+
+        for (String model : FALLBACK_MODELS) {
+            try {
+                String url = "/v1beta/models/" + model + ":generateContent?key=" + geminiApiKey;
+                String response = client.post()
+                        .uri(url)
+                        .header("Content-Type", "application/json")
+                        .bodyValue(bodyJson)
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .block();
+
+                // Check for API-level error in the response body
+                JsonNode root = objectMapper.readTree(response);
+                if (root.has("error")) {
+                    int code = root.path("error").path("code").asInt();
+                    String message = root.path("error").path("message").asText();
+                    if (code == 429) {
+                        // Try next model
+                        lastError = new RuntimeException("429: " + message);
+                        continue;
+                    }
+                    throw new RuntimeException(code + ": " + message);
+                }
+
+                return response;
+
+            } catch (WebClientResponseException e) {
+                if (e.getStatusCode().value() == 429) {
+                    lastError = e;
+                    continue; // Try next model
+                }
+                throw e;
+            }
+        }
+
+        throw lastError != null ? lastError
+                : new RuntimeException("All models exhausted");
+    }
+
+    // ── Extract text from Gemini response ─────────────────────────────────────
+    private String extractText(String responseBody) throws Exception {
+        JsonNode root = objectMapper.readTree(responseBody);
+        return root.path("candidates").get(0)
+                .path("content").path("parts").get(0)
+                .path("text").asText();
+    }
+
+    // ── Public: chat ──────────────────────────────────────────────────────────
     public ChatResponse chat(ChatRequest request) {
         try {
-            WebClient client = WebClient.builder()
-                    .baseUrl(GEMINI_BASE_URL)
-                    .build();
+            ArrayNode contents = buildContents(request.getHistory(), request.getMessage());
 
-            // Build the contents array: system prompt first, then history, then new message
-            ArrayNode contents = objectMapper.createArrayNode();
-
-            // System prompt as first user turn
-            ObjectNode systemTurn = objectMapper.createObjectNode();
-            systemTurn.put("role", "user");
-            ArrayNode systemParts = objectMapper.createArrayNode();
-            ObjectNode systemPart = objectMapper.createObjectNode();
-            systemPart.put("text", SYSTEM_PROMPT);
-            systemParts.add(systemPart);
-            systemTurn.set("parts", systemParts);
-            contents.add(systemTurn);
-
-            // System acknowledgement
-            ObjectNode sysAck = objectMapper.createObjectNode();
-            sysAck.put("role", "model");
-            ArrayNode sysAckParts = objectMapper.createArrayNode();
-            ObjectNode sysAckPart = objectMapper.createObjectNode();
-            sysAckPart.put("text", "Understood! I'm Treyo AI, ready to assist students.");
-            sysAckParts.add(sysAckPart);
-            sysAck.set("parts", sysAckParts);
-            contents.add(sysAck);
-
-            // Chat history
-            if (request.getHistory() != null) {
-                for (ChatRequest.ChatMessage msg : request.getHistory()) {
-                    ObjectNode turn = objectMapper.createObjectNode();
-                    turn.put("role", msg.getRole());
-                    ArrayNode parts = objectMapper.createArrayNode();
-                    ObjectNode part = objectMapper.createObjectNode();
-                    part.put("text", msg.getText());
-                    parts.add(part);
-                    turn.set("parts", parts);
-                    contents.add(turn);
-                }
-            }
-
-            // New user message
-            ObjectNode userTurn = objectMapper.createObjectNode();
-            userTurn.put("role", "user");
-            ArrayNode userParts = objectMapper.createArrayNode();
-            ObjectNode userPart = objectMapper.createObjectNode();
-            userPart.put("text", request.getMessage());
-            userParts.add(userPart);
-            userTurn.set("parts", userParts);
-            contents.add(userTurn);
-
-            // Build request body
             ObjectNode body = objectMapper.createObjectNode();
             body.set("contents", contents);
 
-            // Generation config
             ObjectNode genConfig = objectMapper.createObjectNode();
             genConfig.put("maxOutputTokens", 512);
             genConfig.put("temperature", 0.7);
             body.set("generationConfig", genConfig);
 
-            String url = "/v1beta/models/" + geminiModel + ":generateContent?key=" + geminiApiKey;
-
-            String responseBody = client.post()
-                    .uri(url)
-                    .header("Content-Type", "application/json")
-                    .bodyValue(body.toString())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            // Parse response
-            JsonNode root = objectMapper.readTree(responseBody);
-            String reply = root
-                    .path("candidates").get(0)
-                    .path("content")
-                    .path("parts").get(0)
-                    .path("text")
-                    .asText();
-
+            String response = callGemini(body.toString());
+            String reply = extractText(response);
             return new ChatResponse(reply, true, null);
 
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : "Unknown error";
-            if (msg.contains("429")) {
-                return new ChatResponse(null, false, "AI quota exceeded. Please try again in a moment.");
+            if (msg.contains("429") || msg.contains("quota")) {
+                return new ChatResponse(null, false,
+                        "All AI models are currently busy. Please wait a minute and try again.");
             }
-            return new ChatResponse(null, false, "AI service error: " + msg);
+            return new ChatResponse(null, false, "AI service error. Please try again.");
         }
     }
 
+    // ── Public: transcribe audio ──────────────────────────────────────────────
     public String transcribeAudio(MultipartFile audio) {
         try {
-            WebClient client = WebClient.builder().baseUrl(GEMINI_BASE_URL).build();
-
             byte[] audioBytes = audio.getBytes();
             String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
             String mimeType = audio.getContentType() != null ? audio.getContentType() : "audio/m4a";
 
-            // Build request body with inline audio data
             ObjectNode body = objectMapper.createObjectNode();
             ArrayNode contents = objectMapper.createArrayNode();
             ObjectNode turn = objectMapper.createObjectNode();
@@ -170,20 +196,8 @@ public class GeminiService {
             contents.add(turn);
             body.set("contents", contents);
 
-            String url = "/v1beta/models/" + geminiModel + ":generateContent?key=" + geminiApiKey;
-
-            String responseBody = client.post()
-                    .uri(url)
-                    .header("Content-Type", "application/json")
-                    .bodyValue(body.toString())
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block();
-
-            JsonNode root = objectMapper.readTree(responseBody);
-            return root.path("candidates").get(0)
-                    .path("content").path("parts").get(0)
-                    .path("text").asText("").trim();
+            String response = callGemini(body.toString());
+            return extractText(response).trim();
 
         } catch (Exception e) {
             return "";
