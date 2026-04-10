@@ -29,9 +29,12 @@ public class GeminiService {
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 
     // Models tried in order — first one that works wins
+    // -001 variants have separate quota buckets from their latest counterparts
     private static final List<String> FALLBACK_MODELS = Arrays.asList(
             "gemini-2.0-flash-lite",
+            "gemini-2.0-flash-lite-001",
             "gemini-2.0-flash",
+            "gemini-2.0-flash-001",
             "gemini-flash-lite-latest",
             "gemini-flash-latest"
     );
@@ -114,8 +117,8 @@ public class GeminiService {
                     int code = root.path("error").path("code").asInt();
                     String message = root.path("error").path("message").asText();
                     log.warn("Gemini model {} returned error {}: {}", model, code, message);
-                    if (code == 429) {
-                        lastError = new RuntimeException("429: " + message);
+                    if (code == 429 || code == 403) {
+                        lastError = new RuntimeException(code + ": " + message);
                         continue; // try next model
                     }
                     throw new RuntimeException(code + ": " + message);
@@ -125,8 +128,9 @@ public class GeminiService {
                 return response;
 
             } catch (WebClientResponseException e) {
-                log.warn("Gemini model {} HTTP error {}: {}", model, e.getStatusCode().value(), e.getResponseBodyAsString());
-                if (e.getStatusCode().value() == 429) {
+                int status = e.getStatusCode().value();
+                log.warn("Gemini model {} HTTP {}: {}", model, status, e.getResponseBodyAsString());
+                if (status == 429 || status == 403) {
                     lastError = e;
                     continue; // try next model
                 }
@@ -140,10 +144,9 @@ public class GeminiService {
             }
         }
 
-        String exhaustedMsg = "All Gemini models quota-exceeded. Last error: "
-                + (lastError != null ? lastError.getMessage() : "unknown");
-        log.error(exhaustedMsg);
-        throw new RuntimeException(exhaustedMsg);
+        String lastMsg = lastError != null ? lastError.getMessage() : "unknown";
+        log.error("All {} Gemini models failed. Last error: {}", FALLBACK_MODELS.size(), lastMsg);
+        throw new RuntimeException("QUOTA_EXHAUSTED: " + lastMsg);
     }
 
     // ── Extract text from Gemini response ─────────────────────────────────────
@@ -174,11 +177,10 @@ public class GeminiService {
         } catch (Exception e) {
             String msg = e.getMessage() != null ? e.getMessage() : "Unknown error";
             log.error("Gemini chat error: {}", msg);
-            if (msg.contains("429") || msg.contains("quota")) {
+            if (msg.contains("429") || msg.contains("quota") || msg.contains("QUOTA_EXHAUSTED") || msg.contains("403")) {
                 return new ChatResponse(null, false,
-                        "All AI models are currently busy. Please wait a minute and try again.");
+                        "The AI service quota is exhausted for this API key. Please go to aistudio.google.com and create a new API key, then update it in application.properties.");
             }
-            // Return the real error so it shows in the app during development
             return new ChatResponse(null, false, "AI error: " + msg);
         }
     }
