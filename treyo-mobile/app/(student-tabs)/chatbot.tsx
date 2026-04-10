@@ -7,37 +7,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useEffect } from 'react';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService } from '../../services/api';
 import { useRouter } from 'expo-router';
 import api from '../../services/api';
-
-// ─── Put your NEW Gemini API key here (old one was leaked) ───────────────────
-const GEMINI_API_KEY = 'AIzaSyBLIG2rdxiLQDycH4tSJEIJx3p-QinF_cA';
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SYSTEM_PROMPT = `You are Treyo AI, a friendly and knowledgeable assistant built into the Treyo app — a platform that connects students with professional trainers.
-
-Your role is to help students with:
-- Finding and enrolling in training sessions or courses
-- Understanding their profile, bio, skills, and resume
-- Navigating the app (Home, Profile, Sessions, Messages, Chatbot)
-- Answering questions about training domains, education, and career development
-- Motivating and guiding learners on their journey
-
-Guidelines:
-- Be concise, warm, and encouraging
-- Use simple, clear language
-- If asked about something outside the app's scope, politely redirect
-- Address the user by their first name when you know it
-- Keep responses under 150 words unless a detailed explanation is truly needed`;
 
 type Message = {
     id: string;
     text: string;
     isBot: boolean;
     timestamp: Date;
+};
+
+type ChatHistoryItem = {
+    role: 'user' | 'model';
+    text: string;
 };
 
 type RecordingStatus = 'idle' | 'recording' | 'transcribing';
@@ -47,6 +31,7 @@ export default function ChatbotScreen() {
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>('idle');
@@ -54,7 +39,6 @@ export default function ChatbotScreen() {
 
     const scrollRef = useRef<ScrollView>(null);
     const recordingRef = useRef<Audio.Recording | null>(null);
-    const chatRef = useRef<any>(null);
 
     const isEmptyState = messages.length === 0;
 
@@ -67,15 +51,6 @@ export default function ChatbotScreen() {
                 setProfilePicUrl(res.data.profilePictureUrl || null);
             } catch (_) {}
         })();
-
-        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        chatRef.current = model.startChat({
-            history: [
-                { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-                { role: 'model', parts: [{ text: "Understood! I'm Treyo AI, ready to assist students." }] },
-            ],
-        });
     }, []);
 
     const scrollToBottom = () => {
@@ -89,29 +64,60 @@ export default function ChatbotScreen() {
         return `${h % 12 || 12}:${m}${ampm}`;
     };
 
-    // ── Send message ──────────────────────────────────────────────────────────
+    // ── Send message → backend → Gemini ──────────────────────────────────────
     const sendMessage = async (text: string) => {
         const trimmed = text.trim();
         if (!trimmed || loading) return;
 
-        const userMsg: Message = { id: Date.now().toString(), text: trimmed, isBot: false, timestamp: new Date() };
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            text: trimmed,
+            isBot: false,
+            timestamp: new Date(),
+        };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setLoading(true);
         scrollToBottom();
 
         try {
-            const prompt = userName ? `[User's name: ${userName}]\n${trimmed}` : trimmed;
-            const result = await chatRef.current.sendMessage(prompt);
-            const reply = result.response.text();
-            const botMsg: Message = { id: (Date.now() + 1).toString(), text: reply, isBot: true, timestamp: new Date() };
-            setMessages(prev => [...prev, botMsg]);
-            scrollToBottom();
-        } catch (err) {
-            console.error('Gemini error:', err);
+            const messageText = userName ? `[User's name: ${userName}]\n${trimmed}` : trimmed;
+
+            const res = await api.post('/chatbot/chat', {
+                history: chatHistory,
+                message: messageText,
+            });
+
+            const data = res.data;
+
+            if (data.success && data.reply) {
+                const botMsg: Message = {
+                    id: (Date.now() + 1).toString(),
+                    text: data.reply,
+                    isBot: true,
+                    timestamp: new Date(),
+                };
+                setMessages(prev => [...prev, botMsg]);
+
+                // Keep history for context (last 20 turns to avoid token bloat)
+                setChatHistory(prev => [
+                    ...prev,
+                    { role: 'user', text: trimmed },
+                    { role: 'model', text: data.reply },
+                ].slice(-20));
+
+                scrollToBottom();
+            } else {
+                throw new Error(data.error || 'No reply from AI');
+            }
+        } catch (err: any) {
+            console.error('Chatbot error:', err);
+            const errorText = err?.response?.data?.error
+                || err?.message
+                || "Sorry, I couldn't reach the AI right now. Please try again.";
             const errMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: "Sorry, I couldn't reach the AI right now. Please check your connection and try again.",
+                text: errorText,
                 isBot: true,
                 timestamp: new Date(),
             };
@@ -134,7 +140,7 @@ export default function ChatbotScreen() {
         });
     };
 
-    // ── Voice recording ───────────────────────────────────────────────────────
+    // ── Voice recording → transcribe via backend ──────────────────────────────
     const startRecording = async () => {
         try {
             const { granted } = await Audio.requestPermissionsAsync();
@@ -156,23 +162,16 @@ export default function ChatbotScreen() {
             recordingRef.current = null;
             if (!uri) throw new Error('No URI');
 
-            // Convert to base64
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            const reader = new FileReader();
-            const base64 = await new Promise<string>((res, rej) => {
-                reader.onloadend = () => res((reader.result as string).split(',')[1]);
-                reader.onerror = rej;
-                reader.readAsDataURL(blob);
+            // Upload audio to backend for transcription
+            const filename = uri.split('/').pop() || 'recording.m4a';
+            const formData = new FormData();
+            formData.append('audio', { uri, name: filename, type: 'audio/m4a' } as any);
+
+            const res = await api.post('/chatbot/transcribe', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
             });
 
-            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-            const result = await model.generateContent([
-                { inlineData: { mimeType: 'audio/m4a', data: base64 } },
-                { text: 'Transcribe this audio exactly. Return ONLY the spoken words, nothing else.' },
-            ]);
-            const transcript = result.response.text().trim();
+            const transcript = res.data?.transcript?.trim();
             setRecordingStatus('idle');
             if (transcript) sendMessage(transcript);
         } catch (err) {
@@ -192,7 +191,6 @@ export default function ChatbotScreen() {
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 {/* ── Header ── */}
                 <View style={styles.header}>
@@ -283,9 +281,9 @@ export default function ChatbotScreen() {
                                 />
                                 <View style={[styles.bubble, styles.bubbleBot, styles.typingBubble]}>
                                     <View style={styles.dotsRow}>
-                                        <View style={[styles.dot, styles.dot1]} />
-                                        <View style={[styles.dot, styles.dot2]} />
-                                        <View style={[styles.dot, styles.dot3]} />
+                                        <View style={styles.dot} />
+                                        <View style={styles.dot} />
+                                        <View style={styles.dot} />
                                     </View>
                                 </View>
                             </View>
@@ -295,7 +293,6 @@ export default function ChatbotScreen() {
 
                 {/* ── Input bar ── */}
                 <View style={styles.inputBar}>
-                    {/* Paper clip */}
                     <TouchableOpacity style={styles.clipBtn} activeOpacity={0.7}>
                         <Ionicons name="attach-outline" size={24} color="rgba(255,255,255,0.5)" />
                     </TouchableOpacity>
@@ -311,13 +308,11 @@ export default function ChatbotScreen() {
                             maxLength={500}
                             editable={recordingStatus === 'idle'}
                         />
-                        {/* Image icon */}
                         <TouchableOpacity style={styles.inputIcon} activeOpacity={0.7}>
                             <Ionicons name="image-outline" size={22} color="rgba(120,130,160,0.8)" />
                         </TouchableOpacity>
-                        {/* Mic button */}
                         <TouchableOpacity
-                            style={[styles.inputIcon, recordingStatus === 'recording' && styles.micActive]}
+                            style={styles.inputIcon}
                             onPress={handleMicPress}
                             disabled={recordingStatus === 'transcribing' || loading}
                             activeOpacity={0.7}
@@ -334,11 +329,10 @@ export default function ChatbotScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Send button */}
                     <TouchableOpacity
-                        style={[styles.sendBtn, (!input.trim() && !loading) && styles.sendBtnDim]}
+                        style={styles.sendBtn}
                         onPress={() => sendMessage(input)}
-                        disabled={loading}
+                        disabled={!input.trim() || loading}
                         activeOpacity={0.8}
                     >
                         <Ionicons name="send" size={18} color={input.trim() ? '#3b5bdb' : 'rgba(120,130,160,0.7)'} />
@@ -402,19 +396,13 @@ const styles = StyleSheet.create({
 
     // Bubbles
     bubble: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
-    bubbleBot: {
-        backgroundColor: 'rgba(255,255,255,0.92)',
-        borderBottomLeftRadius: 4,
-    },
-    bubbleUser: {
-        backgroundColor: 'rgba(255,255,255,0.92)',
-        borderBottomRightRadius: 4,
-    },
+    bubbleBot: { backgroundColor: 'rgba(255,255,255,0.92)', borderBottomLeftRadius: 4 },
+    bubbleUser: { backgroundColor: 'rgba(255,255,255,0.92)', borderBottomRightRadius: 4 },
     bubbleText: { fontSize: 15, lineHeight: 22 },
     bubbleTextBot: { color: '#1a1a2e' },
     bubbleTextUser: { color: '#1a1a2e' },
 
-    // User time/tick row
+    // User time/tick
     timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 },
     timeText: { fontSize: 11, color: '#3b5bdb' },
 
@@ -422,35 +410,25 @@ const styles = StyleSheet.create({
     typingBubble: { paddingVertical: 16, paddingHorizontal: 18 },
     dotsRow: { flexDirection: 'row', gap: 5, alignItems: 'center' },
     dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(100,100,140,0.5)' },
-    dot1: {}, dot2: {}, dot3: {},
 
     // Input bar
     inputBar: {
         flexDirection: 'row', alignItems: 'flex-end',
-        paddingHorizontal: 12, paddingVertical: 10,
-        gap: 8,
+        paddingHorizontal: 12, paddingVertical: 10, gap: 8,
         borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
     },
     clipBtn: { paddingBottom: 10, paddingRight: 2 },
     inputWrap: {
-        flex: 1,
-        flexDirection: 'row', alignItems: 'flex-end',
+        flex: 1, flexDirection: 'row', alignItems: 'flex-end',
         backgroundColor: 'rgba(255,255,255,0.92)',
         borderRadius: 26, paddingLeft: 18, paddingRight: 8,
         paddingVertical: 8, maxHeight: 100,
     },
-    textInput: {
-        flex: 1, fontSize: 15, color: '#1a1a2e',
-        minHeight: 26, maxHeight: 80, paddingTop: 2,
-    },
+    textInput: { flex: 1, fontSize: 15, color: '#1a1a2e', minHeight: 26, maxHeight: 80, paddingTop: 2 },
     inputIcon: { paddingHorizontal: 4, paddingBottom: 2 },
-    micActive: {},
-
     sendBtn: {
         width: 44, height: 44, borderRadius: 22,
         backgroundColor: 'transparent',
         justifyContent: 'center', alignItems: 'center',
-        paddingBottom: 0,
     },
-    sendBtnDim: {},
 });
