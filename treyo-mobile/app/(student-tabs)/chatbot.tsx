@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import api from '../../services/api';
 
 // ─── Put your NEW Gemini API key here (old one was leaked) ───────────────────
-const GEMINI_API_KEY = 'REPLACE_WITH_YOUR_NEW_GEMINI_API_KEY';
+const GEMINI_API_KEY = 'AIzaSyBLIG2rdxiLQDycH4tSJEIJx3p-QinF_cA';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are Treyo AI, a friendly and knowledgeable assistant built into the Treyo app — a platform that connects students with professional trainers.
@@ -68,16 +68,14 @@ export default function ChatbotScreen() {
             } catch (_) {}
         })();
 
-        if (GEMINI_API_KEY !== 'REPLACE_WITH_YOUR_NEW_GEMINI_API_KEY') {
-            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-            chatRef.current = model.startChat({
-                history: [
-                    { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-                    { role: 'model', parts: [{ text: "Understood! I'm Treyo AI, ready to assist students." }] },
-                ],
-            });
-        }
+        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        chatRef.current = model.startChat({
+            history: [
+                { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+                { role: 'model', parts: [{ text: "Understood! I'm Treyo AI, ready to assist students." }] },
+            ],
+        });
     }, []);
 
     const scrollToBottom = () => {
@@ -95,17 +93,6 @@ export default function ChatbotScreen() {
     const sendMessage = async (text: string) => {
         const trimmed = text.trim();
         if (!trimmed || loading) return;
-
-        if (GEMINI_API_KEY === 'REPLACE_WITH_YOUR_NEW_GEMINI_API_KEY') {
-            const errMsg: Message = {
-                id: Date.now().toString(),
-                text: 'Please add a valid Gemini API key in chatbot.tsx to activate the AI.',
-                isBot: true,
-                timestamp: new Date(),
-            };
-            setMessages(prev => [...prev, errMsg]);
-            return;
-        }
 
         const userMsg: Message = { id: Date.now().toString(), text: trimmed, isBot: false, timestamp: new Date() };
         setMessages(prev => [...prev, userMsg]);
