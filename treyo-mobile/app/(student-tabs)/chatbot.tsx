@@ -102,9 +102,9 @@ export default function ChatbotScreen() {
                 // Keep history for context (last 20 turns to avoid token bloat)
                 setChatHistory(prev => [
                     ...prev,
-                    { role: 'user', text: trimmed },
-                    { role: 'model', text: data.reply },
-                ].slice(-20));
+                    { role: 'user' as const, text: trimmed },
+                    { role: 'model' as const, text: data.reply },
+                ].slice(-20) as ChatHistoryItem[]);
 
                 scrollToBottom();
             } else {
