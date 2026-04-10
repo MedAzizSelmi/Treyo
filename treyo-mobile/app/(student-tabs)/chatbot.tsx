@@ -1,20 +1,21 @@
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
-    Image, Alert,
+    Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useEffect } from 'react';
-import { BlurView } from 'expo-blur';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService } from '../../services/api';
+import { useRouter } from 'expo-router';
+import api from '../../services/api';
 
-// ── Gemini setup ──────────────────────────────────────────────────────────────
-const GEMINI_API_KEY = 'AIzaSyCtcpjTLKse7DJ_AGtfRU9YV3pYEdqKmmw';
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// ─── Put your NEW Gemini API key here (old one was leaked) ───────────────────
+const GEMINI_API_KEY = 'REPLACE_WITH_YOUR_NEW_GEMINI_API_KEY';
+// ─────────────────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are Treyo AI, a friendly and knowledgeable assistant built into the Treyo app — a platform that connects students with professional trainers.
 
@@ -32,7 +33,6 @@ Guidelines:
 - Address the user by their first name when you know it
 - Keep responses under 150 words unless a detailed explanation is truly needed`;
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 type Message = {
     id: string;
     text: string;
@@ -42,77 +42,72 @@ type Message = {
 
 type RecordingStatus = 'idle' | 'recording' | 'transcribing';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function fileToBase64(uri: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = () => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = (reader.result as string).split(',')[1];
-                resolve(base64);
-            };
-            reader.readAsDataURL(xhr.response);
-        };
-        xhr.onerror = reject;
-        xhr.open('GET', uri);
-        xhr.responseType = 'blob';
-        xhr.send();
-    });
-}
-
 export default function ChatbotScreen() {
+    const router = useRouter();
     const [userName, setUserName] = useState('');
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '0',
-            text: "Hi! I'm Treyo AI, your personal learning assistant 🤖\nAsk me anything about your training journey, sessions, or the app!",
-            isBot: true,
-            timestamp: new Date(),
-        },
-    ]);
+    const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>('idle');
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [autoSpeak, setAutoSpeak] = useState(false);
 
     const scrollRef = useRef<ScrollView>(null);
     const recordingRef = useRef<Audio.Recording | null>(null);
     const chatRef = useRef<any>(null);
 
-    // Load user name + init Gemini chat session
+    const isEmptyState = messages.length === 0;
+
     useEffect(() => {
         (async () => {
             const user = await authService.getCurrentUser();
             if (user?.name) setUserName(user.name.split(' ')[0]);
+            try {
+                const res = await api.get('/students/me');
+                setProfilePicUrl(res.data.profilePictureUrl || null);
+            } catch (_) {}
         })();
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        chatRef.current = model.startChat({
-            history: [
-                { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
-                { role: 'model', parts: [{ text: "Understood! I'm ready to assist Treyo students." }] },
-            ],
-        });
+        if (GEMINI_API_KEY !== 'REPLACE_WITH_YOUR_NEW_GEMINI_API_KEY') {
+            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            chatRef.current = model.startChat({
+                history: [
+                    { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
+                    { role: 'model', parts: [{ text: "Understood! I'm Treyo AI, ready to assist students." }] },
+                ],
+            });
+        }
     }, []);
 
     const scrollToBottom = () => {
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     };
 
-    // ── Send text message ────────────────────────────────────────────────────
+    const formatTime = (date: Date) => {
+        const h = date.getHours();
+        const m = date.getMinutes().toString().padStart(2, '0');
+        const ampm = h >= 12 ? 'pm' : 'am';
+        return `${h % 12 || 12}:${m}${ampm}`;
+    };
+
+    // ── Send message ──────────────────────────────────────────────────────────
     const sendMessage = async (text: string) => {
         const trimmed = text.trim();
         if (!trimmed || loading) return;
 
-        const userMsg: Message = {
-            id: Date.now().toString(),
-            text: trimmed,
-            isBot: false,
-            timestamp: new Date(),
-        };
+        if (GEMINI_API_KEY === 'REPLACE_WITH_YOUR_NEW_GEMINI_API_KEY') {
+            const errMsg: Message = {
+                id: Date.now().toString(),
+                text: 'Please add a valid Gemini API key in chatbot.tsx to activate the AI.',
+                isBot: true,
+                timestamp: new Date(),
+            };
+            setMessages(prev => [...prev, errMsg]);
+            return;
+        }
 
+        const userMsg: Message = { id: Date.now().toString(), text: trimmed, isBot: false, timestamp: new Date() };
         setMessages(prev => [...prev, userMsg]);
         setInput('');
         setLoading(true);
@@ -122,22 +117,14 @@ export default function ChatbotScreen() {
             const prompt = userName ? `[User's name: ${userName}]\n${trimmed}` : trimmed;
             const result = await chatRef.current.sendMessage(prompt);
             const reply = result.response.text();
-
-            const botMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                text: reply,
-                isBot: true,
-                timestamp: new Date(),
-            };
+            const botMsg: Message = { id: (Date.now() + 1).toString(), text: reply, isBot: true, timestamp: new Date() };
             setMessages(prev => [...prev, botMsg]);
             scrollToBottom();
-
-            if (autoSpeak) speakText(reply);
         } catch (err) {
             console.error('Gemini error:', err);
             const errMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: "Sorry, I couldn't reach the AI service right now. Please check your connection and try again.",
+                text: "Sorry, I couldn't reach the AI right now. Please check your connection and try again.",
                 isBot: true,
                 timestamp: new Date(),
             };
@@ -148,281 +135,227 @@ export default function ChatbotScreen() {
         }
     };
 
-    // ── Text-to-Speech ───────────────────────────────────────────────────────
+    // ── TTS ───────────────────────────────────────────────────────────────────
     const speakText = (text: string) => {
         Speech.stop();
         setIsSpeaking(true);
         Speech.speak(text, {
-            language: 'en-US',
-            pitch: 1.0,
-            rate: 0.95,
+            language: 'en-US', pitch: 1.0, rate: 0.95,
             onDone: () => setIsSpeaking(false),
             onStopped: () => setIsSpeaking(false),
             onError: () => setIsSpeaking(false),
         });
     };
 
-    const stopSpeaking = () => {
-        Speech.stop();
-        setIsSpeaking(false);
-    };
-
-    // ── Voice Recording → Gemini Audio → Transcribe ──────────────────────────
+    // ── Voice recording ───────────────────────────────────────────────────────
     const startRecording = async () => {
         try {
             const { granted } = await Audio.requestPermissionsAsync();
-            if (!granted) {
-                Alert.alert('Permission needed', 'Microphone access is required for voice input.');
-                return;
-            }
-
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-            });
-
-            const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
-            );
+            if (!granted) return;
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+            const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
             recordingRef.current = recording;
             setRecordingStatus('recording');
-        } catch (err) {
-            console.error('Start recording error:', err);
-            Alert.alert('Error', 'Could not start recording. Please try again.');
-        }
+        } catch (err) { console.error(err); }
     };
 
     const stopRecording = async () => {
         if (!recordingRef.current) return;
         setRecordingStatus('transcribing');
-
         try {
             await recordingRef.current.stopAndUnloadAsync();
             await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-
             const uri = recordingRef.current.getURI();
             recordingRef.current = null;
+            if (!uri) throw new Error('No URI');
 
-            if (!uri) throw new Error('No recording URI');
+            // Convert to base64
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((res, rej) => {
+                reader.onloadend = () => res((reader.result as string).split(',')[1]);
+                reader.onerror = rej;
+                reader.readAsDataURL(blob);
+            });
 
-            // Convert audio to base64 and send to Gemini for transcription
-            const base64Audio = await fileToBase64(uri);
-
+            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
             const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-            const transcribeResult = await model.generateContent([
-                {
-                    inlineData: {
-                        mimeType: 'audio/m4a',
-                        data: base64Audio,
-                    },
-                },
+            const result = await model.generateContent([
+                { inlineData: { mimeType: 'audio/m4a', data: base64 } },
                 { text: 'Transcribe this audio exactly. Return ONLY the spoken words, nothing else.' },
             ]);
-
-            const transcript = transcribeResult.response.text().trim();
+            const transcript = result.response.text().trim();
             setRecordingStatus('idle');
-
-            if (transcript) {
-                setInput(transcript);
-                // Auto-send after short delay so user can see the transcript
-                setTimeout(() => sendMessage(transcript), 300);
-            } else {
-                Alert.alert('Could not understand', 'Please try speaking more clearly or type your message.');
-            }
+            if (transcript) sendMessage(transcript);
         } catch (err) {
-            console.error('Stop recording error:', err);
+            console.error(err);
             setRecordingStatus('idle');
             recordingRef.current = null;
-            Alert.alert('Error', 'Could not process voice input. Please try again.');
         }
     };
 
     const handleMicPress = () => {
-        if (recordingStatus === 'recording') {
-            stopRecording();
-        } else if (recordingStatus === 'idle') {
-            startRecording();
-        }
+        if (recordingStatus === 'recording') stopRecording();
+        else if (recordingStatus === 'idle') startRecording();
     };
-
-    // ── Suggested prompts ────────────────────────────────────────────────────
-    const suggestions = [
-        'What sessions do I have coming up?',
-        'How do I edit my profile?',
-        'Can you suggest a training domain?',
-        'What skills should I add to my resume?',
-    ];
-
-    const showSuggestions = messages.length <= 1;
 
     return (
         <ScreenBackground>
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 {/* ── Header ── */}
                 <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <Image
-                            source={require('../../assets/images/AI_Robot_small.png')}
-                            style={styles.botAvatar}
-                            resizeMode="contain"
-                        />
-                        <View>
-                            <Text style={styles.headerTitle}>Treyo AI</Text>
-                            <Text style={styles.headerStatus}>
-                                {loading ? 'Thinking...' : recordingStatus === 'recording' ? '🔴 Listening...' : recordingStatus === 'transcribing' ? 'Processing voice...' : 'Online'}
-                            </Text>
+                    <Image source={require('../../assets/images/logo-white.png')} style={styles.logo} resizeMode="contain" />
+                    <View style={styles.headerRow}>
+                        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                            <Ionicons name="arrow-back" size={20} color="#ffffff" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>AI Chat</Text>
+                        <View style={styles.headerRight}>
+                            <TouchableOpacity style={styles.bellWrap}>
+                                <Ionicons name="notifications-outline" size={22} color="#ffffff" />
+                                <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => router.push('/(student-tabs)/profile' as any)}>
+                                {profilePicUrl ? (
+                                    <Image source={{ uri: profilePicUrl }} style={styles.headerAvatar} />
+                                ) : (
+                                    <View style={styles.headerAvatarFallback}>
+                                        <Text style={styles.headerAvatarLetter}>{userName.charAt(0) || 'S'}</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
                         </View>
                     </View>
-                    {/* Auto-speak toggle */}
-                    <TouchableOpacity
-                        style={[styles.speakToggle, autoSpeak && styles.speakToggleActive]}
-                        onPress={() => setAutoSpeak(v => !v)}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons
-                            name={autoSpeak ? 'volume-high' : 'volume-mute'}
-                            size={18}
-                            color={autoSpeak ? '#000' : '#ffffff'}
-                        />
-                    </TouchableOpacity>
                 </View>
 
-                {/* ── Messages ── */}
-                <ScrollView
-                    ref={scrollRef}
-                    style={styles.scroll}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    {/* Suggestions */}
-                    {showSuggestions && (
-                        <View style={styles.suggestionsWrap}>
-                            <Text style={styles.suggestLabel}>Try asking:</Text>
-                            {suggestions.map((s, i) => (
+                {/* ── Messages / Empty state ── */}
+                {isEmptyState ? (
+                    <View style={styles.emptyState}>
+                        <Image
+                            source={require('../../assets/images/AI_Robot.png')}
+                            style={styles.robotImage}
+                            resizeMode="contain"
+                        />
+                        <Text style={styles.emptyTitle}>
+                            {userName ? `Hello, ${userName}!` : 'Hello there!'}{'\n'}I'm Ready To Help You
+                        </Text>
+                        <Text style={styles.emptySubtitle}>
+                            Ask me anything that's on your mind.{'\n'}I'm here to assist you!
+                        </Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        ref={scrollRef}
+                        style={styles.scroll}
+                        contentContainerStyle={styles.scrollContent}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        {messages.map((msg) => (
+                            <View
+                                key={msg.id}
+                                style={[styles.msgRow, msg.isBot ? styles.msgRowBot : styles.msgRowUser]}
+                            >
+                                {msg.isBot && (
+                                    <Image
+                                        source={require('../../assets/images/AI_Robot_small.png')}
+                                        style={styles.botAvatarSmall}
+                                        resizeMode="contain"
+                                    />
+                                )}
                                 <TouchableOpacity
-                                    key={i}
-                                    style={styles.suggestionChip}
-                                    onPress={() => sendMessage(s)}
-                                    activeOpacity={0.75}
+                                    activeOpacity={0.85}
+                                    style={[styles.bubble, msg.isBot ? styles.bubbleBot : styles.bubbleUser]}
+                                    onLongPress={msg.isBot ? () => speakText(msg.text) : undefined}
                                 >
-                                    <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} />
-                                    <Text style={styles.suggestionText}>{s}</Text>
-                                    <Ionicons name="arrow-forward" size={14} color="#7cce06" />
+                                    <Text style={[styles.bubbleText, msg.isBot ? styles.bubbleTextBot : styles.bubbleTextUser]}>
+                                        {msg.text}
+                                    </Text>
+                                    {!msg.isBot && (
+                                        <View style={styles.timeRow}>
+                                            <Text style={styles.timeText}>{formatTime(msg.timestamp)}</Text>
+                                            <Ionicons name="checkmark-done" size={14} color="#7cce06" />
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
-                            ))}
-                        </View>
-                    )}
-
-                    {messages.map((msg) => (
-                        <View
-                            key={msg.id}
-                            style={[
-                                styles.row,
-                                msg.isBot ? styles.rowBot : styles.rowUser,
-                            ]}
-                        >
-                            {msg.isBot && (
-                                <View style={styles.botIcon}>
-                                    <Ionicons name="hardware-chip-outline" size={16} color="#7cce06" />
-                                </View>
-                            )}
-                            <View style={[styles.bubble, msg.isBot ? styles.bubbleBot : styles.bubbleUser]}>
-                                {msg.isBot && (
-                                    <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                                )}
-                                <Text style={[styles.bubbleText, !msg.isBot && styles.bubbleTextUser]}>
-                                    {msg.text}
-                                </Text>
-                                {/* Speak button for bot messages */}
-                                {msg.isBot && (
-                                    <TouchableOpacity
-                                        style={styles.speakBtn}
-                                        onPress={() => isSpeaking ? stopSpeaking() : speakText(msg.text)}
-                                    >
-                                        <Ionicons
-                                            name={isSpeaking ? 'stop-circle-outline' : 'volume-medium-outline'}
-                                            size={15}
-                                            color="rgba(124,206,6,0.7)"
-                                        />
-                                    </TouchableOpacity>
-                                )}
                             </View>
-                        </View>
-                    ))}
+                        ))}
 
-                    {/* Typing indicator */}
-                    {loading && (
-                        <View style={[styles.row, styles.rowBot]}>
-                            <View style={styles.botIcon}>
-                                <Ionicons name="hardware-chip-outline" size={16} color="#7cce06" />
-                            </View>
-                            <View style={[styles.bubble, styles.bubbleBot, styles.typingBubble]}>
-                                <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                                <View style={styles.dotsRow}>
-                                    <ActivityIndicator size="small" color="#7cce06" />
-                                    <Text style={styles.typingText}>Thinking...</Text>
+                        {/* Typing indicator */}
+                        {loading && (
+                            <View style={[styles.msgRow, styles.msgRowBot]}>
+                                <Image
+                                    source={require('../../assets/images/AI_Robot_small.png')}
+                                    style={styles.botAvatarSmall}
+                                    resizeMode="contain"
+                                />
+                                <View style={[styles.bubble, styles.bubbleBot, styles.typingBubble]}>
+                                    <View style={styles.dotsRow}>
+                                        <View style={[styles.dot, styles.dot1]} />
+                                        <View style={[styles.dot, styles.dot2]} />
+                                        <View style={[styles.dot, styles.dot3]} />
+                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    )}
-                </ScrollView>
+                        )}
+                    </ScrollView>
+                )}
 
                 {/* ── Input bar ── */}
                 <View style={styles.inputBar}>
-                    <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                    {/* Paper clip */}
+                    <TouchableOpacity style={styles.clipBtn} activeOpacity={0.7}>
+                        <Ionicons name="attach-outline" size={24} color="rgba(255,255,255,0.5)" />
+                    </TouchableOpacity>
 
-                    <View style={styles.inputRow}>
-                        <View style={styles.inputWrap}>
-                            <TextInput
-                                style={styles.textInput}
-                                value={input}
-                                onChangeText={setInput}
-                                placeholder={recordingStatus === 'recording' ? 'Listening...' : 'Ask Treyo AI...'}
-                                placeholderTextColor="rgba(255,255,255,0.35)"
-                                multiline
-                                maxLength={500}
-                                onSubmitEditing={() => sendMessage(input)}
-                                editable={recordingStatus === 'idle'}
-                            />
-                        </View>
-
+                    <View style={styles.inputWrap}>
+                        <TextInput
+                            style={styles.textInput}
+                            value={input}
+                            onChangeText={setInput}
+                            placeholder="Ask Treyo's Chat Robot"
+                            placeholderTextColor="rgba(120,130,160,0.8)"
+                            multiline
+                            maxLength={500}
+                            editable={recordingStatus === 'idle'}
+                        />
+                        {/* Image icon */}
+                        <TouchableOpacity style={styles.inputIcon} activeOpacity={0.7}>
+                            <Ionicons name="image-outline" size={22} color="rgba(120,130,160,0.8)" />
+                        </TouchableOpacity>
                         {/* Mic button */}
                         <TouchableOpacity
-                            style={[
-                                styles.iconBtn,
-                                recordingStatus === 'recording' && styles.iconBtnRecording,
-                                recordingStatus === 'transcribing' && styles.iconBtnProcessing,
-                            ]}
+                            style={[styles.inputIcon, recordingStatus === 'recording' && styles.micActive]}
                             onPress={handleMicPress}
                             disabled={recordingStatus === 'transcribing' || loading}
-                            activeOpacity={0.8}
+                            activeOpacity={0.7}
                         >
                             {recordingStatus === 'transcribing' ? (
-                                <ActivityIndicator size="small" color="#ffffff" />
+                                <ActivityIndicator size="small" color="#7cce06" />
                             ) : (
                                 <Ionicons
-                                    name={recordingStatus === 'recording' ? 'stop' : 'mic'}
-                                    size={20}
-                                    color="#ffffff"
+                                    name={recordingStatus === 'recording' ? 'stop-circle' : 'mic-outline'}
+                                    size={22}
+                                    color={recordingStatus === 'recording' ? '#ff4444' : 'rgba(120,130,160,0.8)'}
                                 />
                             )}
                         </TouchableOpacity>
-
-                        {/* Send button */}
-                        <TouchableOpacity
-                            style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
-                            onPress={() => sendMessage(input)}
-                            disabled={!input.trim() || loading}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="send" size={18} color="#000000" />
-                        </TouchableOpacity>
                     </View>
+
+                    {/* Send button */}
+                    <TouchableOpacity
+                        style={[styles.sendBtn, (!input.trim() && !loading) && styles.sendBtnDim]}
+                        onPress={() => sendMessage(input)}
+                        disabled={loading}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="send" size={18} color={input.trim() ? '#3b5bdb' : 'rgba(120,130,160,0.7)'} />
+                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
         </ScreenBackground>
@@ -430,105 +363,107 @@ export default function ChatbotScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
+    container: { flex: 1, paddingBottom: 90 },
 
     // Header
-    header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingTop: 56, paddingHorizontal: 20, paddingBottom: 16,
+    header: { paddingTop: 52, paddingHorizontal: 20, marginBottom: 8 },
+    logo: { width: 36, height: 36, marginBottom: 10 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    backBtn: { marginRight: 2 },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', flex: 1 },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    bellWrap: { position: 'relative' },
+    badge: {
+        position: 'absolute', top: -4, right: -6,
+        backgroundColor: '#7cce06', width: 16, height: 16,
+        borderRadius: 8, justifyContent: 'center', alignItems: 'center',
     },
-    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    botAvatar: { width: 40, height: 40, borderRadius: 20 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff' },
-    headerStatus: { fontSize: 12, color: '#7cce06', marginTop: 2 },
-    speakToggle: {
+    badgeText: { fontSize: 9, fontWeight: 'bold', color: '#000000' },
+    headerAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+    headerAvatarFallback: {
         width: 36, height: 36, borderRadius: 18,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(124,206,6,0.2)',
+        borderWidth: 2, borderColor: 'rgba(124,206,6,0.4)',
         justifyContent: 'center', alignItems: 'center',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
     },
-    speakToggleActive: { backgroundColor: '#7cce06', borderColor: '#7cce06' },
+    headerAvatarLetter: { fontSize: 16, fontWeight: 'bold', color: '#7cce06' },
+
+    // Empty state
+    emptyState: {
+        flex: 1, alignItems: 'center', justifyContent: 'center',
+        paddingHorizontal: 32, paddingBottom: 40,
+    },
+    robotImage: { width: 220, height: 220, marginBottom: 28 },
+    emptyTitle: {
+        fontSize: 22, fontWeight: 'bold', color: '#ffffff',
+        textAlign: 'center', lineHeight: 32, marginBottom: 12,
+    },
+    emptySubtitle: {
+        fontSize: 14, color: 'rgba(255,255,255,0.45)',
+        textAlign: 'center', lineHeight: 22,
+    },
 
     // Scroll
     scroll: { flex: 1 },
-    scrollContent: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 8 },
-
-    // Suggestions
-    suggestionsWrap: { marginBottom: 20 },
-    suggestLabel: { fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-    suggestionChip: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        borderRadius: 12, overflow: 'hidden',
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
-        paddingHorizontal: 14, paddingVertical: 12, marginBottom: 8,
-    },
-    suggestionText: { fontSize: 14, color: '#dddddd', flex: 1 },
+    scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
 
     // Message rows
-    row: { flexDirection: 'row', marginBottom: 12, alignItems: 'flex-end' },
-    rowBot: { alignSelf: 'flex-start', maxWidth: '85%' },
-    rowUser: { alignSelf: 'flex-end', maxWidth: '80%', flexDirection: 'row-reverse' },
-    botIcon: {
-        width: 28, height: 28, borderRadius: 14,
-        backgroundColor: 'rgba(124,206,6,0.12)',
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
-        justifyContent: 'center', alignItems: 'center',
-        marginRight: 8, marginBottom: 2,
-    },
+    msgRow: { flexDirection: 'row', marginBottom: 14, alignItems: 'flex-end' },
+    msgRowBot: { alignSelf: 'flex-start', maxWidth: '80%' },
+    msgRowUser: { alignSelf: 'flex-end', maxWidth: '78%', flexDirection: 'row-reverse' },
+    botAvatarSmall: { width: 36, height: 36, marginRight: 8, marginBottom: 2 },
 
     // Bubbles
-    bubble: {
-        borderRadius: 18, overflow: 'hidden',
-        paddingHorizontal: 14, paddingVertical: 10, paddingBottom: 8,
-    },
+    bubble: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
     bubbleBot: {
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.2)',
+        backgroundColor: 'rgba(255,255,255,0.92)',
         borderBottomLeftRadius: 4,
     },
     bubbleUser: {
-        backgroundColor: '#7cce06',
+        backgroundColor: 'rgba(255,255,255,0.92)',
         borderBottomRightRadius: 4,
     },
-    bubbleText: { fontSize: 15, color: '#e8e8e8', lineHeight: 22 },
-    bubbleTextUser: { color: '#000000', fontWeight: '500' },
-    speakBtn: { marginTop: 6, alignSelf: 'flex-end' },
+    bubbleText: { fontSize: 15, lineHeight: 22 },
+    bubbleTextBot: { color: '#1a1a2e' },
+    bubbleTextUser: { color: '#1a1a2e' },
 
-    // Typing
-    typingBubble: { paddingVertical: 12 },
-    dotsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    typingText: { fontSize: 13, color: 'rgba(255,255,255,0.5)', fontStyle: 'italic' },
+    // User time/tick row
+    timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 },
+    timeText: { fontSize: 11, color: '#3b5bdb' },
+
+    // Typing dots
+    typingBubble: { paddingVertical: 16, paddingHorizontal: 18 },
+    dotsRow: { flexDirection: 'row', gap: 5, alignItems: 'center' },
+    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(100,100,140,0.5)' },
+    dot1: {}, dot2: {}, dot3: {},
 
     // Input bar
     inputBar: {
-        overflow: 'hidden',
-        borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
-        paddingHorizontal: 16, paddingVertical: 12,
-        paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+        flexDirection: 'row', alignItems: 'flex-end',
+        paddingHorizontal: 12, paddingVertical: 10,
+        gap: 8,
+        borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
     },
-    inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+    clipBtn: { paddingBottom: 10, paddingRight: 2 },
     inputWrap: {
         flex: 1,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 22, borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.12)',
-        paddingHorizontal: 16, paddingVertical: 10,
-        maxHeight: 100,
+        flexDirection: 'row', alignItems: 'flex-end',
+        backgroundColor: 'rgba(255,255,255,0.92)',
+        borderRadius: 26, paddingLeft: 18, paddingRight: 8,
+        paddingVertical: 8, maxHeight: 100,
     },
-    textInput: { fontSize: 15, color: '#ffffff', minHeight: 22 },
+    textInput: {
+        flex: 1, fontSize: 15, color: '#1a1a2e',
+        minHeight: 26, maxHeight: 80, paddingTop: 2,
+    },
+    inputIcon: { paddingHorizontal: 4, paddingBottom: 2 },
+    micActive: {},
 
-    // Icon + Send buttons
-    iconBtn: {
-        width: 44, height: 44, borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
-        justifyContent: 'center', alignItems: 'center',
-    },
-    iconBtnRecording: { backgroundColor: '#ff4444', borderColor: '#ff4444' },
-    iconBtnProcessing: { backgroundColor: 'rgba(255,165,0,0.4)', borderColor: 'rgba(255,165,0,0.6)' },
     sendBtn: {
         width: 44, height: 44, borderRadius: 22,
-        backgroundColor: '#7cce06',
+        backgroundColor: 'transparent',
         justifyContent: 'center', alignItems: 'center',
+        paddingBottom: 0,
     },
-    sendBtnDisabled: { opacity: 0.4 },
+    sendBtnDim: {},
 });
