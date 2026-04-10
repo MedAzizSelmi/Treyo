@@ -2,6 +2,7 @@ package com.byb.backend.service;
 
 import com.byb.backend.dto.chatbot.ChatRequest;
 import com.byb.backend.dto.chatbot.ChatResponse;
+import com.byb.backend.dto.chatbot.ChatWithImageRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -180,6 +181,62 @@ public class GeminiService {
             if (msg.contains("429") || msg.contains("quota") || msg.contains("QUOTA_EXHAUSTED") || msg.contains("403")) {
                 return new ChatResponse(null, false,
                         "The AI service quota is exhausted for this API key. Please go to aistudio.google.com and create a new API key, then update it in application.properties.");
+            }
+            return new ChatResponse(null, false, "AI error: " + msg);
+        }
+    }
+
+    // ── Public: chat with image ───────────────────────────────────────────────
+    public ChatResponse chatWithImage(ChatWithImageRequest request) {
+        try {
+            ArrayNode contents = objectMapper.createArrayNode();
+            contents.add(textTurn("user", SYSTEM_PROMPT));
+            contents.add(textTurn("model", "Understood! I'm Treyo AI, ready to assist students."));
+
+            if (request.getHistory() != null) {
+                for (ChatRequest.ChatMessage msg : request.getHistory()) {
+                    contents.add(textTurn(msg.getRole(), msg.getText()));
+                }
+            }
+
+            // User turn with image + optional text
+            ObjectNode userTurn = objectMapper.createObjectNode();
+            userTurn.put("role", "user");
+            ArrayNode parts = objectMapper.createArrayNode();
+
+            ObjectNode imagePart = objectMapper.createObjectNode();
+            ObjectNode inlineData = objectMapper.createObjectNode();
+            inlineData.put("mimeType", request.getMimeType() != null ? request.getMimeType() : "image/jpeg");
+            inlineData.put("data", request.getImageBase64());
+            imagePart.set("inlineData", inlineData);
+            parts.add(imagePart);
+
+            String userText = (request.getMessage() != null && !request.getMessage().isBlank())
+                    ? request.getMessage()
+                    : "What do you see in this image? How can it relate to my learning journey?";
+            ObjectNode textPart = objectMapper.createObjectNode();
+            textPart.put("text", userText);
+            parts.add(textPart);
+
+            userTurn.set("parts", parts);
+            contents.add(userTurn);
+
+            ObjectNode body = objectMapper.createObjectNode();
+            body.set("contents", contents);
+            ObjectNode genConfig = objectMapper.createObjectNode();
+            genConfig.put("maxOutputTokens", 512);
+            genConfig.put("temperature", 0.7);
+            body.set("generationConfig", genConfig);
+
+            String response = callGemini(body.toString());
+            String reply = extractText(response);
+            return new ChatResponse(reply, true, null);
+
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            log.error("Gemini chatWithImage error: {}", msg);
+            if (msg.contains("429") || msg.contains("quota") || msg.contains("QUOTA_EXHAUSTED") || msg.contains("403")) {
+                return new ChatResponse(null, false, "All AI models are currently busy. Please wait a minute and try again.");
             }
             return new ChatResponse(null, false, "AI error: " + msg);
         }

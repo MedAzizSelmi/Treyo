@@ -2,6 +2,7 @@ package com.byb.backend.controller;
 
 import com.byb.backend.dto.chatbot.ChatRequest;
 import com.byb.backend.dto.chatbot.ChatResponse;
+import com.byb.backend.dto.chatbot.ChatWithImageRequest;
 import com.byb.backend.service.GeminiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,6 +27,13 @@ public class ChatbotController {
     @Operation(summary = "Send a message to Treyo AI and get a response")
     public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
         ChatResponse response = geminiService.chat(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/chat-with-image")
+    @Operation(summary = "Send an image with optional text to Treyo AI")
+    public ResponseEntity<ChatResponse> chatWithImage(@RequestBody ChatWithImageRequest request) {
+        ChatResponse response = geminiService.chatWithImage(request);
         return ResponseEntity.ok(response);
     }
 
