@@ -69,7 +69,7 @@ export default function ChatbotScreen() {
         })();
 
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
         chatRef.current = model.startChat({
             history: [
                 { role: 'user', parts: [{ text: SYSTEM_PROMPT }] },
@@ -167,7 +167,7 @@ export default function ChatbotScreen() {
             });
 
             const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
             const result = await model.generateContent([
                 { inlineData: { mimeType: 'audio/m4a', data: base64 } },
                 { text: 'Transcribe this audio exactly. Return ONLY the spoken words, nothing else.' },
