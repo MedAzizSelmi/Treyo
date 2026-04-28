@@ -2,6 +2,7 @@ package com.byb.backend.controller;
 
 import com.byb.backend.dto.admin.CourseManagementResponse;
 import com.byb.backend.dto.admin.DashboardStatsResponse;
+import com.byb.backend.dto.admin.SendNotificationRequest;
 import com.byb.backend.dto.admin.UserManagementResponse;
 import com.byb.backend.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -160,5 +161,52 @@ public class AdminController {
     public ResponseEntity<Map<String, String>> deleteCourse(@PathVariable String courseId) {
         adminService.deleteCourse(courseId);
         return ResponseEntity.ok(Map.of("message", "Course deleted successfully"));
+    }
+
+    /**
+     * Update minimum students required for course
+     */
+    @PutMapping("/courses/{courseId}/min-students")
+    @Operation(summary = "Update minimum students required for course")
+    public ResponseEntity<Map<String, String>> updateMinStudents(
+            @PathVariable String courseId,
+            @RequestParam int minStudents
+    ) {
+        adminService.updateCourseMinStudents(courseId, minStudents);
+        return ResponseEntity.ok(Map.of("message", "Minimum students updated to " + minStudents));
+    }
+
+    // ============================================
+    // PROMOTE TO ADMIN
+    // ============================================
+
+    /**
+     * Promote a student or trainer to admin.
+     * Returns a temporary password that must be shared with the promoted user.
+     */
+    @PostMapping("/users/{userId}/promote-to-admin")
+    @Operation(summary = "Promote a user to admin role")
+    public ResponseEntity<Map<String, String>> promoteToAdmin(
+            @PathVariable String userId,
+            @RequestParam String userType
+    ) {
+        Map<String, String> result = adminService.promoteToAdmin(userId, userType);
+        return ResponseEntity.ok(result);
+    }
+
+    // ============================================
+    // SEND NOTIFICATION
+    // ============================================
+
+    /**
+     * Send a notification to a specific user, all students, all trainers, or everyone.
+     */
+    @PostMapping("/notifications/send")
+    @Operation(summary = "Send admin notification")
+    public ResponseEntity<Map<String, String>> sendNotification(
+            @RequestBody SendNotificationRequest request
+    ) {
+        adminService.sendAdminNotification(request);
+        return ResponseEntity.ok(Map.of("message", "Notification sent successfully"));
     }
 }

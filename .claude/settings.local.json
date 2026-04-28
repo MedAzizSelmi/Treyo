@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx expo:*)"
+      "Bash(npx expo:*)",
+      "Bash(npm list:*)",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)",
+      "Bash(winget install:*)",
+      "Bash(gh auth:*)",
+      "Bash(cmd /c \"gh auth status 2>&1\")",
+      "Bash(node -e \"const {GoogleGenerativeAI} = require\\(''''@google/generative-ai''''\\); const g = new GoogleGenerativeAI\\(''''AIzaSyCtcpjTLKse7DJ_AGtfRU9YV3pYEdqKmmw''''\\); g.getGenerativeModel\\({model:''''gemini-pro''''}\\).generateContent\\(''''hi''''\\).then\\(r=>console.log\\(''''gemini-pro OK:'''', r.response.text\\(\\)\\)\\).catch\\(e=>console.log\\(''''gemini-pro FAIL:'''', e.message\\)\\); \")",
+      "Bash(node -e \":*)",
+      "Bash(ls \"C:\\\\Users\\\\1\\\\BYB_Match\\\\backend\\\\src\\\\main\\\\java\\\\com\\\\byb\\\\backend\\\\controller\"\" && ls \"C:Users1BYB_Matchbackendsrcmainjavacombybbackendservice\"\")",
+      "Bash(find C:Users1BYB_Matchtreyo-mobileapp -type f -name *trainer*)"
     ]
   }
 }

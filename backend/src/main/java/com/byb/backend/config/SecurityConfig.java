@@ -37,12 +37,15 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/files/download/**",
+                                "/api/trainers",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/api-docs/**",
                                 "/error"
                         ).permitAll()
+                        // Admin endpoints - ADMIN role only
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )

@@ -3,6 +3,7 @@ package com.byb.backend.controller;
 import com.byb.backend.dto.chatbot.ChatRequest;
 import com.byb.backend.dto.chatbot.ChatResponse;
 import com.byb.backend.dto.chatbot.ChatWithImageRequest;
+import com.byb.backend.dto.chatbot.TranscribeRequest;
 import com.byb.backend.service.GeminiService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -10,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -39,8 +39,8 @@ public class ChatbotController {
 
     @PostMapping("/transcribe")
     @Operation(summary = "Transcribe audio to text using Gemini")
-    public ResponseEntity<Map<String, String>> transcribe(@RequestParam("audio") MultipartFile audio) {
-        String transcript = geminiService.transcribeAudio(audio);
+    public ResponseEntity<Map<String, String>> transcribe(@RequestBody TranscribeRequest request) {
+        String transcript = geminiService.transcribeAudio(request.getAudioBase64(), request.getMimeType());
         return ResponseEntity.ok(Map.of("transcript", transcript));
     }
 }

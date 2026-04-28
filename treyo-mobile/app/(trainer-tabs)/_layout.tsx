@@ -13,7 +13,7 @@ export default function TrainerTabsLayout() {
             >
                 <Tabs.Screen name="home" />
                 <Tabs.Screen name="messages" />
-                <Tabs.Screen name="students" />
+                <Tabs.Screen name="courses" />
                 <Tabs.Screen name="notifications" />
                 <Tabs.Screen name="profile" />
             </Tabs>

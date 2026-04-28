@@ -5,11 +5,9 @@ import { BlurView } from 'expo-blur';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
-import { authService } from '../services/api';
+import { authService, fetchUpload, API_BASE_URL } from '../services/api';
 import api from '../services/api';
 import { ScreenBackground } from '../components/ScreenBackground';
-
-const API_BASE_URL = 'http://192.168.100.30:8085';
 
 export default function EditProfileScreen() {
     const router = useRouter();
@@ -65,44 +63,56 @@ export default function EditProfileScreen() {
         setLoading(true);
         try {
             const user = await authService.getCurrentUser();
+            console.log('Saving profile for user:', user?.userId);
 
             // ── 1. Upload new profile picture if a local file was selected ──
             let pictureUrl: string | null = profilePic;
-            const isLocalFile = profilePic && !profilePic.startsWith('http');
+            const isLocalFile = profilePic &&
+                !profilePic.startsWith('http') &&
+                !profilePic.startsWith('https');
+
+            console.log('profilePic:', profilePic);
+            console.log('isLocalFile:', isLocalFile);
+
             if (isLocalFile) {
                 const filename = profilePic!.split('/').pop() || 'profile.jpg';
-                const ext = filename.split('.').pop() || 'jpg';
+                const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
                 const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+                console.log('Uploading picture:', filename, mimeType);
 
                 const formData = new FormData();
                 formData.append('file', { uri: profilePic!, name: filename, type: mimeType } as any);
-                formData.append('userId', user?.userId || '');
+                formData.append('userId', String(user?.userId || ''));
                 formData.append('userType', 'STUDENT');
 
-                const uploadRes = await api.post('/files/upload/profile-picture', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                });
-                // fileUrl is a relative path like /api/files/download/...  — prepend the base URL
-                pictureUrl = API_BASE_URL + uploadRes.data.fileUrl;
+                const uploadData = await fetchUpload('/files/upload/profile-picture', formData);
+                console.log('Upload response:', JSON.stringify(uploadData));
+
+                pictureUrl = API_BASE_URL + uploadData.fileUrl;
+                console.log('Final pictureUrl:', pictureUrl);
             }
 
             // ── 2. Save name + bio ──
-            await api.put('/students/me/basic', { name: name.trim(), bio: bio.trim() });
+            const basicRes = await api.put('/students/me/basic', { name: name.trim(), bio: bio.trim() });
+            console.log('Basic save status:', basicRes.status);
 
             // ── 3. Save profile picture URL ──
-            await api.put('/students/me/profile-picture', { profilePictureUrl: pictureUrl });
+            const picRes = await api.put('/students/me/profile-picture', { profilePictureUrl: pictureUrl });
+            console.log('Picture URL save status:', picRes.status, 'url saved:', pictureUrl);
 
-            // ── 4. Update SecureStore cache so home screen reflects changes immediately ──
+            // ── 4. Update SecureStore cache ──
             if (user) {
                 const updatedUser = { ...user, name: name.trim(), profilePictureUrl: pictureUrl };
                 await SecureStore.setItemAsync('user_data', JSON.stringify(updatedUser));
             }
 
-            Alert.alert('Success', 'Profile updated successfully!');
-            router.back();
-        } catch (error) {
-            console.log('Save error', error);
-            Alert.alert('Error', 'Failed to update profile');
+            // Navigate back only after user dismisses the alert
+            Alert.alert('Success', 'Profile updated successfully!', [
+                { text: 'OK', onPress: () => router.back() },
+            ]);
+        } catch (error: any) {
+            console.log('Save error', error?.response?.data || error?.message || error);
+            Alert.alert('Error', `Failed to update profile: ${error?.message || 'Unknown error'}`);
         } finally {
             setLoading(false);
         }
@@ -131,7 +141,10 @@ export default function EditProfileScreen() {
                         <TouchableOpacity onPress={() => setShowPicModal(true)} activeOpacity={0.85}>
                             <View style={styles.avatarBorder}>
                                 {profilePic ? (
-                                    <Image source={{ uri: profilePic }} style={styles.avatarImage} />
+                                    <Image
+                                        source={{ uri: profilePic!.startsWith('http') ? `${profilePic}?t=${Date.now()}` : profilePic! }}
+                                        style={styles.avatarImage}
+                                    />
                                 ) : (
                                     <View style={styles.avatarFallback}>
                                         <Text style={styles.avatarLetter}>{name.charAt(0) || 'S'}</Text>

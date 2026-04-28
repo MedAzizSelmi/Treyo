@@ -20,4 +20,6 @@ public interface TrainerRepository extends JpaRepository<Trainer, String> {
     long countByCreatedAtAfter(LocalDateTime date);
 
     List<Trainer> findByIsVerified(Boolean isVerified);
+
+    List<Trainer> findByIsActiveTrue();
 }

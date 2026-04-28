@@ -2,16 +2,20 @@ package com.byb.backend.service;
 
 import com.byb.backend.dto.admin.CourseManagementResponse;
 import com.byb.backend.dto.admin.DashboardStatsResponse;
+import com.byb.backend.dto.admin.SendNotificationRequest;
 import com.byb.backend.dto.admin.UserManagementResponse;
 import com.byb.backend.model.*;
 import com.byb.backend.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,6 +29,9 @@ public class AdminService {
     private final GroupRepository groupRepository;
     private final InteractionRepository interactionRepository;
     private final MessageRepository messageRepository;
+    private final AdminRepository adminRepository;
+    private final NotificationRepository notificationRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Get dashboard overview statistics
@@ -243,6 +250,114 @@ public class AdminService {
             course.setIsActive(false);
             courseRepository.save(course);
         });
+    }
+
+    /**
+     * Update minimum students required for a course
+     */
+    @Transactional
+    public void updateCourseMinStudents(String courseId, int minStudents) {
+        courseRepository.findById(courseId).ifPresent(course -> {
+            course.setMinStudentsRequired(minStudents);
+            courseRepository.save(course);
+        });
+    }
+
+    // ============================================
+    // PROMOTE TO ADMIN
+    // ============================================
+
+    /**
+     * Promote a student or trainer to admin role.
+     * Creates a new Admin record with the user's name/email and a generated temp password.
+     * Returns a map containing the temp password so the caller can share it.
+     */
+    @Transactional
+    public Map<String, String> promoteToAdmin(String userId, String userType) {
+        String name;
+        String email;
+
+        if ("STUDENT".equalsIgnoreCase(userType)) {
+            Student s = studentRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Student not found: " + userId));
+            name = s.getName();
+            email = s.getEmail();
+        } else if ("TRAINER".equalsIgnoreCase(userType)) {
+            Trainer t = trainerRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Trainer not found: " + userId));
+            name = t.getName();
+            email = t.getEmail();
+        } else {
+            throw new RuntimeException("Unknown userType: " + userType);
+        }
+
+        if (adminRepository.existsByEmail(email)) {
+            throw new RuntimeException("An admin with this email already exists.");
+        }
+
+        String tempPassword = "Treyo@" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        Admin admin = new Admin();
+        admin.setAdminId("ADM_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
+        admin.setName(name);
+        admin.setEmail(email);
+        admin.setPasswordHash(passwordEncoder.encode(tempPassword));
+        admin.setIsActive(true);
+        admin.setCreatedAt(LocalDateTime.now());
+        admin.setUpdatedAt(LocalDateTime.now());
+
+        adminRepository.save(admin);
+
+        return Map.of(
+                "message", "User promoted to admin successfully",
+                "adminEmail", email,
+                "tempPassword", tempPassword
+        );
+    }
+
+    // ============================================
+    // SEND NOTIFICATION
+    // ============================================
+
+    /**
+     * Send a notification to a specific user, all students, all trainers, or everyone.
+     */
+    @Transactional
+    public void sendAdminNotification(SendNotificationRequest req) {
+        String type = req.getRecipientType();
+
+        if ("SPECIFIC".equalsIgnoreCase(type)) {
+            saveNotification(req.getTargetUserId(),
+                    req.getTargetUserType() != null ? req.getTargetUserType().toLowerCase() : "student",
+                    req.getTitle(), req.getMessage(), req.getPriority());
+            return;
+        }
+
+        if ("ALL".equalsIgnoreCase(type) || "STUDENTS".equalsIgnoreCase(type)) {
+            studentRepository.findAll().forEach(s ->
+                    saveNotification(s.getStudentId(), "student",
+                            req.getTitle(), req.getMessage(), req.getPriority()));
+        }
+
+        if ("ALL".equalsIgnoreCase(type) || "TRAINERS".equalsIgnoreCase(type)) {
+            trainerRepository.findAll().forEach(t ->
+                    saveNotification(t.getTrainerId(), "trainer",
+                            req.getTitle(), req.getMessage(), req.getPriority()));
+        }
+    }
+
+    private void saveNotification(String userId, String userType,
+                                   String title, String message, String priority) {
+        Notification notification = new Notification();
+        notification.setNotificationId("NOT_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
+        notification.setUserId(userId);
+        notification.setUserType(userType);
+        notification.setNotificationType("ADMIN_BROADCAST");
+        notification.setTitle(title);
+        notification.setMessage(message);
+        notification.setPriority(priority != null ? priority : "normal");
+        notification.setCreatedAt(LocalDateTime.now());
+        notificationRepository.save(notification);
     }
 
     // ============================================

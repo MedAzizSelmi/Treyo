@@ -12,6 +12,7 @@ export default function ProfileScreen() {
     const router = useRouter();
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
+    const [imageTs, setImageTs] = useState(Date.now());
 
     // Reload every time screen comes into focus
     useFocusEffect(
@@ -27,6 +28,7 @@ export default function ProfileScreen() {
             // Fetch full profile from backend
             const res = await api.get('/students/me');
             setProfile(res.data);
+            setImageTs(Date.now()); // bust image cache on every reload
         } catch (e) {
             console.log('Profile fetch error', e);
         }
@@ -50,31 +52,26 @@ export default function ProfileScreen() {
             <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Header bar */}
                 <View style={styles.header}>
-                    <View style={styles.headerLeft}>
+                    <View style={styles.logoRow}>
                         <Image source={require('../../assets/images/logo-white.png')} style={styles.logo} resizeMode="contain" />
+                        <View style={styles.headerRight}>
+                            <TouchableOpacity onPress={() => router.push('/(student-tabs)/notifications' as any)} style={styles.bellWrap}>
+                                <Ionicons name="notifications-outline" size={22} color="#ffffff" />
+                                <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleLogout}>
+                                <Ionicons name="log-out-outline" size={22} color="#ffffff" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                    <View style={styles.headerRow}>
-                        <TouchableOpacity onPress={() => router.back()}>
-                            <Ionicons name="arrow-back" size={22} color="#ffffff" />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Profile</Text>
-                    </View>
-                    <View style={styles.headerRight}>
-                        <TouchableOpacity onPress={() => router.push('/(student-tabs)/notifications' as any)} style={styles.bellWrap}>
-                            <Ionicons name="notifications-outline" size={22} color="#ffffff" />
-                            <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={handleLogout}>
-                            <Ionicons name="log-out-outline" size={22} color="#ffffff" />
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={styles.headerTitle}>Profile</Text>
                 </View>
 
                 {/* Avatar */}
                 <View style={styles.avatarSection}>
                     <View style={styles.avatarBorder}>
                         {profile?.profilePictureUrl ? (
-                            <Image source={{ uri: profile.profilePictureUrl }} style={styles.avatarImage} />
+                            <Image source={{ uri: `${profile.profilePictureUrl}?t=${imageTs}` }} style={styles.avatarImage} />
                         ) : (
                             <View style={styles.avatarFallback}>
                                 <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'S'}</Text>
@@ -156,7 +153,7 @@ export default function ProfileScreen() {
 
                 {/* Edit Resume button */}
                 <TouchableOpacity style={styles.editResumeBtn} onPress={() => router.push('/edit-profile' as any)} activeOpacity={0.8}>
-                    <Text style={styles.editResumeBtnText}>Edit Resume</Text>
+                    <Text style={styles.editResumeBtnText}>Edit Profile</Text>
                 </TouchableOpacity>
             </ScrollView>
         </ScreenBackground>
@@ -169,11 +166,10 @@ const styles = StyleSheet.create({
 
     // Header
     header: { paddingTop: 50, paddingHorizontal: 20, marginBottom: 8 },
-    headerLeft: { marginBottom: 12 },
+    logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
     logo: { width: 40, height: 40 },
-    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 0 },
-    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', flex: 1 },
-    headerRight: { position: 'absolute', top: 68, right: 20, flexDirection: 'row', gap: 16, alignItems: 'center' },
+    headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#ffffff' },
+    headerRight: { flexDirection: 'row', gap: 16, alignItems: 'center' },
     bellWrap: { position: 'relative' },
     badge: { position: 'absolute', top: -4, right: -6, backgroundColor: '#ff4444', width: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
     badgeText: { fontSize: 9, fontWeight: 'bold', color: '#ffffff' },

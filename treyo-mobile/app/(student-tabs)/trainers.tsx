@@ -1,64 +1,111 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ScreenBackground } from '../../components/ScreenBackground';
-import {useSafeAreaInsets} from "react-native-safe-area-context";
+import { trainerService } from '../../services/api';
 
 export default function TrainersScreen() {
     const { colors } = useTheme();
-    const trainers = [
-        { id: 1, name: 'John Doe', specialization: 'Web Development', rating: 4.8, students: 234, courses: 'React Native Bootcamp' },
-        { id: 2, name: 'Jane Smith', specialization: 'UI/UX Design', rating: 4.9, students: 189, courses: 'Design Masterclass' },
-        { id: 3, name: 'Alex Brown', specialization: 'Data Science', rating: 4.7, students: 312, courses: 'Python for Data Science' },
-    ];
-    const insets = useSafeAreaInsets();
+    const [trainers, setTrainers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadTrainers();
+        }, [])
+    );
+
+    const loadTrainers = async () => {
+        try {
+            const data = await trainerService.getAllTrainers();
+            setTrainers(data || []);
+        } catch (e) {
+            console.log('Load trainers error', e);
+            setTrainers([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <ScreenBackground style={styles.container}>
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>My Trainers</Text>
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Trainers you're learning from</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>Trainers</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Find the perfect trainer for you</Text>
             </View>
 
-            <ScrollView style={styles.content}>
-                {trainers.map(trainer => (
-                    <TouchableOpacity key={trainer.id} style={[styles.trainerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        <LinearGradient colors={['#7cce06', '#6bb805']} style={styles.avatar}>
-                            <Ionicons name="person" size={32} color="#ffffff" />
-                        </LinearGradient>
+            {loading ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color="#7cce06" />
+                </View>
+            ) : (
+                <ScrollView style={styles.content}>
+                    {trainers.map((trainer: any) => (
+                        <TouchableOpacity
+                            key={trainer.trainerId || trainer.userId}
+                            style={[styles.trainerCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                        >
+                            {trainer.profilePictureUrl ? (
+                                <Image source={{ uri: trainer.profilePictureUrl }} style={styles.avatar} />
+                            ) : (
+                                <LinearGradient colors={['#7cce06', '#6bb805']} style={styles.avatar}>
+                                    <Ionicons name="person" size={32} color="#ffffff" />
+                                </LinearGradient>
+                            )}
 
-                        <View style={styles.trainerInfo}>
-                            <Text style={[styles.trainerName, { color: colors.text }]}>{trainer.name}</Text>
-                            <Text style={[styles.specialization, { color: colors.textSecondary }]}>{trainer.specialization}</Text>
-                            <Text style={styles.courses} numberOfLines={1}>📚 {trainer.courses}</Text>
+                            <View style={styles.trainerInfo}>
+                                <Text style={[styles.trainerName, { color: colors.text }]}>{trainer.name || 'Trainer'}</Text>
+                                {!!trainer.specialization && (
+                                    <Text style={[styles.specialization, { color: colors.textSecondary }]}>
+                                        {trainer.specialization}
+                                    </Text>
+                                )}
+                                {typeof trainer.coursesCount === 'number' && (
+                                    <Text style={styles.courses} numberOfLines={1}>
+                                        📚 {trainer.coursesCount} {trainer.coursesCount === 1 ? 'course' : 'courses'}
+                                    </Text>
+                                )}
 
-                            <View style={styles.stats}>
-                                <View style={styles.statItem}>
-                                    <Ionicons name="star" size={14} color="#FFD700" />
-                                    <Text style={[styles.statText, { color: colors.textSecondary }]}>{trainer.rating}</Text>
-                                </View>
-                                <View style={styles.statItem}>
-                                    <Ionicons name="people" size={14} color={colors.textTertiary} />
-                                    <Text style={[styles.statText, { color: colors.textSecondary }]}>{trainer.students} students</Text>
+                                <View style={styles.stats}>
+                                    {typeof trainer.rating === 'number' && trainer.rating > 0 && (
+                                        <View style={styles.statItem}>
+                                            <Ionicons name="star" size={14} color="#FFD700" />
+                                            <Text style={[styles.statText, { color: colors.textSecondary }]}>
+                                                {trainer.rating.toFixed(1)}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {typeof trainer.studentsCount === 'number' && (
+                                        <View style={styles.statItem}>
+                                            <Ionicons name="people" size={14} color={colors.textTertiary} />
+                                            <Text style={[styles.statText, { color: colors.textSecondary }]}>
+                                                {trainer.studentsCount} students
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
-                        </View>
 
-                        <TouchableOpacity style={styles.messageButton}>
-                            <Ionicons name="chatbubble-outline" size={20} color="#7cce06" />
+                            <TouchableOpacity style={styles.messageButton}>
+                                <Ionicons name="chatbubble-outline" size={20} color="#7cce06" />
+                            </TouchableOpacity>
                         </TouchableOpacity>
-                    </TouchableOpacity>
-                ))}
+                    ))}
 
-                {trainers.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Ionicons name="people-outline" size={64} color={colors.textTertiary} />
-                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No trainers yet</Text>
-                        <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>Enroll in a course to connect with trainers</Text>
-                    </View>
-                )}
-            </ScrollView>
+                    {trainers.length === 0 && (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="people-outline" size={64} color={colors.textTertiary} />
+                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No trainers available</Text>
+                            <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>
+                                Check back soon for new trainers joining the platform
+                            </Text>
+                        </View>
+                    )}
+                </ScrollView>
+            )}
         </ScreenBackground>
     );
 }

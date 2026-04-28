@@ -11,23 +11,19 @@ type TabBarProps = {
 const VISIBLE_TABS = [
     {
         name: 'home',
-        icon: require('../assets/Tabs/Home.png'),
-        iconFilled: require('../assets/Tabs/Home_Filled.png'),
+        icon: require('../assets/Tabs/home.png'),
     },
     {
         name: 'messages',
-        icon: require('../assets/Tabs/Chat.png'),
-        iconFilled: require('../assets/Tabs/Chat_Filled.png'),
+        icon: require('../assets/Tabs/chat.png'),
     },
     {
-        name: 'students',
-        icon: require('../assets/Tabs/Bot.png'),
-        iconFilled: require('../assets/Tabs/Bot_Filled.png'),
+        name: 'courses',
+        icon: require('../assets/Tabs/bot.png'),
     },
     {
         name: 'profile',
-        icon: require('../assets/Tabs/User.png'),
-        iconFilled: require('../assets/Tabs/User_Filled.png'),
+        icon: require('../assets/Tabs/user.png'),
     },
 ];
 
@@ -44,7 +40,6 @@ export function TrainerTabBar({ state, descriptors, navigation }: TabBarProps) {
         const route = state.routes[routeIndex];
         const isFocused = state.index === routeIndex;
 
-        // Bounce animation
         Animated.sequence([
             Animated.timing(scaleAnims[visibleIndex], {
                 toValue: 0.8,
@@ -89,13 +84,16 @@ export function TrainerTabBar({ state, descriptors, navigation }: TabBarProps) {
                             <Animated.View
                                 style={[
                                     styles.iconContainer,
+                                    isFocused && styles.iconContainerActive,
                                     { transform: [{ scale: scaleAnims[visibleIndex] }] },
                                 ]}
                             >
                                 <Image
-                                    source={isFocused ? tab.iconFilled : tab.icon}
+                                    source={tab.icon}
                                     style={[
                                         styles.icon,
+                                        tab.name === 'courses' && { width: 30, height: 30 }, // example fix
+                                        tab.name === 'messages' && { width: 30, height: 30 }, // example fix
                                         { opacity: isFocused ? 1 : 0.5 },
                                     ]}
                                     resizeMode="contain"
@@ -124,9 +122,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 24,
-        backgroundColor: 'rgba(30, 30, 30, 0.85)',
+        backgroundColor: 'rgba(76, 76, 76, 0.8)',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderColor: 'rgba(76, 76, 76, 0.8)',
         width: 360,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
@@ -143,12 +141,21 @@ const styles = StyleSheet.create({
     iconContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+    },
+    iconContainerActive: {
+        backgroundColor: '#7cce06',
+        shadowColor: '#7cce06',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.5,
+        shadowRadius: 8,
+        elevation: 6,
     },
     icon: {
-        width: 26,
-        height: 26,
+        width: 24,
+        height: 24,
         tintColor: '#ffffff',
     },
 });

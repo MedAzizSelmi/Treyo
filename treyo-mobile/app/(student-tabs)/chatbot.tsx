@@ -1,7 +1,7 @@
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
     ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
-    Image, Animated, Alert,
+    Image, Animated, Alert, Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useRef, useEffect } from 'react';
@@ -9,10 +9,14 @@ import { BlurView } from 'expo-blur';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService } from '../../services/api';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import api from '../../services/api';
+
+const { width: SCREEN_W } = Dimensions.get('window');
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Message = {
@@ -49,29 +53,33 @@ async function uriToBase64(uri: string): Promise<string> {
 
 // ── Animated typing dots ──────────────────────────────────────────────────────
 function TypingDots() {
-    const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+    const dots = [
+        useRef(new Animated.Value(0)).current,
+        useRef(new Animated.Value(0)).current,
+        useRef(new Animated.Value(0)).current,
+    ];
 
     useEffect(() => {
         const animate = (dot: Animated.Value, delay: number) =>
             Animated.loop(
                 Animated.sequence([
                     Animated.delay(delay),
-                    Animated.timing(dot, { toValue: -6, duration: 300, useNativeDriver: true }),
-                    Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
-                    Animated.delay(600),
+                    Animated.timing(dot, { toValue: -5, duration: 280, useNativeDriver: true }),
+                    Animated.timing(dot, { toValue: 0, duration: 280, useNativeDriver: true }),
+                    Animated.delay(500),
                 ])
             ).start();
-        dots.forEach((d, i) => animate(d, i * 150));
+        dots.forEach((d, i) => animate(d, i * 160));
     }, []);
 
     return (
-        <View style={{ flexDirection: 'row', gap: 5, alignItems: 'center', paddingVertical: 4 }}>
+        <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', paddingVertical: 2 }}>
             {dots.map((d, i) => (
                 <Animated.View
                     key={i}
                     style={{
-                        width: 7, height: 7, borderRadius: 3.5,
-                        backgroundColor: 'rgba(124,206,6,0.7)',
+                        width: 6.5, height: 6.5, borderRadius: 3.25,
+                        backgroundColor: '#7cce06',
                         transform: [{ translateY: d }],
                     }}
                 />
@@ -85,6 +93,7 @@ export default function ChatbotScreen() {
     const router = useRouter();
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+    const [imageTs, setImageTs] = useState(Date.now());
     const [messages, setMessages] = useState<Message[]>([]);
     const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
     const [input, setInput] = useState('');
@@ -105,20 +114,29 @@ export default function ChatbotScreen() {
         (async () => {
             const user = await authService.getCurrentUser();
             if (user?.name) setUserName(user.name.split(' ')[0]);
-            try {
-                const res = await api.get('/students/me');
-                setProfilePicUrl(res.data.profilePictureUrl || null);
-            } catch (_) {}
         })();
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }, []);
+
+    // Reload profile picture every time this tab comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            (async () => {
+                try {
+                    const res = await api.get('/students/me');
+                    setProfilePicUrl(res.data.profilePictureUrl || null);
+                    setImageTs(Date.now());
+                } catch (_) {}
+            })();
+        }, [])
+    );
 
     const scrollToBottom = () =>
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
 
     const formatTime = (d: Date) => {
         const h = d.getHours(), m = d.getMinutes().toString().padStart(2, '0');
-        return `${h % 12 || 12}:${m}${h >= 12 ? 'pm' : 'am'}`;
+        return `${h % 12 || 12}:${m} ${h >= 12 ? 'PM' : 'AM'}`;
     };
 
     const formatDuration = (s: number) =>
@@ -127,7 +145,7 @@ export default function ChatbotScreen() {
     const startPulse = () => {
         pulseLoop.current = Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, { toValue: 1.4, duration: 500, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1.35, duration: 500, useNativeDriver: true }),
                 Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
             ])
         );
@@ -252,21 +270,40 @@ export default function ChatbotScreen() {
             await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
             const uri = recordingRef.current.getURI();
             recordingRef.current = null;
-            if (!uri) throw new Error('No URI');
+            if (!uri) throw new Error('No recording URI');
 
-            const filename = uri.split('/').pop() || 'recording.m4a';
-            const formData = new FormData();
-            formData.append('audio', { uri, name: filename, type: 'audio/m4a' } as any);
-            const res = await api.post('/chatbot/transcribe', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+            // Use expo-file-system — the only reliable way to read files as base64 in RN/Hermes
+            // (FileReader is a browser API and doesn't work in React Native)
+            const audioBase64 = await FileSystem.readAsStringAsync(uri, {
+                encoding: 'base64' as any,
             });
+            console.log('Audio base64 ready, size:', Math.round(audioBase64.length / 1024), 'KB');
+
+            const ext = (uri.split('.').pop()?.toLowerCase()) || 'm4a';
+            const mimeMap: Record<string, string> = {
+                m4a: 'audio/mp4', mp4: 'audio/mp4', aac: 'audio/aac',
+                wav: 'audio/wav', webm: 'audio/webm', ogg: 'audio/ogg',
+                '3gp': 'audio/3gpp', amr: 'audio/amr',
+            };
+            const mimeType = mimeMap[ext] || 'audio/mp4';
+
+            const res = await api.post('/chatbot/transcribe', {
+                audioBase64,
+                mimeType,
+            }, { timeout: 30000 });
+
             const transcript = res.data?.transcript?.trim();
             setRecordingStatus('idle');
-            if (transcript) sendMessage(transcript);
-        } catch (err) {
-            console.error(err);
+            if (transcript) {
+                sendMessage(transcript);
+            } else {
+                Alert.alert('Voice', "Couldn't understand the audio. Please try again.");
+            }
+        } catch (err: any) {
+            console.error('Transcribe error:', err?.response?.data || err?.message || err);
             setRecordingStatus('idle');
             recordingRef.current = null;
+            Alert.alert('Voice Error', 'Failed to transcribe audio. Please try again.');
         }
     };
 
@@ -274,6 +311,8 @@ export default function ChatbotScreen() {
         if (recordingStatus === 'recording') stopRecording();
         else if (recordingStatus === 'idle') startRecording();
     };
+
+    const canSend = (input.trim() || pendingImage) && !loading;
 
     return (
         <ScreenBackground>
@@ -283,20 +322,27 @@ export default function ChatbotScreen() {
             >
                 {/* ── Header ── */}
                 <View style={styles.header}>
-                    <Image source={require('../../assets/images/logo-white.png')} style={styles.logo} resizeMode="contain" />
-                    <View style={styles.headerRow}>
-                        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-                            <Ionicons name="arrow-back" size={22} color="#ffffff" />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>AI Chat</Text>
+                    <View style={styles.headerInner}>
+                        <View style={styles.headerLeft}>
+                            <View style={styles.aiIconWrap}>
+                                <Image source={require('../../assets/images/AI_Robot_small.png')} style={styles.aiIcon} resizeMode="contain" />
+                            </View>
+                            <View>
+                                <Text style={styles.headerTitle}>Treyo AI</Text>
+                                <Text style={styles.headerSubtitle}>Always here to help</Text>
+                            </View>
+                        </View>
                         <View style={styles.headerRight}>
-                            <TouchableOpacity style={styles.bellWrap}>
-                                <Ionicons name="notifications-outline" size={22} color="#ffffff" />
+                            <TouchableOpacity
+                                onPress={() => router.push('/(student-tabs)/notifications' as any)}
+                                style={styles.headerIconBtn}
+                            >
+                                <Ionicons name="notifications-outline" size={24} color="rgba(255,255,255,0.7)" />
                                 <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => router.push('/(student-tabs)/profile' as any)}>
                                 {profilePicUrl ? (
-                                    <Image source={{ uri: profilePicUrl }} style={styles.headerAvatar} />
+                                    <Image source={{ uri: `${profilePicUrl}?t=${imageTs}` }} style={styles.headerAvatar} />
                                 ) : (
                                     <View style={styles.headerAvatarFallback}>
                                         <Text style={styles.headerAvatarLetter}>{userName.charAt(0) || 'S'}</Text>
@@ -310,14 +356,17 @@ export default function ChatbotScreen() {
                 {/* ── Recording banner ── */}
                 {recordingStatus !== 'idle' && (
                     <View style={styles.recordingBanner}>
+                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.recDot} />
                         <Text style={styles.recText}>
                             {recordingStatus === 'recording'
                                 ? `Listening  ${formatDuration(recordSeconds)}`
-                                : 'Transcribing your voice...'}
+                                : 'Transcribing...'}
                         </Text>
                         {recordingStatus === 'recording'
-                            ? <TouchableOpacity onPress={stopRecording}><Ionicons name="stop-circle" size={22} color="#ff4444" /></TouchableOpacity>
+                            ? <TouchableOpacity onPress={stopRecording} style={styles.recStopBtn}>
+                                <Ionicons name="stop" size={14} color="#fff" />
+                              </TouchableOpacity>
                             : <ActivityIndicator size="small" color="#7cce06" />}
                     </View>
                 )}
@@ -325,13 +374,29 @@ export default function ChatbotScreen() {
                 {/* ── Empty state ── */}
                 {isEmptyState ? (
                     <View style={styles.emptyState}>
-                        <Image source={require('../../assets/images/AI_Robot.png')} style={styles.robotBig} resizeMode="contain" />
+                        <View style={styles.emptyRobotGlow}>
+                            <Image source={require('../../assets/images/AI_Robot.png')} style={styles.robotBig} resizeMode="contain" />
+                        </View>
                         <Text style={styles.emptyTitle}>
-                            {userName ? `Hello, ${userName}!` : 'Hello there!'}{'\n'}I'm Ready To Help You
+                            {userName ? `Hey ${userName}!` : 'Hello!'}
                         </Text>
                         <Text style={styles.emptySubtitle}>
-                            Ask me anything that's on your mind.{'\n'}I'm here to assist you!
+                            I'm your AI assistant. Ask me anything{'\n'}about training, courses, or your profile.
                         </Text>
+
+                        {/* Quick action chips */}
+                        <View style={styles.chipRow}>
+                            {['What can you do?', 'Help with profile', 'Find a course'].map(chip => (
+                                <TouchableOpacity
+                                    key={chip}
+                                    style={styles.chip}
+                                    onPress={() => sendMessage(chip)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles.chipText}>{chip}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
                 ) : (
                     <ScrollView
@@ -353,12 +418,10 @@ export default function ChatbotScreen() {
 
                                 {/* Bubble */}
                                 <TouchableOpacity
-                                    activeOpacity={0.92}
+                                    activeOpacity={0.85}
                                     style={[styles.bubble, msg.isBot ? styles.bubbleBot : styles.bubbleUser]}
                                     onLongPress={() => msg.isBot && Speech.speak(msg.text, { language: 'en-US' })}
                                 >
-                                    {msg.isBot && <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />}
-
                                     {msg.imageUri && (
                                         <Image source={{ uri: msg.imageUri }} style={styles.bubbleImg} resizeMode="cover" />
                                     )}
@@ -369,12 +432,9 @@ export default function ChatbotScreen() {
                                         </Text>
                                     )}
 
-                                    {!msg.isBot && (
-                                        <View style={styles.timeRow}>
-                                            <Text style={styles.timeText}>{formatTime(msg.timestamp)}</Text>
-                                            <Ionicons name="checkmark-done" size={13} color="rgba(255,255,255,0.7)" />
-                                        </View>
-                                    )}
+                                    <Text style={[styles.timeText, msg.isBot ? styles.timeBot : styles.timeUser]}>
+                                        {formatTime(msg.timestamp)}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         ))}
@@ -386,7 +446,6 @@ export default function ChatbotScreen() {
                                     <Image source={require('../../assets/images/AI_Robot_small.png')} style={styles.botAvatar} resizeMode="contain" />
                                 </View>
                                 <View style={[styles.bubble, styles.bubbleBot, styles.typingBubble]}>
-                                    <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
                                     <TypingDots />
                                 </View>
                             </View>
@@ -397,71 +456,81 @@ export default function ChatbotScreen() {
                 {/* ── Pending image preview ── */}
                 {pendingImage && (
                     <View style={styles.previewBar}>
-                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
                         <Image source={{ uri: pendingImage.uri }} style={styles.previewThumb} />
-                        <Text style={styles.previewLabel}>Image ready to send</Text>
-                        <TouchableOpacity onPress={() => setPendingImage(null)}>
-                            <Ionicons name="close-circle" size={22} color="#ff4444" />
+                        <Text style={styles.previewLabel}>Image attached</Text>
+                        <TouchableOpacity onPress={() => setPendingImage(null)} style={styles.previewClose}>
+                            <Ionicons name="close" size={16} color="#fff" />
                         </TouchableOpacity>
                     </View>
                 )}
 
                 {/* ── Input bar ── */}
                 <View style={styles.inputBar}>
-                    {/* Clip */}
-                    <TouchableOpacity onPress={handleAttachment} disabled={recordingStatus !== 'idle'} style={styles.clipBtn}>
-                        <Ionicons name="attach-outline" size={26} color={pendingImage ? '#7cce06' : 'rgba(255,255,255,0.5)'} />
-                    </TouchableOpacity>
+                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
 
-                    {/* Pill input */}
-                    <View style={styles.pill}>
-                        <TextInput
-                            style={styles.textInput}
-                            value={input}
-                            onChangeText={setInput}
-                            placeholder={
-                                recordingStatus === 'recording' ? `🎙  ${formatDuration(recordSeconds)}`
-                                : recordingStatus === 'transcribing' ? 'Transcribing...'
-                                : "Ask Treyo's Chat Robot"
-                            }
-                            placeholderTextColor="rgba(80,90,120,0.85)"
-                            multiline
-                            maxLength={500}
-                            editable={recordingStatus === 'idle'}
-                        />
+                    <View style={styles.inputRow}>
+                        {/* Text field */}
+                        <View style={styles.inputField}>
+                            <TextInput
+                                style={styles.textInput}
+                                value={input}
+                                onChangeText={setInput}
+                                placeholder={
+                                    recordingStatus === 'recording' ? `Recording  ${formatDuration(recordSeconds)}`
+                                    : recordingStatus === 'transcribing' ? 'Transcribing...'
+                                    : 'Message Treyo AI...'
+                                }
+                                placeholderTextColor="rgba(255,255,255,0.35)"
+                                multiline
+                                maxLength={500}
+                                editable={recordingStatus === 'idle'}
+                            />
 
-                        {/* Image icon */}
-                        <TouchableOpacity onPress={handleAttachment} disabled={recordingStatus !== 'idle'} style={styles.pillIcon}>
-                            <Ionicons name="image-outline" size={22} color={pendingImage ? '#7cce06' : 'rgba(80,90,120,0.85)'} />
+                            {/* Inline actions */}
+                            <View style={styles.inlineActions}>
+                                <TouchableOpacity
+                                    onPress={handleAttachment}
+                                    disabled={recordingStatus !== 'idle'}
+                                    style={styles.inlineBtn}
+                                    activeOpacity={0.6}
+                                >
+                                    <Ionicons
+                                        name="image-outline"
+                                        size={20}
+                                        color={pendingImage ? '#7cce06' : 'rgba(255,255,255,0.4)'}
+                                    />
+                                </TouchableOpacity>
+
+                                <Animated.View style={{ transform: [{ scale: recordingStatus === 'recording' ? pulseAnim : 1 }] }}>
+                                    <TouchableOpacity
+                                        onPress={handleMicPress}
+                                        disabled={recordingStatus === 'transcribing' || loading}
+                                        style={[styles.inlineBtn, recordingStatus === 'recording' && styles.inlineBtnRec]}
+                                        activeOpacity={0.6}
+                                    >
+                                        {recordingStatus === 'transcribing'
+                                            ? <ActivityIndicator size="small" color="#7cce06" />
+                                            : <Ionicons
+                                                name={recordingStatus === 'recording' ? 'stop' : 'mic-outline'}
+                                                size={recordingStatus === 'recording' ? 16 : 20}
+                                                color={recordingStatus === 'recording' ? '#fff' : 'rgba(255,255,255,0.4)'}
+                                              />}
+                                    </TouchableOpacity>
+                                </Animated.View>
+                            </View>
+                        </View>
+
+                        {/* Send */}
+                        <TouchableOpacity
+                            style={[styles.sendBtn, canSend ? styles.sendActive : styles.sendDim]}
+                            onPress={() => sendMessage(input)}
+                            disabled={!canSend}
+                            activeOpacity={0.75}
+                        >
+                            <Ionicons name="arrow-up" size={20} color={canSend ? '#fff' : 'rgba(255,255,255,0.2)'} />
                         </TouchableOpacity>
-
-                        {/* Mic */}
-                        <Animated.View style={{ transform: [{ scale: recordingStatus === 'recording' ? pulseAnim : 1 }] }}>
-                            <TouchableOpacity
-                                onPress={handleMicPress}
-                                disabled={recordingStatus === 'transcribing' || loading}
-                                style={[styles.pillIcon, recordingStatus === 'recording' && styles.pillIconRec]}
-                            >
-                                {recordingStatus === 'transcribing'
-                                    ? <ActivityIndicator size="small" color="#7cce06" />
-                                    : <Ionicons
-                                        name={recordingStatus === 'recording' ? 'stop-circle' : 'mic-outline'}
-                                        size={22}
-                                        color={recordingStatus === 'recording' ? '#ff4444' : 'rgba(80,90,120,0.85)'}
-                                      />}
-                            </TouchableOpacity>
-                        </Animated.View>
                     </View>
-
-                    {/* Send */}
-                    <TouchableOpacity
-                        style={[styles.sendBtn, (input.trim() || pendingImage) && !loading ? styles.sendActive : styles.sendDim]}
-                        onPress={() => sendMessage(input)}
-                        disabled={(!input.trim() && !pendingImage) || loading}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="send" size={18} color={(input.trim() || pendingImage) ? '#ffffff' : 'rgba(255,255,255,0.3)'} />
-                    </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
         </ScreenBackground>
@@ -471,95 +540,137 @@ export default function ChatbotScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, paddingBottom: 90 },
 
-    // ── Header
-    header: { paddingTop: 52, paddingHorizontal: 20, marginBottom: 6 },
-    logo: { width: 36, height: 36, marginBottom: 10 },
-    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    backBtn: { padding: 2 },
-    headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: '#ffffff' },
-    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-    bellWrap: { position: 'relative' },
-    badge: {
-        position: 'absolute', top: -4, right: -6,
-        width: 16, height: 16, borderRadius: 8,
-        backgroundColor: '#7cce06', justifyContent: 'center', alignItems: 'center',
+    // ── Header ──
+    header: {
+        paddingTop: 56, paddingBottom: 14,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.06)',
     },
-    badgeText: { fontSize: 9, fontWeight: 'bold', color: '#000' },
-    headerAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)' },
-    headerAvatarFallback: {
-        width: 36, height: 36, borderRadius: 18,
-        backgroundColor: 'rgba(124,206,6,0.2)', borderWidth: 2, borderColor: 'rgba(124,206,6,0.4)',
+    headerInner: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    aiIconWrap: {
+        width: 42, height: 42, borderRadius: 21,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        borderWidth: 1.5, borderColor: 'rgba(124,206,6,0.25)',
         justifyContent: 'center', alignItems: 'center',
-    },
-    headerAvatarLetter: { fontSize: 15, fontWeight: 'bold', color: '#7cce06' },
-
-    // ── Recording banner
-    recordingBanner: {
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        marginHorizontal: 16, marginBottom: 6,
-        backgroundColor: 'rgba(255,68,68,0.1)',
-        borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8,
-        borderWidth: 1, borderColor: 'rgba(255,68,68,0.25)',
-    },
-    recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff4444' },
-    recText: { flex: 1, fontSize: 13, color: '#ff6666', fontWeight: '500' },
-
-    // ── Empty state
-    emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, paddingBottom: 20 },
-    robotBig: { width: 200, height: 200, marginBottom: 24 },
-    emptyTitle: { fontSize: 24, fontWeight: '800', color: '#ffffff', textAlign: 'center', lineHeight: 34, marginBottom: 10 },
-    emptySubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.4)', textAlign: 'center', lineHeight: 22 },
-
-    // ── Scroll
-    scroll: { flex: 1 },
-    scrollContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
-
-    // ── Message rows
-    row: { flexDirection: 'row', marginBottom: 16, alignItems: 'flex-end' },
-    rowBot: { alignSelf: 'flex-start', maxWidth: '84%' },
-    rowUser: { alignSelf: 'flex-end', maxWidth: '78%', flexDirection: 'row-reverse' },
-
-    // Bot avatar circle
-    botAvatarWrap: {
-        width: 34, height: 34, borderRadius: 17,
-        backgroundColor: 'rgba(124,206,6,0.1)',
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.2)',
-        justifyContent: 'center', alignItems: 'center',
-        marginRight: 8, marginBottom: 2,
         overflow: 'hidden',
     },
-    botAvatar: { width: 28, height: 28 },
+    aiIcon: { width: 30, height: 30 },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+    headerSubtitle: { fontSize: 12, color: 'rgba(124,206,6,0.7)', marginTop: 1 },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    headerIconBtn: { position: 'relative', padding: 4 },
+    badge: {
+        position: 'absolute', top: 0, right: -2,
+        width: 15, height: 15, borderRadius: 7.5,
+        backgroundColor: '#ff4444', justifyContent: 'center', alignItems: 'center',
+    },
+    badgeText: { fontSize: 8, fontWeight: 'bold', color: '#fff' },
+    headerAvatar: {
+        width: 40, height: 40, borderRadius: 20,
+        borderWidth: 2, borderColor: 'rgba(124,206,6,0.6)',
+    },
+    headerAvatarFallback: {
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: 'rgba(124,206,6,0.2)', borderWidth: 2, borderColor: 'rgba(124,206,6,0.5)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    headerAvatarLetter: { fontSize: 15, fontWeight: '700', color: '#7cce06' },
+
+    // ── Recording banner ──
+    recordingBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        marginHorizontal: 16, marginTop: 8, marginBottom: 4,
+        borderRadius: 14, overflow: 'hidden',
+        paddingHorizontal: 14, paddingVertical: 10,
+        borderWidth: 1, borderColor: 'rgba(255,68,68,0.2)',
+    },
+    recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff4444' },
+    recText: { flex: 1, fontSize: 13, color: '#ff8888', fontWeight: '600', letterSpacing: 0.3 },
+    recStopBtn: {
+        width: 28, height: 28, borderRadius: 14,
+        backgroundColor: '#ff4444', justifyContent: 'center', alignItems: 'center',
+    },
+
+    // ── Empty state ──
+    emptyState: {
+        flex: 1, alignItems: 'center', justifyContent: 'center',
+        paddingHorizontal: 32, paddingBottom: 30,
+    },
+    emptyRobotGlow: {
+        marginBottom: 28,
+        shadowColor: '#7cce06', shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.3, shadowRadius: 40,
+    },
+    robotBig: { width: 160, height: 160 },
+    emptyTitle: {
+        fontSize: 26, fontWeight: '800', color: '#ffffff',
+        textAlign: 'center', letterSpacing: -0.5, marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 14, color: 'rgba(255,255,255,0.45)',
+        textAlign: 'center', lineHeight: 22, marginBottom: 28,
+    },
+    chipRow: {
+        flexDirection: 'row', flexWrap: 'wrap',
+        justifyContent: 'center', gap: 8,
+    },
+    chip: {
+        borderRadius: 20, paddingHorizontal: 16, paddingVertical: 9,
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
+        backgroundColor: 'rgba(124,206,6,0.06)',
+    },
+    chipText: { fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
+
+    // ── Scroll ──
+    scroll: { flex: 1 },
+    scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
+
+    // ── Message rows ──
+    row: { flexDirection: 'row', marginBottom: 14, alignItems: 'flex-end' },
+    rowBot: { alignSelf: 'flex-start', maxWidth: '85%' },
+    rowUser: { alignSelf: 'flex-end', maxWidth: '80%', flexDirection: 'row-reverse' },
+
+    // Bot avatar
+    botAvatarWrap: {
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: 'rgba(124,206,6,0.1)',
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.18)',
+        justifyContent: 'center', alignItems: 'center',
+        marginRight: 8,
+        overflow: 'hidden',
+    },
+    botAvatar: { width: 22, height: 22 },
 
     // Bubbles
     bubble: { borderRadius: 20, overflow: 'hidden' },
 
-    // Bot — dark glass
     bubbleBot: {
-        borderBottomLeftRadius: 4,
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.15)',
-        paddingHorizontal: 16, paddingVertical: 12,
-        backgroundColor: 'transparent',
+        borderBottomLeftRadius: 6,
+        backgroundColor: 'rgba(255,255,255,0.07)',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+        paddingHorizontal: 14, paddingVertical: 10,
     },
 
-    // User — brand green gradient feel
     bubbleUser: {
-        borderBottomRightRadius: 4,
+        borderBottomRightRadius: 6,
         backgroundColor: '#7cce06',
-        paddingHorizontal: 16, paddingVertical: 12,
-        shadowColor: '#7cce06', shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35, shadowRadius: 8, elevation: 6,
+        paddingHorizontal: 14, paddingVertical: 10,
     },
 
-    bubbleImg: { width: 200, height: 155, borderRadius: 12, marginBottom: 10 },
+    bubbleImg: { width: 200, height: 150, borderRadius: 12, marginBottom: 8 },
 
-    bubbleText: { fontSize: 15, lineHeight: 23 },
-    bubbleTextBot: { color: '#e8e8e8' },
-    bubbleTextUser: { color: '#000000', fontWeight: '500' },
+    bubbleText: { fontSize: 14.5, lineHeight: 21 },
+    bubbleTextBot: { color: 'rgba(255,255,255,0.88)' },
+    bubbleTextUser: { color: '#0a1a00' },
 
-    timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 5 },
-    timeText: { fontSize: 11, color: 'rgba(0,0,0,0.55)' },
+    timeText: { fontSize: 10.5, marginTop: 4 },
+    timeBot: { color: 'rgba(255,255,255,0.3)' },
+    timeUser: { color: 'rgba(10,26,0,0.5)', textAlign: 'right' },
 
-    // Typing
     typingBubble: { paddingVertical: 14, paddingHorizontal: 16 },
 
     // Pending image preview
@@ -567,43 +678,55 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', gap: 10,
         marginHorizontal: 16, marginBottom: 4,
         borderRadius: 14, overflow: 'hidden',
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.2)',
         paddingHorizontal: 12, paddingVertical: 8,
     },
-    previewThumb: { width: 42, height: 42, borderRadius: 8 },
-    previewLabel: { flex: 1, fontSize: 13, color: '#7cce06', fontWeight: '500' },
-
-    // ── Input bar
-    inputBar: {
-        flexDirection: 'row', alignItems: 'flex-end',
-        paddingHorizontal: 14, paddingVertical: 10, gap: 8,
-        borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+    previewThumb: { width: 40, height: 40, borderRadius: 8 },
+    previewLabel: { flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: '500' },
+    previewClose: {
+        width: 24, height: 24, borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
     },
-    clipBtn: { paddingBottom: 10 },
 
-    pill: {
+    // ── Input bar ──
+    inputBar: {
+        paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10,
+        borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)',
+        overflow: 'hidden',
+    },
+    inputRow: {
+        flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    },
+    inputField: {
         flex: 1, flexDirection: 'row', alignItems: 'flex-end',
-        backgroundColor: 'rgba(255,255,255,0.94)',
-        borderRadius: 28, paddingLeft: 18, paddingRight: 6,
-        paddingVertical: 8, maxHeight: 110,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+        paddingLeft: 16, paddingRight: 6,
+        paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+        maxHeight: 120,
     },
     textInput: {
-        flex: 1, fontSize: 15, color: '#1a1a2e',
-        minHeight: 26, maxHeight: 80, paddingTop: 2,
+        flex: 1, fontSize: 15, color: '#ffffff',
+        minHeight: 24, maxHeight: 80,
+        paddingTop: Platform.OS === 'ios' ? 0 : 6,
+        paddingBottom: Platform.OS === 'ios' ? 0 : 6,
     },
-    pillIcon: { paddingHorizontal: 4, paddingBottom: 2, borderRadius: 14 },
-    pillIconRec: { backgroundColor: 'rgba(255,68,68,0.08)' },
+    inlineActions: { flexDirection: 'row', alignItems: 'center', gap: 2, marginLeft: 4 },
+    inlineBtn: { padding: 6, borderRadius: 16 },
+    inlineBtnRec: {
+        backgroundColor: '#ff4444', borderRadius: 14,
+        width: 28, height: 28,
+        justifyContent: 'center', alignItems: 'center',
+        padding: 0,
+    },
 
     sendBtn: {
-        width: 46, height: 46, borderRadius: 23,
+        width: 44, height: 44, borderRadius: 22,
         justifyContent: 'center', alignItems: 'center',
     },
     sendActive: {
-        backgroundColor: '#3b5bdb',
-        shadowColor: '#3b5bdb', shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+        backgroundColor: '#7cce06',
     },
-    sendDim: { backgroundColor: 'rgba(255,255,255,0.1)' },
+    sendDim: { backgroundColor: 'rgba(255,255,255,0.06)' },
 });

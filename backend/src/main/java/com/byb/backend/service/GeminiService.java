@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -242,12 +241,22 @@ public class GeminiService {
         }
     }
 
-    // ── Public: transcribe audio ──────────────────────────────────────────────
-    public String transcribeAudio(MultipartFile audio) {
+    // ── Public: transcribe audio (accepts base64 + mimeType directly) ────────
+    public String transcribeAudio(String audioBase64, String rawMimeType) {
         try {
-            byte[] audioBytes = audio.getBytes();
-            String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
-            String mimeType = audio.getContentType() != null ? audio.getContentType() : "audio/m4a";
+            log.info("Transcribe request: mimeType={}, base64Length={}", rawMimeType,
+                    audioBase64 != null ? audioBase64.length() : 0);
+
+            // Normalise MIME type — Gemini needs a valid audio/* type
+            String mimeType = "audio/mp4"; // safe default
+            if (rawMimeType != null && rawMimeType.startsWith("audio/")) {
+                mimeType = switch (rawMimeType) {
+                    case "audio/m4a", "audio/x-m4a" -> "audio/mp4";
+                    case "audio/3gpp" -> "audio/3gpp";
+                    default -> rawMimeType;
+                };
+            }
+            log.info("Using MIME type: {}", mimeType);
 
             ObjectNode body = objectMapper.createObjectNode();
             ArrayNode contents = objectMapper.createArrayNode();
@@ -258,7 +267,7 @@ public class GeminiService {
             ObjectNode audioPart = objectMapper.createObjectNode();
             ObjectNode inlineData = objectMapper.createObjectNode();
             inlineData.put("mimeType", mimeType);
-            inlineData.put("data", base64Audio);
+            inlineData.put("data", audioBase64);
             audioPart.set("inlineData", inlineData);
             parts.add(audioPart);
 
@@ -271,9 +280,13 @@ public class GeminiService {
             body.set("contents", contents);
 
             String response = callGemini(body.toString());
-            return extractText(response).trim();
+            String transcript = extractText(response).trim();
+            log.info("Transcription result ({} chars): {}", transcript.length(),
+                    transcript.length() > 80 ? transcript.substring(0, 80) + "..." : transcript);
+            return transcript;
 
         } catch (Exception e) {
+            log.error("Transcribe error: {}", e.getMessage(), e);
             return "";
         }
     }
