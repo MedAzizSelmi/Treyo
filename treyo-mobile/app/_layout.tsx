@@ -26,7 +26,9 @@ export default function RootLayout() {
         return <OnboardingCarousel onFinish={() => setSplashStep(3)} />;
     }
 
-    // APP
+    // APP. Konnect doesn't need a client-side provider — payments happen
+    // via expo-web-browser opening Konnect's hosted page, with the
+    // backend driving init + verification end to end.
     return (
         <ThemeProvider>
             <StatusBar translucent backgroundColor="transparent" style="light" />
@@ -40,13 +42,26 @@ export default function RootLayout() {
                 <Stack.Screen name="notification-settings" />
                 <Stack.Screen name="certificates" />
                 <Stack.Screen name="help-support" />
+                <Stack.Screen name="course-search" />
+                <Stack.Screen name="course-detail" />
+                <Stack.Screen name="trainer-edit-profile" />
+                <Stack.Screen name="trainer-course-manage" />
+                <Stack.Screen name="trainer-profile" />
+                <Stack.Screen name="groups-forming" />
+                <Stack.Screen name="recommended-courses" />
+                <Stack.Screen name="settings-privacy" />
+                <Stack.Screen name="settings-language" />
+                <Stack.Screen name="settings-security" />
+                <Stack.Screen name="settings-payments" />
+                <Stack.Screen name="favorites" />
+                <Stack.Screen name="group-chat" />
+                <Stack.Screen name="user-profile" />
                 <Stack.Screen name="onboarding/student/step1" />
                 <Stack.Screen name="onboarding/student/step2" />
                 <Stack.Screen name="onboarding/student/step3" />
                 <Stack.Screen name="onboarding/trainer/step1" />
                 <Stack.Screen name="onboarding/trainer/step2" />
                 <Stack.Screen name="onboarding/trainer/step3" />
-                <Stack.Screen name="onboarding/trainer/step4" />
                 <Stack.Screen name="(student-tabs)" />
                 <Stack.Screen name="(trainer-tabs)" />
             </Stack>

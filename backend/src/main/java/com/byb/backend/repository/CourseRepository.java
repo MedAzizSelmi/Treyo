@@ -18,6 +18,12 @@ public interface CourseRepository extends JpaRepository<Course, String> {
 
     List<Course> findByTrainerId(String trainerId);
 
+    List<Course> findByTemplateId(String templateId);
+
+    long countByTemplateId(String templateId);
+
+    boolean existsByTemplateIdAndTrainerId(String templateId, String trainerId);
+
     List<Course> findByDomain(String domain);
 
     List<Course> findByIsPublishedTrueAndIsActiveTrue();

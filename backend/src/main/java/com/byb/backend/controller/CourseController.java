@@ -22,22 +22,47 @@ public class CourseController {
 
     private final CourseService courseService;
 
+    // ─────────────────────────────────────────────────────────────────
+    // NOTE: Trainers can NO LONGER create or edit course content.
+    // The admin owns all course content via CourseTemplate; offerings are
+    // auto-created when admin assigns a template to a trainer's roster.
+    // The create/update endpoints below are kept disabled (410 Gone) so
+    // any stale mobile clients fail fast with a clear message instead of
+    // silently mutating data.
+    // ─────────────────────────────────────────────────────────────────
+
     @PostMapping
-    @Operation(summary = "Create a new course (Trainer only)")
-    public ResponseEntity<CourseResponse> createCourse(
-            @RequestParam String trainerId,
-            @Valid @RequestBody CreateCourseRequest request) {
-        CourseResponse course = courseService.createCourse(trainerId, request);
-        return ResponseEntity.ok(course);
+    @Operation(summary = "DEPRECATED — admin now creates courses via /admin/course-templates")
+    public ResponseEntity<?> createCourse(
+            @RequestParam(required = false) String trainerId,
+            @RequestBody(required = false) CreateCourseRequest request) {
+        return ResponseEntity.status(410).body(java.util.Map.of(
+                "error", "Trainers can no longer create courses. Contact the admin to publish a new course."
+        ));
+    }
+
+    @PutMapping("/{courseId}")
+    @Operation(summary = "DEPRECATED — course content is now managed by admin via CourseTemplate")
+    public ResponseEntity<?> updateCourse(
+            @PathVariable String courseId,
+            @RequestParam(required = false) String trainerId,
+            @RequestBody(required = false) CreateCourseRequest request) {
+        return ResponseEntity.status(410).body(java.util.Map.of(
+                "error", "Course content is admin-managed. Ask the admin to edit the template."
+        ));
     }
 
     @PostMapping("/{courseId}/publish")
-    @Operation(summary = "Publish a course (Trainer only)")
-    public ResponseEntity<CourseResponse> publishCourse(
+    @Operation(summary = "DEPRECATED — drafts removed; every offering is created live")
+    public ResponseEntity<?> publishCourse(
             @PathVariable String courseId,
-            @RequestParam String trainerId) {
-        CourseResponse course = courseService.publishCourse(courseId, trainerId);
-        return ResponseEntity.ok(course);
+            @RequestParam(required = false) String trainerId) {
+        // Drafts no longer exist — assigning a template to a trainer now
+        // immediately publishes the offering. This endpoint is kept for any
+        // stale mobile client that still calls it, but it's a no-op.
+        return ResponseEntity.status(410).body(java.util.Map.of(
+                "error", "Drafts have been removed. Courses are published the moment the admin assigns them."
+        ));
     }
 
     @GetMapping

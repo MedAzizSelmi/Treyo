@@ -1,8 +1,8 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
-import { authService } from '../../services/api';
+import { authService, notificationService } from '../../services/api';
 import api from '../../services/api';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
@@ -13,6 +13,7 @@ export default function ProfileScreen() {
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [imageTs, setImageTs] = useState(Date.now());
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
     // Reload every time screen comes into focus
     useFocusEffect(
@@ -29,6 +30,14 @@ export default function ProfileScreen() {
             const res = await api.get('/students/me');
             setProfile(res.data);
             setImageTs(Date.now()); // bust image cache on every reload
+
+            // Pull real unread-notification count for the header bell
+            if (currentUser?.userId) {
+                try {
+                    const count = await notificationService.getUnreadCount(currentUser.userId);
+                    setUnreadNotifCount(typeof count === 'number' ? count : 0);
+                } catch (_) {}
+            }
         } catch (e) {
             console.log('Profile fetch error', e);
         }
@@ -57,7 +66,11 @@ export default function ProfileScreen() {
                         <View style={styles.headerRight}>
                             <TouchableOpacity onPress={() => router.push('/(student-tabs)/notifications' as any)} style={styles.bellWrap}>
                                 <Ionicons name="notifications-outline" size={22} color="#ffffff" />
-                                <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
+                                {unreadNotifCount > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                             <TouchableOpacity onPress={handleLogout}>
                                 <Ionicons name="log-out-outline" size={22} color="#ffffff" />
@@ -78,12 +91,17 @@ export default function ProfileScreen() {
                             </View>
                         )}
                     </View>
-                    {/* Settings + heart icons */}
+                    {/* Settings + heart icons.
+                        Heart opens the favourites screen, populated by every
+                        course the student has saved via the heart toggle on
+                        course-detail. */}
                     <View style={styles.iconRow}>
                         <TouchableOpacity onPress={() => router.push('/edit-profile' as any)}>
                             <Ionicons name="settings-outline" size={22} color="#7cce06" />
                         </TouchableOpacity>
-                        <Ionicons name="heart" size={22} color="#7cce06" />
+                        <TouchableOpacity onPress={() => router.push('/favorites' as any)}>
+                            <Ionicons name="heart" size={22} color="#7cce06" />
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -151,6 +169,57 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
+                {/* LinkedIn / Portfolio links */}
+                {(profile?.linkedinUrl || profile?.portfolioUrl) && (
+                    <View style={styles.sectionWrap}>
+                        <Text style={styles.sectionLabel}>Links</Text>
+                        <View style={styles.glassCard}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={styles.linksRow}>
+                                {profile.linkedinUrl && (
+                                    <TouchableOpacity
+                                        style={styles.linkBtn}
+                                        onPress={() => Linking.openURL(profile.linkedinUrl)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="logo-linkedin" size={16} color="#0A66C2" />
+                                        <Text style={styles.linkBtnText}>LinkedIn</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {profile.portfolioUrl && (
+                                    <TouchableOpacity
+                                        style={styles.linkBtn}
+                                        onPress={() => Linking.openURL(profile.portfolioUrl)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="globe-outline" size={16} color="#7cce06" />
+                                        <Text style={styles.linkBtnText}>Portfolio</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                )}
+
+                {/* Settings & Privacy entry */}
+                <View style={styles.sectionWrap}>
+                    <TouchableOpacity
+                        style={styles.settingsRow}
+                        onPress={() => router.push('/settings-privacy' as any)}
+                        activeOpacity={0.8}
+                    >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.settingsIconWrap}>
+                            <Ionicons name="settings-outline" size={22} color="#7cce06" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.settingsTitle}>Settings & Privacy</Text>
+                            <Text style={styles.settingsSubtitle}>Language, security, payments and more</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Edit Resume button */}
                 <TouchableOpacity style={styles.editResumeBtn} onPress={() => router.push('/edit-profile' as any)} activeOpacity={0.8}>
                     <Text style={styles.editResumeBtnText}>Edit Profile</Text>
@@ -209,6 +278,31 @@ const styles = StyleSheet.create({
     overviewTitle: { fontSize: 11, fontWeight: '700', color: '#7cce06', marginBottom: 6, letterSpacing: 0.3 },
     overviewValue: { fontSize: 13, color: '#cccccc', lineHeight: 19 },
     overviewBullet: { fontSize: 13, color: '#cccccc', lineHeight: 20 },
+
+    // Settings & Privacy entry
+    settingsRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 14,
+        borderRadius: 16, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
+        paddingHorizontal: 16, paddingVertical: 14,
+    },
+    settingsIconWrap: {
+        width: 42, height: 42, borderRadius: 12,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    settingsTitle: { fontSize: 15, fontWeight: '700', color: '#ffffff' },
+    settingsSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
+
+    // Links row
+    linksRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+    linkBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    },
+    linkBtnText: { fontSize: 13, color: '#ffffff', fontWeight: '500' },
 
     // Edit Resume button
     editResumeBtn: {

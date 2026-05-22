@@ -116,6 +116,13 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!--
+            Payments are handled via Konnect (Tunisian PSP) over REST.
+            We talk to https://api.konnect.network/api/v2 with Spring's
+            built-in WebClient — no SDK dependency needed. See
+            PaymentService for the full integration.
+        -->
     </dependencies>
 
     <build>

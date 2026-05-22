@@ -1,17 +1,33 @@
 # FastAPI and server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+# Pinned floors chosen so wheels exist for current Python (3.13/3.14).
+# The older 0.109 line couldn't build pydantic-core on Py 3.14.
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.30.0,<1.0.0
+pydantic>=2.9.0,<3.0.0
+pydantic-settings>=2.5.0,<3.0.0
 
-# Database
-psycopg2-binary==2.9.9
+# Database — 2.9.10+ added Python 3.13 support; older releases tried to
+# compile C source against removed Python internals on 3.14.
+psycopg2-binary>=2.9.10,<3.0.0
 
 # Environment variables
-python-dotenv==1.0.0
+python-dotenv>=1.0.0,<2.0.0
 
 # Optional but useful
-python-multipart==0.0.6
+python-multipart>=0.0.9,<1.0.0
+
+# Background model-refresh scheduler
+apscheduler>=3.10.4,<4.0.0
+
+# Approximate nearest-neighbour index — used for course similarity at
+# scale (replaces the O(N²) cosine_similarity matrix). Use a recent
+# release so wheels exist for current Python versions (1.7.x has no
+# wheels past Python 3.11).
+faiss-cpu>=1.13.0,<2.0.0
+
+# Process-level CPU / memory metrics exposed via /health for the admin
+# dashboard's System Health page.
+psutil>=5.9.8,<6.0.0
 
 # Note: pandas, numpy, scikit-learn should already be installed
 # If not, install them with: pip install pandas numpy scikit-learn

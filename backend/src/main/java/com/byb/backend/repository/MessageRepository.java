@@ -60,4 +60,16 @@ public interface MessageRepository extends JpaRepository<Message, String> {
             @Param("conversationId") String conversationId,
             @Param("userId") String userId
     );
+
+    // ─── Group chat ─────────────────────────────────────────────────
+    // Group chats reuse this same `messages` table but with a different
+    // conversation_id format: "GROUP_<groupId>". One row per message
+    // regardless of how many people are in the group. Members are
+    // derived dynamically (enrollments + group.trainer + admins) — no
+    // separate group_members table needed.
+
+    /** All messages in one group's conversation, oldest first. */
+    @Query("SELECT m FROM Message m WHERE m.conversationId = :convId "
+            + "AND m.isDeleted = false ORDER BY m.createdAt ASC")
+    List<Message> findGroupMessages(@Param("convId") String conversationId);
 }

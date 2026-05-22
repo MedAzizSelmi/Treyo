@@ -20,6 +20,17 @@ public class TrainerService {
         return mapToProfileResponse(trainer);
     }
 
+    /**
+     * Lookup variant used by the /me endpoints. The JWT carries the user's
+     * email as its subject, so the controller can resolve "current user"
+     * without needing a trainerId query param.
+     */
+    public TrainerProfileResponse getProfileByEmail(String email) {
+        Trainer trainer = trainerRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Trainer not found: " + email));
+        return mapToProfileResponse(trainer);
+    }
+
     @Transactional
     public TrainerProfileResponse updateProfilePage1(String trainerId, TrainerProfilePage1Request request) {
         Trainer trainer = trainerRepository.findByTrainerId(trainerId)

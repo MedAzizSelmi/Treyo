@@ -1,6 +1,8 @@
 package com.byb.backend.controller;
 
 import com.byb.backend.model.Enrollment;
+import com.byb.backend.repository.EnrollmentRepository;
+import com.byb.backend.repository.StudentRepository;
 import com.byb.backend.service.EnrollmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -10,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/enrollments")
@@ -19,14 +23,45 @@ import java.util.List;
 public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
+    private final EnrollmentRepository enrollmentRepository;
+    private final StudentRepository studentRepository;
+
+    @GetMapping("/course/{courseId}")
+    @Operation(summary = "Get all enrollments for a course (trainer view)")
+    public ResponseEntity<List<Map<String, Object>>> getCourseEnrollments(@PathVariable String courseId) {
+        List<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId);
+        List<Map<String, Object>> result = enrollments.stream().map(e -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("enrollmentId", e.getEnrollmentId());
+            m.put("studentId", e.getStudentId());
+            m.put("courseId", e.getCourseId());
+            m.put("groupId", e.getGroupId());
+            m.put("enrollmentStatus", e.getEnrollmentStatus());
+            m.put("progressPercentage", e.getProgressPercentage());
+            m.put("sessionsAttended", e.getSessionsAttended());
+            m.put("enrolledAt", e.getEnrolledAt());
+            // Enrich with student name
+            studentRepository.findByStudentId(e.getStudentId()).ifPresent(s -> {
+                m.put("studentName", s.getName());
+                m.put("studentProfilePicture", s.getProfilePictureUrl());
+            });
+            return m;
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
 
     @PostMapping("/confirm")
-    @Operation(summary = "Student confirms enrollment in course/group")
+    @Operation(summary = "Student confirms enrollment (requires successful Konnect payment for paid courses)")
     public ResponseEntity<Enrollment> confirmEnrollment(
             @RequestParam String studentId,
             @RequestParam String courseId,
-            @RequestParam(required = false) String groupId) {
-        Enrollment enrollment = enrollmentService.confirmEnrollment(studentId, courseId, groupId);
+            @RequestParam(required = false) String groupId,
+            // For paid courses this MUST be a Konnect paymentRef returned
+            // by POST /api/payments/enrollment-payment and completed via
+            // the user's redirect flow. Optional for free courses.
+            @RequestParam(required = false) String paymentRef) {
+        Enrollment enrollment = enrollmentService.confirmEnrollment(
+                studentId, courseId, groupId, paymentRef);
         return ResponseEntity.ok(enrollment);
     }
 

@@ -1,13 +1,22 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl, ActivityIndicator, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { courseService, authService, enrollmentService, notificationService, trainerService } from '../../services/api';
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ScreenBackground } from '../../components/ScreenBackground';
+
+// A course shows up in "Groups Forming Now" only once it has reached this
+// fraction of its minimum-students requirement. So a course with min=100
+// needs >= 75 requests to surface; with min=8 it needs >= 6 requests. This
+// keeps the section focused on groups that are realistically close to
+// forming, instead of cluttering it with courses that just opened.
+const GROUP_FORMING_THRESHOLD = 0.75;
+// Home only shows a peek of 5 — the rest live behind "See All".
+const HOME_FORMING_LIMIT = 5;
 
 const { width } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -25,6 +34,29 @@ export default function StudentHomeScreen() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Derived: groups that are actually close to forming.
+    // Filtering rules:
+    //   - must have a min-students gate
+    //   - interest count must be >= 75% of the gate (close to launching)
+    //   - and still below the gate (otherwise group is already formed and
+    //     admin will promote it — no longer "forming")
+    // Within those, we rank by progress so the closest-to-launching groups
+    // surface first.
+    const formingGroups = useMemo(() => {
+        return recommendations
+            .map((c: any) => {
+                const min = c.minStudentsRequired || 5;
+                const enrolled = c.interestedStudentsCount ?? c.totalEnrolled ?? 0;
+                const pct = Math.min(Math.round((enrolled / min) * 100), 100);
+                return { ...c, _min: min, _enrolled: enrolled, _pct: pct };
+            })
+            .filter((c: any) =>
+                c._enrolled >= c._min * GROUP_FORMING_THRESHOLD && c._enrolled < c._min
+            )
+            .sort((a: any, b: any) => b._pct - a._pct)
+            .slice(0, HOME_FORMING_LIMIT);
+    }, [recommendations]);
 
     useEffect(() => { loadData(); }, []);
 
@@ -149,10 +181,10 @@ export default function StudentHomeScreen() {
 
                 {/* ── QUICK ACTIONS ── */}
                 <View style={styles.quickRow}>
-                    <TouchableOpacity style={[styles.quickCard, { width: CARD_HALF, height: CARD_HALF * 0.85 }]} onPress={() => router.push('/(student-tabs)/trainers' as any)} activeOpacity={0.8}>
+                    <TouchableOpacity style={[styles.quickCard, { width: CARD_HALF, height: CARD_HALF * 0.85 }]} onPress={() => router.push('/course-search' as any)} activeOpacity={0.8}>
                         <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.quickTop}>
-                            <View style={styles.quickIconWrap}><Ionicons name="school-outline" size={22} color="rgba(255,255,255,0.7)" /></View>
+                            <View style={styles.quickIconWrap}><Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.7)" /></View>
                             <Ionicons name="arrow-up-outline" size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: '45deg' }] }} />
                         </View>
                         <Text style={styles.quickLabel}>Trainings</Text>
@@ -185,7 +217,12 @@ export default function StudentHomeScreen() {
                             <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
                         </View>
                         {enrolledCourses.slice(0, 4).map((enrollment: any, i: number) => (
-                            <TouchableOpacity key={enrollment.enrollmentId || i} style={styles.sessionCard} activeOpacity={0.85}>
+                            <TouchableOpacity
+                                key={enrollment.enrollmentId || i}
+                                style={styles.sessionCard}
+                                activeOpacity={0.85}
+                                onPress={() => enrollment.courseId && router.push({ pathname: '/course-detail' as any, params: { courseId: enrollment.courseId } })}
+                            >
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={[styles.sessionAccent, {
                                     backgroundColor: enrollment.enrollmentStatus === 'active' ? '#7cce06' : 'rgba(124,206,6,0.35)'
@@ -227,36 +264,53 @@ export default function StudentHomeScreen() {
                     </View>
                 )}
 
-                {/* ── GROUPS FORMING NOW ── */}
-                {recommendations.length > 0 && (
+                {/* ── GROUPS FORMING NOW ──
+                    Shows courses that are ≥75% of the way to their minimum
+                    student requirement. Tapping a card opens course-detail
+                    where the student goes through the normal request flow —
+                    no inline Join button, so there's a single path through
+                    the funnel and we don't have to duplicate enrollment UX. */}
+                {formingGroups.length > 0 && (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Groups Forming Now</Text>
-                            <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => router.push('/groups-forming' as any)}><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
-                            {recommendations.slice(0, 5).map((course: any, i: number) => {
-                                const enrolled = course.interestedStudentsCount || course.totalEnrolled || 0;
-                                const min = course.minStudentsRequired || 5;
-                                const pct = Math.min(Math.round((enrolled / min) * 100), 100);
+                            {formingGroups.map((course: any, i: number) => {
+                                const courseId = course.courseId || course.id;
+                                const spotsLeft = course._min - course._enrolled;
                                 return (
-                                    <TouchableOpacity key={course.courseId || course.id || i} style={styles.groupCard} activeOpacity={0.85}>
+                                    <TouchableOpacity
+                                        key={courseId || i}
+                                        style={styles.groupCard}
+                                        activeOpacity={0.85}
+                                        onPress={() => router.push({ pathname: '/course-detail' as any, params: { courseId } })}
+                                    >
                                         <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
                                         <View style={styles.groupDomain}>
                                             <Ionicons name="people" size={16} color="#7cce06" />
-                                            <Text style={styles.groupDomainText}>{course.level || 'Beginner'}</Text>
+                                            <Text style={styles.groupDomainText} numberOfLines={1}>
+                                                {course.domain || course.level || 'Course'}
+                                            </Text>
                                         </View>
                                         <Text style={styles.groupTitle} numberOfLines={2}>{course.title}</Text>
-                                        <Text style={styles.groupTrainer}>{course.trainerName || course.trainer || ''}</Text>
+                                        <Text style={styles.groupTrainer} numberOfLines={1}>
+                                            {course.trainerName || course.trainer || 'Trainer'}
+                                        </Text>
                                         <View style={styles.groupProgress}>
                                             <View style={styles.progressTrackSmall}>
-                                                <View style={[styles.progressFillGroup, { width: `${pct}%` }]} />
+                                                <View style={[styles.progressFillGroup, { width: `${course._pct}%` }]} />
                                             </View>
-                                            <Text style={styles.groupCount}>{enrolled}/{min}</Text>
+                                            <Text style={styles.groupCount}>{course._enrolled}/{course._min}</Text>
                                         </View>
-                                        <TouchableOpacity style={styles.joinBtn}>
-                                            <Text style={styles.joinText}>Join Group</Text>
-                                        </TouchableOpacity>
+                                        <Text style={styles.spotsHint}>
+                                            {spotsLeft === 1 ? '1 spot left' : `${spotsLeft} spots left`}
+                                        </Text>
+                                        <View style={styles.viewHint}>
+                                            <Text style={styles.viewHintText}>View course</Text>
+                                            <Ionicons name="chevron-forward" size={13} color="#7cce06" />
+                                        </View>
                                     </TouchableOpacity>
                                 );
                             })}
@@ -269,10 +323,15 @@ export default function StudentHomeScreen() {
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Recommended For You</Text>
-                            <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => router.push('/recommended-courses' as any)}><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
                         </View>
                         {recommendations.slice(0, 4).map((course: any) => (
-                            <TouchableOpacity key={course.courseId || course.id} style={styles.recCard} activeOpacity={0.85}>
+                            <TouchableOpacity
+                                key={course.courseId || course.id}
+                                style={styles.recCard}
+                                activeOpacity={0.85}
+                                onPress={() => router.push({ pathname: '/course-detail' as any, params: { courseId: course.courseId || course.id } })}
+                            >
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <View style={styles.recIcon}>
                                     <Ionicons name="school" size={28} color="#7cce06" />
@@ -412,8 +471,11 @@ const styles = StyleSheet.create({
     progressTrackSmall: { flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)' },
     progressFillGroup: { height: 4, borderRadius: 2, backgroundColor: '#7cce06' },
     groupCount: { fontSize: 11, color: '#aaaaaa', fontWeight: '600' },
-    joinBtn: { backgroundColor: 'rgba(124,206,6,0.15)', borderRadius: 10, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(124,206,6,0.3)' },
-    joinText: { fontSize: 13, fontWeight: '600', color: '#7cce06' },
+    spotsHint: { fontSize: 10, color: '#FFA500', fontWeight: '600', marginBottom: 8 },
+    // viewHint replaces the old Join button: tapping the card navigates to
+    // course-detail, so all we need is a "tap me" affordance, not an action.
+    viewHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 2 },
+    viewHintText: { fontSize: 12, fontWeight: '600', color: '#7cce06' },
 
     recCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', padding: 14, marginBottom: 10 },
     recIcon: { width: 52, height: 52, borderRadius: 14, backgroundColor: 'rgba(124,206,6,0.12)', justifyContent: 'center', alignItems: 'center', marginRight: 14 },

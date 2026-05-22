@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,28 @@ public class TrainerController {
     private final TrainerService trainerService;
     private final TrainerRepository trainerRepository;
     private final CourseRepository courseRepository;
+
+    @GetMapping("/{trainerId}")
+    @Operation(summary = "Get a trainer's public profile by ID")
+    public ResponseEntity<Map<String, Object>> getTrainerById(@PathVariable String trainerId) {
+        return trainerRepository.findById(trainerId).map(t -> {
+            Map<String, Object> map = new java.util.LinkedHashMap<>();
+            map.put("trainerId", t.getTrainerId());
+            map.put("name", t.getName());
+            map.put("profilePictureUrl", t.getProfilePictureUrl());
+            map.put("specializations", t.getSpecializations());
+            map.put("skills", t.getSkills());
+            map.put("experienceYears", t.getExperienceYears());
+            map.put("bio", t.getBio());
+            map.put("isVerified", t.getIsVerified());
+            map.put("averageRating", t.getAverageRating());
+            map.put("linkedinUrl", t.getLinkedinUrl());
+            map.put("portfolioUrl", t.getPortfolioUrl());
+            long coursesCount = courseRepository.countByTrainerId(t.getTrainerId());
+            map.put("coursesCount", coursesCount);
+            return ResponseEntity.ok(map);
+        }).orElse(ResponseEntity.notFound().build());
+    }
 
     @GetMapping
     @Operation(summary = "Get all active trainers")
@@ -50,10 +73,12 @@ public class TrainerController {
     }
 
     @GetMapping("/me")
-    @Operation(summary = "Get current trainer profile")
-    public ResponseEntity<TrainerProfileResponse> getMyProfile(
-            @RequestParam String trainerId) {
-        TrainerProfileResponse profile = trainerService.getProfile(trainerId);
+    @Operation(summary = "Get current trainer profile (derives identity from JWT)")
+    public ResponseEntity<TrainerProfileResponse> getMyProfile(Authentication authentication) {
+        // JWT subject is the trainer's email; service resolves the row from it.
+        // This avoids the 400-on-missing-trainerId-param the old signature caused.
+        String email = authentication.getName();
+        TrainerProfileResponse profile = trainerService.getProfileByEmail(email);
         return ResponseEntity.ok(profile);
     }
 

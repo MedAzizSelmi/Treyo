@@ -24,6 +24,15 @@ public class Course extends BaseEntity {
     @Column(name = "trainer_id", length = 50, nullable = false)
     private String trainerId;
 
+    /**
+     * Link back to the admin-owned CourseTemplate that this offering was
+     * created from. When admin edits the template, the shared content fields
+     * on this row are kept in sync. Null only for legacy rows created before
+     * the template system existed.
+     */
+    @Column(name = "template_id", length = 50)
+    private String templateId;
+
     @Column(nullable = false, length = 500)
     private String title;
 
@@ -69,6 +78,14 @@ public class Course extends BaseEntity {
 
     @Column(name = "max_students_per_group")
     private Integer maxStudentsPerGroup = 30;
+
+    /**
+     * Maximum number of parallel groups the trainer is willing to run for this
+     * course. Once this many groups have been formed, the course stops accepting
+     * new enrollments. Defaults to 1 — most trainers run a single cohort.
+     */
+    @Column(name = "max_groups_allowed")
+    private Integer maxGroupsAllowed = 1;
 
     @Column(name = "current_groups_count")
     private Integer currentGroupsCount = 0;

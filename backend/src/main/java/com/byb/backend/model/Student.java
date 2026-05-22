@@ -71,6 +71,12 @@ public class Student extends BaseEntity {
     @Column(name = "cv_url")
     private String cvUrl;
 
+    @Column(name = "linkedin_url")
+    private String linkedinUrl;
+
+    @Column(name = "portfolio_url")
+    private String portfolioUrl;
+
     @Column(name = "professional_experience", columnDefinition = "TEXT")
     private String professionalExperience;
 

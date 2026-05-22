@@ -5,6 +5,7 @@ import com.byb.backend.dto.course.CourseResponse;
 import com.byb.backend.model.Course;
 import com.byb.backend.model.Trainer;
 import com.byb.backend.repository.CourseRepository;
+import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.InteractionRepository;
 import com.byb.backend.repository.TrainerRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final TrainerRepository trainerRepository;
     private final InteractionRepository interactionRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     @Transactional
     public CourseResponse createCourse(String trainerId, CreateCourseRequest request) {
@@ -47,6 +49,7 @@ public class CourseService {
         course.setPrice(request.getPrice());
         course.setMinStudentsRequired(request.getMinStudentsRequired());
         course.setMaxStudentsPerGroup(request.getMaxStudentsPerGroup());
+        course.setMaxGroupsAllowed(request.getMaxGroupsAllowed());
         course.setHasCertificate(request.getHasCertificate());
         course.setIsActive(true);
         course.setIsPublished(false); // Initially unpublished
@@ -99,6 +102,59 @@ public class CourseService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Returns the student's saved/favourited courses as full CourseResponse
+     * objects so the mobile favourites screen can render cards directly
+     * (no N+1 lookup from the client). Inactive courses are filtered out —
+     * if a trainer's offering was deactivated after the student saved it,
+     * we just hide it rather than rendering a broken stub.
+     */
+    public List<CourseResponse> getSavedCoursesForStudent(String studentId) {
+        List<String> savedIds = interactionRepository.findSavedCourseIdsByStudent(studentId);
+        if (savedIds.isEmpty()) return List.of();
+
+        return courseRepository.findAllById(savedIds).stream()
+                .filter(c -> Boolean.TRUE.equals(c.getIsActive()))
+                .map(course -> {
+                    Trainer trainer = trainerRepository.findByTrainerId(course.getTrainerId())
+                            .orElse(null);
+                    String trainerName = trainer != null ? trainer.getName() : "Unknown";
+                    return mapToCourseResponse(course, trainerName);
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public CourseResponse updateCourse(String courseId, String trainerId, CreateCourseRequest request) {
+        Course course = courseRepository.findByCourseId(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found"));
+
+        if (!course.getTrainerId().equals(trainerId)) {
+            throw new RuntimeException("Unauthorized: You can only edit your own courses");
+        }
+
+        if (request.getTitle() != null) course.setTitle(request.getTitle());
+        if (request.getDescription() != null) course.setDescription(request.getDescription());
+        if (request.getDomain() != null) course.setDomain(request.getDomain());
+        if (request.getSpecificTopic() != null) course.setSpecificTopic(request.getSpecificTopic());
+        if (request.getLevel() != null) course.setLevel(request.getLevel());
+        if (request.getDurationHours() != null) course.setDurationHours(request.getDurationHours());
+        if (request.getLanguage() != null) course.setLanguage(request.getLanguage());
+        if (request.getFormat() != null) course.setFormat(request.getFormat());
+        if (request.getPrerequisites() != null) course.setPrerequisites(request.getPrerequisites());
+        if (request.getLearningOutcomes() != null) course.setLearningOutcomes(request.getLearningOutcomes());
+        if (request.getPrice() != null) course.setPrice(request.getPrice());
+        if (request.getMinStudentsRequired() != null) course.setMinStudentsRequired(request.getMinStudentsRequired());
+        if (request.getMaxStudentsPerGroup() != null) course.setMaxStudentsPerGroup(request.getMaxStudentsPerGroup());
+        if (request.getMaxGroupsAllowed() != null) course.setMaxGroupsAllowed(request.getMaxGroupsAllowed());
+        if (request.getHasCertificate() != null) course.setHasCertificate(request.getHasCertificate());
+
+        course = courseRepository.save(course);
+
+        Trainer trainer = trainerRepository.findByTrainerId(trainerId).orElse(null);
+        return mapToCourseResponse(course, trainer != null ? trainer.getName() : "Unknown");
+    }
+
     public CourseResponse getCourseById(String courseId) {
         Course course = courseRepository.findByCourseId(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
@@ -111,8 +167,9 @@ public class CourseService {
     }
 
     private CourseResponse mapToCourseResponse(Course course, String trainerName) {
-        // Count interested students
+        // Count interested students AND actual enrollments (dynamic — stays in sync with DB)
         long interestedCount = interactionRepository.countInterestedStudents(course.getCourseId());
+        long actualEnrolled = enrollmentRepository.countByCourseId(course.getCourseId());
         boolean canFormGroup = course.canFormGroup((int) interestedCount);
 
         return CourseResponse.builder()
@@ -137,7 +194,7 @@ public class CourseService {
                 .currentGroupsCount(course.getCurrentGroupsCount())
                 .averageRating(course.getAverageRating())
                 .totalRatings(course.getTotalRatings())
-                .totalEnrolled(course.getTotalEnrolled())
+                .totalEnrolled((int) actualEnrolled)
                 .totalCompleted(course.getTotalCompleted())
                 .completionRate(course.getCompletionRate())
                 .isPublished(course.getIsPublished())

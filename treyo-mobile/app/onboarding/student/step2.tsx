@@ -55,7 +55,7 @@ export default function StudentOnboardingStep2() {
                 experienceLevel: 'beginner',
             });
 
-            router.push({
+            router.replace({
                 pathname: '/onboarding/student/step3' as any,
                 params: { fields: params.fields, interests: selectedInterests.join(',') },
             });

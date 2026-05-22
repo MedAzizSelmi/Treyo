@@ -51,14 +51,28 @@ public class MLRecommendationService {
         }
     }
 
-    public RecommendationResponse getColdStartRecommendations(String interests, String level, int count) {
+    /**
+     * Call the FastAPI cold-start endpoint. Field names MUST match the
+     * ColdStartRequest Pydantic model in ml-service/main.py:
+     *   student_interests, student_level, student_domains, n_recommendations
+     * (The previous "interests"/"level" names caused 422 validation errors.)
+     *
+     * @param domains comma-separated primary_domains, e.g. "informatique,design".
+     *                Optional — when null/blank the ranker falls back to pure
+     *                content/rating scoring without the hard domain gate.
+     */
+    public RecommendationResponse getColdStartRecommendations(
+            String interests, String level, int count, String domains) {
         try {
             String url = mlServiceUrl + "/recommendations/cold-start";
 
             Map<String, Object> request = new HashMap<>();
-            request.put("interests", interests);
-            request.put("level", level);
+            request.put("student_interests", interests);
+            request.put("student_level", level);
             request.put("n_recommendations", count);
+            if (domains != null && !domains.isBlank()) {
+                request.put("student_domains", domains);
+            }
 
             WebClient webClient = webClientBuilder.build();
 
@@ -78,6 +92,11 @@ public class MLRecommendationService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to get cold-start recommendations: " + e.getMessage());
         }
+    }
+
+    // Backwards-compat overload for any caller still passing the 3-arg form.
+    public RecommendationResponse getColdStartRecommendations(String interests, String level, int count) {
+        return getColdStartRecommendations(interests, level, count, null);
     }
 
     public void trackInteraction(String studentId, String courseId, String interactionType) {

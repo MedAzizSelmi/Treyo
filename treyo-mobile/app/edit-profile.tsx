@@ -1,11 +1,11 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, Image, Modal } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, Image, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
-import { authService, fetchUpload, API_BASE_URL } from '../services/api';
+import { authService, fetchUpload, API_BASE_URL, enrollmentService } from '../services/api';
 import api from '../services/api';
 import { ScreenBackground } from '../components/ScreenBackground';
 
@@ -17,6 +17,14 @@ export default function EditProfileScreen() {
     const [loading, setLoading] = useState(false);
     const [showPicModal, setShowPicModal] = useState(false);
 
+    // Professional fields
+    const [skills, setSkills] = useState<string[]>([]);
+    const [skillInput, setSkillInput] = useState('');
+    const [educationLevel, setEducationLevel] = useState('');
+    const [professionalExperience, setProfessionalExperience] = useState('');
+    const [linkedinUrl, setLinkedinUrl] = useState('');
+    const [portfolioUrl, setPortfolioUrl] = useState('');
+
     useEffect(() => { loadProfile(); }, []);
 
     const loadProfile = async () => {
@@ -27,9 +35,26 @@ export default function EditProfileScreen() {
             const p = res.data;
             setBio(p.bio || '');
             setProfilePic(p.profilePictureUrl || null);
+            setSkills(Array.isArray(p.keySkills) ? p.keySkills : (p.keySkills ? [p.keySkills] : []));
+            setEducationLevel(p.educationLevel || '');
+            setProfessionalExperience(p.professionalExperience || '');
+            setLinkedinUrl(p.linkedinUrl || '');
+            setPortfolioUrl(p.portfolioUrl || '');
         } catch (e) {
             console.log('Load profile error', e);
         }
+    };
+
+    const addSkill = () => {
+        const trimmed = skillInput.trim();
+        if (trimmed && !skills.includes(trimmed)) {
+            setSkills(prev => [...prev, trimmed]);
+        }
+        setSkillInput('');
+    };
+
+    const removeSkill = (skill: string) => {
+        setSkills(prev => prev.filter(s => s !== skill));
     };
 
     const handlePickImage = async (source: 'camera' | 'gallery') => {
@@ -63,50 +88,43 @@ export default function EditProfileScreen() {
         setLoading(true);
         try {
             const user = await authService.getCurrentUser();
-            console.log('Saving profile for user:', user?.userId);
 
-            // ── 1. Upload new profile picture if a local file was selected ──
+            // 1. Upload new profile picture if a local file was selected
             let pictureUrl: string | null = profilePic;
-            const isLocalFile = profilePic &&
-                !profilePic.startsWith('http') &&
-                !profilePic.startsWith('https');
-
-            console.log('profilePic:', profilePic);
-            console.log('isLocalFile:', isLocalFile);
-
+            const isLocalFile = profilePic && !profilePic.startsWith('http') && !profilePic.startsWith('https');
             if (isLocalFile) {
                 const filename = profilePic!.split('/').pop() || 'profile.jpg';
                 const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
                 const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-                console.log('Uploading picture:', filename, mimeType);
-
                 const formData = new FormData();
                 formData.append('file', { uri: profilePic!, name: filename, type: mimeType } as any);
                 formData.append('userId', String(user?.userId || ''));
                 formData.append('userType', 'STUDENT');
-
                 const uploadData = await fetchUpload('/files/upload/profile-picture', formData);
-                console.log('Upload response:', JSON.stringify(uploadData));
-
                 pictureUrl = API_BASE_URL + uploadData.fileUrl;
-                console.log('Final pictureUrl:', pictureUrl);
             }
 
-            // ── 2. Save name + bio ──
-            const basicRes = await api.put('/students/me/basic', { name: name.trim(), bio: bio.trim() });
-            console.log('Basic save status:', basicRes.status);
+            // 2. Save name + bio
+            await api.put('/students/me/basic', { name: name.trim(), bio: bio.trim() });
 
-            // ── 3. Save profile picture URL ──
-            const picRes = await api.put('/students/me/profile-picture', { profilePictureUrl: pictureUrl });
-            console.log('Picture URL save status:', picRes.status, 'url saved:', pictureUrl);
+            // 3. Save profile picture URL
+            await api.put('/students/me/profile-picture', { profilePictureUrl: pictureUrl });
 
-            // ── 4. Update SecureStore cache ──
+            // 4. Save professional profile fields
+            await enrollmentService.updateStudentProfile({
+                keySkills: skills,
+                educationLevel: educationLevel.trim() || undefined,
+                professionalExperience: professionalExperience.trim() || undefined,
+                linkedinUrl: linkedinUrl.trim() || null,
+                portfolioUrl: portfolioUrl.trim() || null,
+            });
+
+            // 5. Update SecureStore cache
             if (user) {
                 const updatedUser = { ...user, name: name.trim(), profilePictureUrl: pictureUrl };
                 await SecureStore.setItemAsync('user_data', JSON.stringify(updatedUser));
             }
 
-            // Navigate back only after user dismisses the alert
             Alert.alert('Success', 'Profile updated successfully!', [
                 { text: 'OK', onPress: () => router.back() },
             ]);
@@ -129,9 +147,7 @@ export default function EditProfileScreen() {
                             <Ionicons name="arrow-back" size={22} color="#ffffff" />
                         </TouchableOpacity>
                         <Text style={styles.headerTitle}>Edit Profile</Text>
-                        <TouchableOpacity onPress={handleSave} style={styles.logoutBtn}>
-                            <Ionicons name="log-out-outline" size={22} color="#ffffff" />
-                        </TouchableOpacity>
+                        <View style={{ width: 22 }} />
                     </View>
                 </View>
 
@@ -157,38 +173,87 @@ export default function EditProfileScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Username */}
-                    <Text style={styles.fieldLabel}>Enter Username</Text>
+                    {/* Section: Basic Info */}
+                    <Text style={styles.sectionTitle}>Basic Info</Text>
+
+                    <Text style={styles.fieldLabel}>Username</Text>
                     <View style={styles.inputWrap}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput
-                            style={styles.input}
-                            value={name}
-                            onChangeText={setName}
-                            placeholder="Your name"
-                            placeholderTextColor="#555"
-                        />
+                        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor="#555" />
                     </View>
 
-                    {/* Bio */}
-                    <Text style={styles.fieldLabel}>Enter Your Bio</Text>
+                    <Text style={styles.fieldLabel}>Bio</Text>
                     <View style={[styles.inputWrap, styles.bioWrap]}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput
-                            style={[styles.input, styles.bioInput]}
-                            value={bio}
-                            onChangeText={setBio}
-                            placeholder="Tell us about yourself..."
-                            placeholderTextColor="#555"
-                            multiline
-                            textAlignVertical="top"
-                        />
+                        <TextInput style={[styles.input, styles.bioInput]} value={bio} onChangeText={setBio} placeholder="Tell us about yourself..." placeholderTextColor="#555" multiline textAlignVertical="top" />
                     </View>
 
-                    {/* Edit Resume */}
-                    <TouchableOpacity style={styles.editResumeBtn} onPress={() => router.push('/onboarding/student/step3' as any)} activeOpacity={0.8}>
-                        <Text style={styles.editResumeBtnText}>Edit Resume</Text>
-                    </TouchableOpacity>
+                    {/* Section: Professional Profile */}
+                    <Text style={styles.sectionTitle}>Professional Profile</Text>
+
+                    <Text style={styles.fieldLabel}>Education Level</Text>
+                    <View style={styles.inputWrap}>
+                        <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+                        <TextInput style={styles.input} value={educationLevel} onChangeText={setEducationLevel} placeholder="e.g. Bachelor's, Master's..." placeholderTextColor="#555" />
+                    </View>
+
+                    <Text style={styles.fieldLabel}>Professional Experience</Text>
+                    <View style={[styles.inputWrap, styles.bioWrap]}>
+                        <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+                        <TextInput style={[styles.input, styles.bioInput]} value={professionalExperience} onChangeText={setProfessionalExperience} placeholder="Describe your work experience..." placeholderTextColor="#555" multiline textAlignVertical="top" />
+                    </View>
+
+                    <Text style={styles.fieldLabel}>Key Skills</Text>
+                    <View style={styles.tagInputRow}>
+                        <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
+                            <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+                            <TextInput
+                                style={styles.input}
+                                value={skillInput}
+                                onChangeText={setSkillInput}
+                                placeholder="Add a skill..."
+                                placeholderTextColor="#555"
+                                onSubmitEditing={addSkill}
+                                returnKeyType="done"
+                            />
+                        </View>
+                        <TouchableOpacity style={styles.addTagBtn} onPress={addSkill} activeOpacity={0.8}>
+                            <Ionicons name="add" size={20} color="#000" />
+                        </TouchableOpacity>
+                    </View>
+                    {skills.length > 0 && (
+                        <View style={styles.tagsWrap}>
+                            {skills.map(skill => (
+                                <View key={skill} style={styles.tag}>
+                                    <Text style={styles.tagText}>{skill}</Text>
+                                    <TouchableOpacity onPress={() => removeSkill(skill)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                                        <Ionicons name="close" size={13} color="#7cce06" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* Section: Links */}
+                    <Text style={styles.sectionTitle}>Links <Text style={styles.optionalPill}>Optional</Text></Text>
+
+                    <Text style={styles.fieldLabel}>LinkedIn URL</Text>
+                    <View style={styles.inputWrap}>
+                        <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.inputWithIcon}>
+                            <Ionicons name="logo-linkedin" size={16} color="#0A66C2" style={{ marginLeft: 14 }} />
+                            <TextInput style={[styles.input, { flex: 1 }]} value={linkedinUrl} onChangeText={setLinkedinUrl} placeholder="https://linkedin.com/in/..." placeholderTextColor="#555" autoCapitalize="none" keyboardType="url" />
+                        </View>
+                    </View>
+
+                    <Text style={styles.fieldLabel}>Portfolio URL</Text>
+                    <View style={styles.inputWrap}>
+                        <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.inputWithIcon}>
+                            <Ionicons name="globe-outline" size={16} color="#7cce06" style={{ marginLeft: 14 }} />
+                            <TextInput style={[styles.input, { flex: 1 }]} value={portfolioUrl} onChangeText={setPortfolioUrl} placeholder="https://yourportfolio.com" placeholderTextColor="#555" autoCapitalize="none" keyboardType="url" />
+                        </View>
+                    </View>
 
                     {/* Save */}
                     <TouchableOpacity
@@ -197,7 +262,7 @@ export default function EditProfileScreen() {
                         disabled={loading}
                         activeOpacity={0.85}
                     >
-                        <Text style={styles.saveBtnText}>{loading ? 'Saving...' : 'Save'}</Text>
+                        {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -206,20 +271,16 @@ export default function EditProfileScreen() {
             <Modal visible={showPicModal} transparent animationType="slide">
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowPicModal(false)}>
                     <View style={styles.modalContent}>
-                        {/* Handle bar */}
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>Add profile picture</Text>
-
                         <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('camera')}>
                             <Ionicons name="camera-outline" size={22} color="#ffffff" />
                             <Text style={styles.modalOptionText}>Take a photo</Text>
                         </TouchableOpacity>
-
                         <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('gallery')}>
                             <Ionicons name="image-outline" size={22} color="#ffffff" />
                             <Text style={styles.modalOptionText}>Upload from phone</Text>
                         </TouchableOpacity>
-
                         {profilePic && (
                             <TouchableOpacity style={styles.modalOption} onPress={handleRemovePicture}>
                                 <Ionicons name="trash-outline" size={22} color="#ff4444" />
@@ -235,73 +296,63 @@ export default function EditProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-
-    // Header
     header: { paddingTop: 50, paddingHorizontal: 20 },
     logo: { width: 40, height: 40, marginBottom: 10 },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#ffffff', flex: 1 },
-    logoutBtn: {},
-
-    // Content
     content: { flex: 1 },
     contentInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 60 },
 
-    // Avatar
     avatarSection: { alignItems: 'center', marginBottom: 28 },
-    avatarBorder: {
-        width: 150, height: 150, borderRadius: 75,
-        borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)',
-        overflow: 'hidden',
-        backgroundColor: 'rgba(255,255,255,0.05)',
-    },
+    avatarBorder: { width: 150, height: 150, borderRadius: 75, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.05)' },
     avatarImage: { width: '100%', height: '100%' },
     avatarFallback: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(124,206,6,0.15)' },
     avatarLetter: { fontSize: 52, fontWeight: 'bold', color: '#7cce06' },
     editPicText: { fontSize: 15, color: '#ffffff', fontWeight: '500', marginTop: 10 },
 
-    // Fields
-    fieldLabel: { fontSize: 14, fontWeight: '700', color: '#7cce06', marginBottom: 8, marginTop: 4 },
-    inputWrap: {
-        borderRadius: 14, overflow: 'hidden',
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-        marginBottom: 20,
+    sectionTitle: {
+        fontSize: 16, fontWeight: '800', color: '#ffffff',
+        marginBottom: 14, marginTop: 8,
+        paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)',
+        flexDirection: 'row', alignItems: 'center',
     },
-    input: { color: '#ffffff', fontSize: 15, paddingHorizontal: 16, paddingVertical: 16 },
+    optionalPill: {
+        fontSize: 11, fontWeight: '600', color: '#aaaaaa',
+    },
+
+    fieldLabel: { fontSize: 13, fontWeight: '700', color: '#7cce06', marginBottom: 8, marginTop: 4 },
+    inputWrap: { borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 16 },
+    input: { color: '#ffffff', fontSize: 15, paddingHorizontal: 16, paddingVertical: 14 },
     bioWrap: {},
-    bioInput: { minHeight: 110, textAlignVertical: 'top', paddingTop: 16 },
+    bioInput: { minHeight: 100, textAlignVertical: 'top', paddingTop: 14 },
+    inputWithIcon: { flexDirection: 'row', alignItems: 'center' },
 
-    // Edit Resume
-    editResumeBtn: {
-        alignSelf: 'center',
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.4)',
-        borderRadius: 12, paddingHorizontal: 32, paddingVertical: 12,
-        backgroundColor: 'rgba(124,206,6,0.08)',
-        marginTop: 8, marginBottom: 28,
-    },
-    editResumeBtnText: { fontSize: 14, fontWeight: '600', color: '#aaaaaa' },
-
-    // Save
-    saveBtn: {
+    tagInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+    addTagBtn: {
+        width: 46, height: 46, borderRadius: 14,
         backgroundColor: '#7cce06',
-        borderRadius: 14, paddingVertical: 16,
-        alignItems: 'center',
+        justifyContent: 'center', alignItems: 'center',
+        flexShrink: 0,
+    },
+    tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+    tag: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.3)',
+        borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+    },
+    tagText: { fontSize: 13, color: '#7cce06', fontWeight: '600' },
+
+    saveBtn: {
+        backgroundColor: '#7cce06', borderRadius: 14, paddingVertical: 16,
+        alignItems: 'center', marginTop: 8,
         shadowColor: '#7cce06', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
     },
     saveBtnText: { fontSize: 17, fontWeight: 'bold', color: '#000000' },
 
-    // Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: {
-        backgroundColor: '#2b12c6',
-        borderTopLeftRadius: 28, borderTopRightRadius: 28,
-        padding: 24, paddingTop: 14,
-    },
-    modalHandle: {
-        width: 40, height: 4, borderRadius: 2,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        alignSelf: 'center', marginBottom: 18,
-    },
+    modalContent: { backgroundColor: '#2b12c6', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingTop: 14 },
+    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.3)', alignSelf: 'center', marginBottom: 18 },
     modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginBottom: 20 },
     modalOption: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
     modalOptionText: { fontSize: 16, color: '#ffffff' },

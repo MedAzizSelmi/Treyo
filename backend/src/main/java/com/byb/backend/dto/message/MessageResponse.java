@@ -19,6 +19,10 @@ public class MessageResponse {
     private String senderId;
     private String senderType;
     private String senderName;
+    // Profile photo of the sender, looked up from students/trainers/admins
+    // by senderId + senderType. May be null (no uploaded picture yet) —
+    // the client falls back to an initial-letter avatar in that case.
+    private String senderPhotoUrl;
     private String receiverId;
     private String receiverType;
     private String conversationId;

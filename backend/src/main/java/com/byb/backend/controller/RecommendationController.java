@@ -32,9 +32,13 @@ public class RecommendationController {
     public ResponseEntity<RecommendationResponse> getColdStartRecommendations(
             @RequestParam String interests,
             @RequestParam(defaultValue = "beginner") String level,
-            @RequestParam(defaultValue = "10") int count) {
+            @RequestParam(defaultValue = "10") int count,
+            // Optional comma-separated primary_domains (e.g. "informatique,design").
+            // When supplied, the ML ranker hard-restricts boosting to in-domain
+            // courses so highly-rated unrelated courses can't surface at the top.
+            @RequestParam(required = false) String domains) {
         RecommendationResponse recommendations =
-                mlRecommendationService.getColdStartRecommendations(interests, level, count);
+                mlRecommendationService.getColdStartRecommendations(interests, level, count, domains);
         return ResponseEntity.ok(recommendations);
     }
 }

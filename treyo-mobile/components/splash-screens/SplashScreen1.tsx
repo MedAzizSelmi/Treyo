@@ -6,7 +6,16 @@ type SplashScreenProps = {
     onFinish: () => void;
 };
 
-const { width, height } = Dimensions.get('window');
+// Use 'screen' (full physical screen) instead of 'window' (safe area).
+//
+// On iOS the two are essentially identical, so iPhone behaviour is
+// unchanged. On Android, 'window' excludes the system navigation bar
+// area — that made our bottomGlow view shorter than intended, which in
+// turn pulled the strong-green bottom of the gradient up INTO the
+// visible area instead of staying off-screen. 'screen' gives us the
+// full height the gradient was designed against, so the strong-green
+// portion stays below the visible region on every device.
+const { width, height } = Dimensions.get('screen');
 
 export default function SplashScreen1({ onFinish }: SplashScreenProps) {
     const fadeAnim = useRef(new Animated.Value(0)).current;

@@ -203,4 +203,51 @@ public class AuthService {
 
         throw new BadCredentialsException("Invalid email or password");
     }
+
+    /**
+     * Change the password of the currently-authenticated user.
+     * Looks up the account by email (the JWT subject), verifies the current
+     * password, then hashes and stores the new one. Works for students,
+     * trainers, and admins — whichever table the email lives in.
+     */
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        // Student
+        var studentOpt = studentRepository.findByEmail(email);
+        if (studentOpt.isPresent()) {
+            Student s = studentOpt.get();
+            if (!passwordEncoder.matches(currentPassword, s.getPasswordHash())) {
+                throw new BadCredentialsException("Current password is incorrect");
+            }
+            s.setPasswordHash(passwordEncoder.encode(newPassword));
+            studentRepository.save(s);
+            return;
+        }
+
+        // Trainer
+        var trainerOpt = trainerRepository.findByEmail(email);
+        if (trainerOpt.isPresent()) {
+            Trainer t = trainerOpt.get();
+            if (!passwordEncoder.matches(currentPassword, t.getPasswordHash())) {
+                throw new BadCredentialsException("Current password is incorrect");
+            }
+            t.setPasswordHash(passwordEncoder.encode(newPassword));
+            trainerRepository.save(t);
+            return;
+        }
+
+        // Admin
+        var adminOpt = adminRepository.findByEmail(email);
+        if (adminOpt.isPresent()) {
+            Admin a = adminOpt.get();
+            if (!passwordEncoder.matches(currentPassword, a.getPasswordHash())) {
+                throw new BadCredentialsException("Current password is incorrect");
+            }
+            a.setPasswordHash(passwordEncoder.encode(newPassword));
+            adminRepository.save(a);
+            return;
+        }
+
+        throw new RuntimeException("Account not found");
+    }
 }

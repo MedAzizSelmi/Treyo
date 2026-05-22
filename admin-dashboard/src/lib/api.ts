@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8085/api';
+// Backend root (no /api suffix) — exported so screens that need to
+// resolve relative file URLs like "/files/profile-pictures/abc.jpg"
+// can prefix them properly.
+export const API_BASE_URL = 'http://localhost:8085';
+const API_URL = `${API_BASE_URL}/api`;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -89,6 +93,49 @@ export const updateCourseMinStudents = (courseId: string, minStudents: number) =
     params: { minStudents },
   });
 
+// ── Course Templates (admin owns the master content) ──
+export interface CourseTemplatePayload {
+  title: string;
+  description: string;
+  domain: string;
+  specificTopic: string;
+  level: string;
+  durationHours?: number | null;
+  language?: string;
+  format?: string;
+  prerequisites?: string;
+  learningOutcomes?: string[];
+  price?: number;
+  minStudentsRequired?: number;
+  maxStudentsPerGroup?: number;
+  maxGroupsAllowed?: number;
+  hasCertificate?: boolean;
+}
+
+export const getAllTemplates = () => api.get('/admin/course-templates');
+export const getTemplate = (templateId: string) =>
+  api.get(`/admin/course-templates/${templateId}`);
+export const createTemplate = (payload: CourseTemplatePayload) =>
+  api.post('/admin/course-templates', payload);
+export const updateTemplate = (templateId: string, payload: Partial<CourseTemplatePayload>) =>
+  api.put(`/admin/course-templates/${templateId}`, payload);
+export const deleteTemplate = (templateId: string) =>
+  api.delete(`/admin/course-templates/${templateId}`);
+// Drafts removed — assigning a template to trainers publishes immediately.
+export const assignTemplateTrainers = (templateId: string, trainerIds: string[]) =>
+  api.post(`/admin/course-templates/${templateId}/assign`, { trainerIds });
+
+// ── Course interest / group formation workflow ──
+export const getRequestedCourses = () => api.get('/admin/requests');
+export const cleanupStaleRequests = () => api.post('/admin/requests/cleanup');
+export const getAllGroups = () => api.get('/admin/groups');
+export const getCourseInterest = (courseId: string) =>
+  api.get(`/admin/courses/${courseId}/interest`);
+export const notifyInterestedStudents = (courseId: string) =>
+  api.post(`/admin/courses/${courseId}/notify-interested`);
+export const formCourseGroup = (courseId: string) =>
+  api.post(`/admin/courses/${courseId}/form-group`);
+
 // ── Promote to Admin ──
 export const promoteToAdmin = (userId: string, userType: string) =>
   api.post(`/admin/users/${userId}/promote-to-admin`, null, { params: { userType } });
@@ -98,6 +145,61 @@ export const getNotifications = (userId: string) =>
   api.get(`/notifications/user/${userId}`);
 export const getUnreadCount = (userId: string) =>
   api.get(`/notifications/user/${userId}/unread/count`);
+
+// ── System Health ──
+// The dashboard polls these every few seconds to render live cards and
+// rolling sparklines. They go through the JWT-protected Spring proxy so
+// the ML service isn't exposed to the public internet.
+export const getMlHealth = () => api.get('/admin/system/ml-health');
+export const getBackendHealth = () => api.get('/admin/system/backend-health');
+
+// ── Messages (group chat) ──
+// Admins are full members of every group chat — they see them all and
+// can post into any of them. These three calls back the Messages page.
+export const getAdminConversations = (adminUserId: string) =>
+  api.get(`/messages/conversations/${adminUserId}`);
+export const getGroupMessages = (groupId: string, viewerId: string) =>
+  api.get(`/messages/group/${groupId}`, { params: { viewerId } });
+export const sendGroupMessage = (
+  groupId: string,
+  senderId: string,
+  content: string,
+  opts?: { attachmentUrl?: string; messageType?: 'text' | 'image' | 'file' },
+) =>
+  api.post(`/messages/group/${groupId}`, {
+    senderId,
+    content,
+    messageType: opts?.messageType || 'text',
+    ...(opts?.attachmentUrl ? { attachmentUrl: opts.attachmentUrl } : {}),
+  });
+
+/**
+ * Upload an image picked from <input type="file"> to the backend's
+ * message-attachment endpoint. Returns the URL the chat should reference
+ * in `attachmentUrl`. messageId is just a unique key the storage uses to
+ * filename the upload — doesn't need to match the actual Message.id.
+ *
+ * Axios is bypassed because it muddles multipart boundaries in some setups;
+ * the JWT is read off localStorage directly and attached to the fetch call.
+ */
+export async function uploadMessageAttachment(file: File): Promise<{ fileUrl: string }> {
+  const messageId = `MSG_${Date.now().toString(36).toUpperCase()}`;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('messageId', messageId);
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+  const res = await fetch(`${API_BASE_URL}/api/files/upload/message-attachment`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`Upload failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
 
 export interface SendNotificationPayload {
   recipientType: 'ALL' | 'STUDENTS' | 'TRAINERS' | 'SPECIFIC';

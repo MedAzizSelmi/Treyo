@@ -17,4 +17,9 @@ public interface StudentRepository extends JpaRepository<Student, String> {
     Optional<Student> findByStudentId(String studentId);
 
     long countByCreatedAtAfter(LocalDateTime date);
+
+    /** Active = logged in since the given timestamp. Used by the dashboard
+     *  "Active Today" tile (passes today's 00:00 UTC). Derived query —
+     *  Spring Data generates the SQL from the method name. */
+    long countByLastLoginAtAfter(LocalDateTime date);
 }

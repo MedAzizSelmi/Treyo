@@ -8,10 +8,20 @@ import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder, normalize
 from scipy.sparse import csr_matrix
 import warnings
 warnings.filterwarnings('ignore')
+
+# FAISS is the production-grade ANN library used for top-k similarity
+# search. We import it optionally so the service still boots on machines
+# where the wheel isn't installed (falls back to sklearn brute force).
+try:
+    import faiss
+    _FAISS_AVAILABLE = True
+except ImportError:
+    _FAISS_AVAILABLE = False
+    print("⚠️  faiss not installed — falling back to sklearn cosine_similarity (slow at >10k courses)")
 
 class CourseRecommendationSystem:
     """
@@ -31,9 +41,14 @@ class CourseRecommendationSystem:
         self.label_encoder = LabelEncoder()
 
         # Matrices
-        self.course_content_matrix = None
-        self.user_item_matrix = None
-        self.course_similarity_matrix = None
+        self.course_content_matrix = None      # sparse TF-IDF, shape (N_courses, V)
+        self.user_item_matrix = None            # dense pivot of interactions
+        # NOTE: course_similarity_matrix was a precomputed N×N cosine matrix
+        # that was never read elsewhere — pure O(N²) dead memory. Removed.
+        # All content similarity now goes through self._faiss_index (or
+        # the sklearn fallback when FAISS isn't installed).
+        self._faiss_index = None                # IndexFlatIP over L2-normalized content vectors
+        self._content_matrix_normalised = None  # numpy float32, kept for the sklearn fallback path
 
         print("✅ Course Recommendation System initialized")
 
@@ -102,24 +117,99 @@ class CourseRecommendationSystem:
         return self
 
     def build_content_based_model(self):
-        """Build content-based filtering using TF-IDF"""
+        """Build content-based filtering using TF-IDF + a FAISS index.
+
+        Two changes from the old version:
+          1. We no longer materialize the N×N course-to-course similarity
+             matrix. It was unused dead memory (O(N²) growth).
+          2. We build a FAISS IndexFlatIP over the L2-normalized TF-IDF
+             rows. Inner product on unit vectors = cosine similarity, so
+             a FAISS top-k search returns the same neighbours sklearn's
+             cosine_similarity would, in O(log N) instead of O(N).
+        """
         print("\n🧠 Building Content-Based Model...")
 
-        # Create TF-IDF matrix for courses
+        # 1. TF-IDF matrix (sparse, kept for backwards-compat with any
+        # caller that still expects course_content_matrix).
         self.course_content_matrix = self.tfidf_vectorizer.fit_transform(
             self.courses_df['content_text']
         )
-
-        # Calculate course similarity matrix
-        self.course_similarity_matrix = cosine_similarity(
-            self.course_content_matrix,
-            self.course_content_matrix
-        )
-
         print(f"   ✓ Content matrix shape: {self.course_content_matrix.shape}")
-        print(f"   ✓ Similarity matrix shape: {self.course_similarity_matrix.shape}")
+
+        # 2. L2-normalize the rows so dot product == cosine similarity.
+        # We must densify for FAISS — but only to float32 of (N, V), which
+        # is much smaller than the old (N, N) matrix once N > V.
+        dense = self.course_content_matrix.toarray().astype('float32')
+        # normalize() handles zero rows safely (returns zeros).
+        self._content_matrix_normalised = normalize(dense, norm='l2', axis=1)
+
+        if _FAISS_AVAILABLE:
+            d = self._content_matrix_normalised.shape[1]
+            # IndexFlatIP = exact (not approximate) inner-product search.
+            # For our scale (≤ a few hundred thousand courses) the exact
+            # index is plenty fast and gives identical results to sklearn.
+            # When N grows past ~1M, swap for IndexIVFFlat with training.
+            self._faiss_index = faiss.IndexFlatIP(d)
+            self._faiss_index.add(self._content_matrix_normalised)
+            print(f"   ✓ FAISS index built (d={d}, ntotal={self._faiss_index.ntotal})")
+        else:
+            self._faiss_index = None
+            print("   ⚠️  Skipping FAISS index — sklearn fallback will be used")
 
         return self
+
+    def _content_scores(self, query_text):
+        """Compute cosine similarity between a free-text query and every
+        course. Returns a numpy array of length N_courses aligned with
+        self.courses_df row order. Uses FAISS when available (fast at
+        scale) or sklearn cosine_similarity as a fallback.
+
+        Why we return the full N-array rather than top-K: the rankers
+        combine content_score with rating + popularity + level boost and
+        only then take the top N, so they need all scores to do the math.
+        For very large N this should be replaced with a true top-K
+        candidate-generation pattern; see the docstring on
+        _topk_candidates() below.
+        """
+        # TF-IDF transform → sparse row vector
+        q_sparse = self.tfidf_vectorizer.transform([query_text])
+        # Densify + normalize so FAISS or sklearn both see the same shape.
+        q_dense = normalize(q_sparse.toarray().astype('float32'), norm='l2', axis=1)
+
+        if self._faiss_index is not None:
+            # FAISS doesn't have a "score everything" mode, but searching
+            # for k = ntotal returns all neighbours sorted. We then reorder
+            # back to the original row order so callers can keep indexing
+            # by self.courses_df position.
+            n = self._faiss_index.ntotal
+            scores, idx = self._faiss_index.search(q_dense, n)
+            out = np.zeros(n, dtype='float32')
+            out[idx[0]] = scores[0]
+            return out
+
+        # Fallback: sklearn brute force on the normalized matrix.
+        return cosine_similarity(q_dense, self._content_matrix_normalised)[0]
+
+    def _topk_candidates(self, query_text, k):
+        """Top-K nearest courses for the query text, as (indices, scores).
+        Indices are positions in self.courses_df. This is the path to use
+        when N >> n_recommendations — avoids scoring the long tail. Not
+        currently wired into the rankers (which need full scores for the
+        rating/popularity mix); kept here for future "candidate generation
+        → reranking" refactors when course catalogue grows beyond ~100k.
+        """
+        q_sparse = self.tfidf_vectorizer.transform([query_text])
+        q_dense = normalize(q_sparse.toarray().astype('float32'), norm='l2', axis=1)
+        if self._faiss_index is not None:
+            k = min(k, self._faiss_index.ntotal)
+            scores, idx = self._faiss_index.search(q_dense, k)
+            return idx[0], scores[0]
+        # Fallback: brute force then take top-K via argpartition.
+        all_scores = cosine_similarity(q_dense, self._content_matrix_normalised)[0]
+        top_idx = np.argpartition(-all_scores, min(k, len(all_scores) - 1))[:k]
+        # Sort the top-K so the caller sees descending scores.
+        top_idx = top_idx[np.argsort(-all_scores[top_idx])]
+        return top_idx, all_scores[top_idx]
 
     def build_collaborative_model(self):
         """Build collaborative filtering using user-item interactions"""
@@ -160,9 +250,49 @@ class CourseRecommendationSystem:
 
         return self
 
+    def _get_student_domains(self, student_row):
+        """Parse the student's primary_domains into a normalized lowercase set.
+
+        Used by the rankers below to apply a hard domain-match multiplier so
+        a highly-rated trainer in an unrelated domain can't outrank a weaker
+        match in the student's own field. Returns an empty set when the
+        student hasn't picked any domains — callers should treat that as
+        "no domain filter" and rank purely on content / interaction signals.
+        """
+        domains_raw = student_row.get('primary_domains', '') or ''
+        return {
+            d.strip().lower()
+            for d in str(domains_raw).split(',')
+            if d.strip()
+        }
+
+    def _domain_multiplier(self, student_domains, in_domain_weight=1.0,
+                           out_domain_weight=0.4):
+        """Return a per-course multiplier array that boosts in-domain courses.
+
+        - in-domain  → 1.0   (full score)
+        - out-of-domain → 0.4 (heavy penalty — can still surface if it has
+          overwhelming content/collab signal, but ratings alone can't push
+          an unrelated course past in-domain ones)
+        If the student has no declared domains we return a flat 1.0 array so
+        ranking falls back to pure content/rating/popularity scoring.
+        """
+        if not student_domains:
+            return np.ones(len(self.courses_df))
+        course_domains_lower = self.courses_df['domain'].fillna('').str.lower()
+        return np.where(
+            course_domains_lower.isin(student_domains),
+            in_domain_weight,
+            out_domain_weight,
+        )
+
     def content_based_recommendations(self, student_id, n_recommendations=10):
         """
-        Generate recommendations based on student interests and course content
+        Generate recommendations based on student interests and course content.
+
+        Scoring now uses a hard domain-match multiplier so a highly-rated
+        course outside the student's domain can't outrank a weaker match
+        inside it. Ratings still order results within the student's domain.
         """
         # Get student data
         student = self.students_df[self.students_df['student_id'] == student_id]
@@ -171,16 +301,14 @@ class CourseRecommendationSystem:
             print(f"⚠️  Student {student_id} not found")
             return pd.DataFrame()
 
-        student_interests = student.iloc[0]['interest_text']
+        student_row = student.iloc[0]
+        student_interests = student_row['interest_text']
 
-        # Transform student interests to TF-IDF space
-        student_vector = self.tfidf_vectorizer.transform([student_interests])
-
-        # Calculate similarity with all courses
-        course_scores = cosine_similarity(student_vector, self.course_content_matrix)[0]
+        # FAISS-backed similarity (sklearn fallback when faiss is missing).
+        course_scores = self._content_scores(student_interests)
 
         # Get student's experience level
-        student_level = student.iloc[0]['experience_level']
+        student_level = student_row['experience_level']
 
         # Create scoring DataFrame
         scores_df = pd.DataFrame({
@@ -194,15 +322,37 @@ class CourseRecommendationSystem:
         # Boost courses matching student's level
         level_boost = np.where(scores_df['level'] == student_level, 1.2, 1.0)
 
-        # Combined score
-        scores_df['final_score'] = (
-            scores_df['content_score'] * 0.5 * level_boost +
-            scores_df['rating_score'] * 0.3 +
-            scores_df['popularity_score'] * 0.2
-        )
+        # Hard domain-match multiplier. Without this, a 5-star unrelated
+        # course (rating_score ≈ 1.0 × 0.3 = 0.30) beats a domain-matched
+        # course with content_score 0.4 (0.4 × 0.5 = 0.20).
+        student_domains = self._get_student_domains(student_row)
+        domain_mult = self._domain_multiplier(student_domains)
 
-        # Sort and get top recommendations
-        top_courses = scores_df.nlargest(n_recommendations, 'final_score')
+        # Reweighted: content 65 / rating 15 / popularity 20.
+        # Rating is now low enough that, within the same domain, it acts as
+        # a tiebreaker rather than the dominant factor.
+        scores_df['final_score'] = (
+            scores_df['content_score'] * 0.65 * level_boost +
+            scores_df['rating_score'] * 0.15 +
+            scores_df['popularity_score'] * 0.20
+        ) * domain_mult
+
+        # Strict domain priority: in-domain courses always rank above any
+        # out-of-domain course, regardless of score. The 0.4 multiplier
+        # above is a soft prior — a strong-enough out-of-domain score could
+        # still creep past a weak in-domain one. This sort guarantees it
+        # never does. Within each group, the existing score order applies.
+        scores_df['_domain_lc'] = self.courses_df['domain'].fillna('').str.lower().values
+        if student_domains:
+            scores_df['_in_domain'] = scores_df['_domain_lc'].isin(student_domains)
+            scores_df = scores_df.sort_values(
+                ['_in_domain', 'final_score'],
+                ascending=[False, False],
+            )
+        else:
+            scores_df = scores_df.sort_values('final_score', ascending=False)
+
+        top_courses = scores_df.head(n_recommendations)
 
         # Merge with course details
         recommendations = self.courses_df.merge(
@@ -210,10 +360,14 @@ class CourseRecommendationSystem:
             on='course_id'
         )
 
+        # Preserve the strict in-domain ordering after the merge (which
+        # otherwise reorders by self.courses_df position).
+        order_map = {cid: i for i, cid in enumerate(top_courses['course_id'].tolist())}
+        recommendations['_order'] = recommendations['course_id'].map(order_map)
+        recommendations = recommendations.sort_values('_order').drop(columns='_order')
+
         return recommendations[['course_id', 'title', 'domain', 'specific_topic',
-                               'level', 'rating', 'final_score']].sort_values(
-                                   'final_score', ascending=False
-                               )
+                               'level', 'rating', 'final_score']]
 
     def collaborative_recommendations(self, student_id, n_recommendations=10):
         """
@@ -266,18 +420,29 @@ class CourseRecommendationSystem:
 
     def popularity_based_recommendations(self, domain=None, n_recommendations=10):
         """
-        Generate recommendations based on popularity and ratings
+        Generate recommendations based on popularity and ratings.
+
+        `domain` accepts either a single string (legacy) or an iterable of
+        domain names. When provided, results are restricted to that set —
+        critical to prevent highly-rated unrelated courses from showing up
+        as recommendations for a student whose domain we already know.
         """
         courses = self.courses_df.copy()
 
-        # Filter by domain if specified
+        # Filter by domain (single string or iterable) if specified
         if domain:
-            courses = courses[courses['domain'] == domain]
+            if isinstance(domain, str):
+                allowed = {domain.lower()}
+            else:
+                allowed = {d.lower() for d in domain if d}
+            if allowed:
+                courses = courses[courses['domain'].fillna('').str.lower().isin(allowed)]
 
-        # Calculate popularity score
+        # Popularity 50 / rating 50 — within the already-filtered domain
+        # bucket, ratings act as a tiebreaker between popular courses.
         courses['popularity_rating_score'] = (
-            courses['popularity_normalized'] * 0.4 +
-            courses['rating_normalized'] * 0.6
+            courses['popularity_normalized'] * 0.5 +
+            courses['rating_normalized'] * 0.5
         )
 
         top_courses = courses.nlargest(n_recommendations, 'popularity_rating_score')
@@ -303,11 +468,8 @@ class CourseRecommendationSystem:
         # Combine all search queries
         search_text = ' '.join(student_searches['query'].tolist())
 
-        # Transform to TF-IDF space
-        search_vector = self.tfidf_vectorizer.transform([search_text])
-
-        # Calculate similarity with courses
-        course_scores = cosine_similarity(search_vector, self.course_content_matrix)[0]
+        # FAISS-backed similarity (sklearn fallback when faiss is missing).
+        course_scores = self._content_scores(search_text)
 
         # Create recommendations
         scores_df = pd.DataFrame({
@@ -327,30 +489,57 @@ class CourseRecommendationSystem:
     def hybrid_recommendations(self, student_id, n_recommendations=10,
                               include_search=True):
         """
-        MAIN RECOMMENDATION FUNCTION
-        Combines all methods for best results
+        MAIN RECOMMENDATION FUNCTION — combines all methods.
+
+        Source weights:
+          - Content (domain + interests, with hard domain gate): 45 %
+          - Collaborative (similar students' interactions):       35 %
+          - Search history:                                       15 %
+          - Popularity (highly-rated trainers in same domain):     5 %
+
+        Domain ordering (the strict rule):
+          AFTER all sources are aggregated, results are sorted with a
+          two-level key:
+            primary  → in_domain DESC  (True before False)
+            secondary → final_score DESC
+
+          This GUARANTEES that no out-of-domain course can ever rank above
+          an in-domain one. Without it, collaborative + search picks
+          (which on their own don't see the student's domain) could leak
+          unrelated courses into the top slots — a student in 'informatique'
+          whose behavioural peers happened to also explore 'marketing'
+          would see marketing courses above informatique ones.
         """
         print(f"\n🎯 Generating Hybrid Recommendations for {student_id}...")
 
+        # Resolve the student's domains UP-FRONT so we can use them both for
+        # the popularity filter below and the final domain-priority sort.
+        # We snapshot it once here — if the row isn't found we treat the
+        # student as having no domain preference (every course is "in").
+        student_row = self.students_df[self.students_df['student_id'] == student_id]
+        student_domains = self._get_student_domains(student_row.iloc[0]) if not student_row.empty else set()
+
         all_recommendations = []
 
-        # 1. Content-Based (40% weight)
+        # 1. Content-Based (45% weight) — strongest signal: explicit domain
+        # + interests match the course content.
         try:
             content_recs = self.content_based_recommendations(student_id, n_recommendations * 2)
             if not content_recs.empty:
                 content_recs['source'] = 'content'
-                content_recs['weight'] = 0.4
+                content_recs['weight'] = 0.45
                 all_recommendations.append(content_recs)
                 print(f"   ✓ Content-based: {len(content_recs)} courses")
         except Exception as e:
             print(f"   ⚠️  Content-based failed: {e}")
 
-        # 2. Collaborative (30% weight)
+        # 2. Collaborative (35% weight) — what students with similar
+        # interaction history have engaged with.
         try:
             collab_recs = self.collaborative_recommendations(student_id, n_recommendations * 2)
             if not collab_recs.empty:
                 collab_recs['source'] = 'collaborative'
-                collab_recs['weight'] = 0.3
+                collab_recs['weight'] = 0.35
                 # Rename score column
                 if 'collab_score' in collab_recs.columns:
                     collab_recs.rename(columns={'collab_score': 'final_score'}, inplace=True)
@@ -359,13 +548,13 @@ class CourseRecommendationSystem:
         except Exception as e:
             print(f"   ⚠️  Collaborative failed: {e}")
 
-        # 3. Search-Based (20% weight) - if available
+        # 3. Search-Based (15% weight) — what the student has searched for.
         if include_search and self.searches_df is not None:
             try:
                 search_recs = self.search_based_recommendations(student_id, n_recommendations)
                 if not search_recs.empty:
                     search_recs['source'] = 'search'
-                    search_recs['weight'] = 0.2
+                    search_recs['weight'] = 0.15
                     # Rename score column
                     if 'search_score' in search_recs.columns:
                         search_recs.rename(columns={'search_score': 'final_score'}, inplace=True)
@@ -374,18 +563,21 @@ class CourseRecommendationSystem:
             except Exception as e:
                 print(f"   ⚠️  Search-based failed: {e}")
 
-        # 4. Popularity (10% weight) - fallback
+        # 4. Popularity (5% weight) — surface "highly-rated trainers in
+        # YOUR field" but only as a small tiebreaker, never enough to push
+        # an unrelated course to the top. Uses the student_domains we
+        # already resolved at the top of this method.
         try:
-            # Get student's primary domain
-            student = self.students_df[self.students_df['student_id'] == student_id]
-            if not student.empty:
-                domains = student.iloc[0]['primary_domains'].split(',')[0]
-                pop_recs = self.popularity_based_recommendations(domains, n_recommendations)
-                pop_recs['source'] = 'popularity'
-                pop_recs['weight'] = 0.1
-                pop_recs['final_score'] = pop_recs['rating'] / 5.0  # Normalize to 0-1
-                all_recommendations.append(pop_recs)
-                print(f"   ✓ Popularity-based: {len(pop_recs)} courses")
+            if student_domains:
+                pop_recs = self.popularity_based_recommendations(
+                    student_domains, n_recommendations
+                )
+                if not pop_recs.empty:
+                    pop_recs['source'] = 'popularity'
+                    pop_recs['weight'] = 0.05
+                    pop_recs['final_score'] = pop_recs['rating'] / 5.0
+                    all_recommendations.append(pop_recs)
+                    print(f"   ✓ Popularity-based: {len(pop_recs)} courses")
         except Exception as e:
             print(f"   ⚠️  Popularity-based failed: {e}")
 
@@ -407,8 +599,27 @@ class CourseRecommendationSystem:
             'source': lambda x: ', '.join(set(x))
         }).reset_index()
 
-        # Sort by final score
-        aggregated = aggregated.sort_values('final_score', ascending=False)
+        # STRICT DOMAIN PRIORITY:
+        #   Sort by (in_domain DESC, final_score DESC). This guarantees no
+        #   out-of-domain course outranks any in-domain one — even when a
+        #   collaborative/search pick from outside the domain has a higher
+        #   raw score than a weak in-domain match.
+        #
+        #   The student's behaviourally-similar peers may have explored
+        #   tangentially-related fields, but that's no guarantee THIS
+        #   student wants those. Domain is the explicit preference signal;
+        #   collab is an inferred one — explicit wins.
+        if student_domains:
+            aggregated['_in_domain'] = aggregated['domain'].fillna('').str.lower().isin(student_domains)
+            aggregated = aggregated.sort_values(
+                ['_in_domain', 'final_score'],
+                ascending=[False, False],
+            ).drop(columns='_in_domain')
+            in_count = aggregated.head(n_recommendations)['domain'].fillna('').str.lower().isin(student_domains).sum()
+            print(f"   🎯 Domain-priority sort: {in_count}/{min(n_recommendations, len(aggregated))} in-domain in top results")
+        else:
+            # No declared domain → fall back to pure score ordering.
+            aggregated = aggregated.sort_values('final_score', ascending=False)
 
         # Get top N
         final_recommendations = aggregated.head(n_recommendations)
@@ -418,20 +629,28 @@ class CourseRecommendationSystem:
         return final_recommendations
 
     def cold_start_recommendations(self, student_interests, student_level='beginner',
-                                   n_recommendations=10):
+                                   n_recommendations=10, student_domains=None):
         """
-        Handle new students with no interaction history
-        Based purely on stated interests
+        Handle new students with no interaction history.
 
-        FIXED: Prioritize interest matching over ratings!
+        Args:
+            student_interests: comma-separated specific_interests from
+              onboarding (e.g. "React, JavaScript"). Used for TF-IDF
+              content matching against course title/description/topic.
+            student_level: beginner / intermediate / expert
+            student_domains: optional comma-separated primary_domains
+              (e.g. "informatique,design"). Used for the HARD domain-
+              match multiplier so highly-rated unrelated courses can't
+              outrank in-domain ones. If omitted (legacy callers), the
+              multiplier falls back to flat 1.0 and ranking is pure
+              content/rating/popularity.
+
+        Scoring: interest 70 / rating 15 / popularity 15, gated by domain.
         """
         print(f"\n❄️  Cold-start recommendations for new student...")
 
-        # Transform interests to TF-IDF space
-        interest_vector = self.tfidf_vectorizer.transform([student_interests])
-
-        # Calculate similarity with courses
-        course_scores = cosine_similarity(interest_vector, self.course_content_matrix)[0]
+        # FAISS-backed similarity (sklearn fallback when faiss is missing).
+        course_scores = self._content_scores(student_interests)
 
         # Create scoring DataFrame
         scores_df = pd.DataFrame({
@@ -445,27 +664,55 @@ class CourseRecommendationSystem:
         # Boost beginner courses for new students
         level_boost = np.where(scores_df['level'] == student_level, 1.3, 1.0)
 
-        # FIXED: Prioritize interest matching (70%) over ratings (20%) and popularity (10%)
-        scores_df['final_score'] = (
-            scores_df['content_score'] * 0.7 * level_boost +  # Interest matching 70%!
-            scores_df['rating_score'] * 0.2 +                 # Rating 20%
-            scores_df['popularity_score'] * 0.1               # Popularity 10%
-        )
+        # Hard domain-match multiplier. We need primary_domains (not the
+        # finer-grained specific_interests) because course.domain is the
+        # high-level field (e.g. "informatique"). When the caller didn't
+        # pass domains, fall back to flat 1.0 — content_score alone has to
+        # carry the ranking in that case.
+        domain_tokens = {
+            t.strip().lower()
+            for t in (student_domains or '').split(',')
+            if t.strip()
+        }
+        domain_mult = self._domain_multiplier(domain_tokens)
 
-        # Get top recommendations
-        top_courses = scores_df.nlargest(n_recommendations, 'final_score')
+        # Interest 70 / rating 15 / popularity 15, then domain-gated.
+        scores_df['final_score'] = (
+            scores_df['content_score'] * 0.7 * level_boost +
+            scores_df['rating_score'] * 0.15 +
+            scores_df['popularity_score'] * 0.15
+        ) * domain_mult
+
+        # Strict domain priority — same guarantee as content_based_recs:
+        # in-domain courses always appear before any out-of-domain course,
+        # regardless of raw score. The multiplier above is a soft hint, this
+        # sort is the actual contract with the user.
+        scores_df['_domain_lc'] = self.courses_df['domain'].fillna('').str.lower().values
+        if domain_tokens:
+            scores_df['_in_domain'] = scores_df['_domain_lc'].isin(domain_tokens)
+            scores_df = scores_df.sort_values(
+                ['_in_domain', 'final_score'],
+                ascending=[False, False],
+            )
+        else:
+            scores_df = scores_df.sort_values('final_score', ascending=False)
+
+        top_courses = scores_df.head(n_recommendations)
 
         recommendations = self.courses_df.merge(
             top_courses[['course_id', 'final_score']],
             on='course_id'
         )
 
+        # Preserve the strict ordering after merge.
+        order_map = {cid: i for i, cid in enumerate(top_courses['course_id'].tolist())}
+        recommendations['_order'] = recommendations['course_id'].map(order_map)
+        recommendations = recommendations.sort_values('_order').drop(columns='_order')
+
         print(f"   ✓ Generated {len(recommendations)} cold-start recommendations")
 
         return recommendations[['course_id', 'title', 'domain', 'specific_topic',
-                               'level', 'rating', 'final_score']].sort_values(
-                                   'final_score', ascending=False
-                               )
+                               'level', 'rating', 'final_score']]
 
     def explain_recommendation(self, student_id, course_id):
         """

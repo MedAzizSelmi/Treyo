@@ -4,6 +4,7 @@ import com.byb.backend.dto.admin.CourseManagementResponse;
 import com.byb.backend.dto.admin.DashboardStatsResponse;
 import com.byb.backend.dto.admin.SendNotificationRequest;
 import com.byb.backend.dto.admin.UserManagementResponse;
+import com.byb.backend.service.AdminGroupFormationService;
 import com.byb.backend.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminGroupFormationService groupFormationService;
 
     /**
      * Get dashboard overview statistics
@@ -174,6 +176,68 @@ public class AdminController {
     ) {
         adminService.updateCourseMinStudents(courseId, minStudents);
         return ResponseEntity.ok(Map.of("message", "Minimum students updated to " + minStudents));
+    }
+
+    // ============================================
+    // GROUP FORMATION WORKFLOW
+    // ============================================
+
+    /**
+     * Overview of all published courses with their request funnel (interested + confirmed).
+     */
+    @GetMapping("/requests")
+    @Operation(summary = "Get all courses with request/funnel info")
+    public ResponseEntity<List<Map<String, Object>>> getRequestedCourses() {
+        return ResponseEntity.ok(groupFormationService.getRequestedCoursesOverview());
+    }
+
+    /**
+     * Maintenance: remove stale "clicked_interested" interactions
+     * (rows for students who are already enrolled, plus duplicate rows for the same student).
+     */
+    @PostMapping("/requests/cleanup")
+    @Operation(summary = "Clean up stale interest interactions")
+    public ResponseEntity<Map<String, Object>> cleanupStaleRequests() {
+        return ResponseEntity.ok(groupFormationService.cleanupStaleRequests());
+    }
+
+    /**
+     * Lists every active group enriched with course, trainer, and member details.
+     */
+    @GetMapping("/groups")
+    @Operation(summary = "Get all groups with members")
+    public ResponseEntity<List<Map<String, Object>>> getAllGroups() {
+        return ResponseEntity.ok(groupFormationService.getAllGroupsWithMembers());
+    }
+
+    /**
+     * Returns the enrollment funnel for a course: interested students, confirmed enrollments,
+     * and whether the admin can take next-step actions (notify / form group).
+     */
+    @GetMapping("/courses/{courseId}/interest")
+    @Operation(summary = "Get course interest summary with interested students")
+    public ResponseEntity<Map<String, Object>> getCourseInterest(@PathVariable String courseId) {
+        return ResponseEntity.ok(groupFormationService.getCourseInterestSummary(courseId));
+    }
+
+    /**
+     * Sends a GROUP_FORMING notification to every interested student. The students
+     * confirm by accepting the notification (which creates a pending Enrollment).
+     */
+    @PostMapping("/courses/{courseId}/notify-interested")
+    @Operation(summary = "Send group-forming notifications to interested students")
+    public ResponseEntity<Map<String, Object>> notifyInterested(@PathVariable String courseId) {
+        return ResponseEntity.ok(groupFormationService.notifyInterestedStudents(courseId));
+    }
+
+    /**
+     * Finalises group creation with all students who have confirmed. Sends GROUP_READY
+     * and moves enrollments from "confirmed" to "active".
+     */
+    @PostMapping("/courses/{courseId}/form-group")
+    @Operation(summary = "Form a group from confirmed enrollments")
+    public ResponseEntity<Map<String, Object>> formGroup(@PathVariable String courseId) {
+        return ResponseEntity.ok(groupFormationService.formGroup(courseId));
     }
 
     // ============================================

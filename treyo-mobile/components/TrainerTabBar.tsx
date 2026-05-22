@@ -1,5 +1,6 @@
 import { View, TouchableOpacity, StyleSheet, Animated, Image, Platform } from 'react-native';
 import { useRef } from 'react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 type TabBarProps = {
     state: any;
@@ -7,23 +8,25 @@ type TabBarProps = {
     navigation: any;
 };
 
-// Only these 4 routes appear in the tab bar
-const VISIBLE_TABS = [
+// Only these 4 routes appear in the tab bar.
+// `book-open-outline` lives in MaterialCommunityIcons, not Ionicons —
+// using Ionicons for it renders a "?" placeholder.
+const VISIBLE_TABS: Array<{ name: string; icon?: any; mcIcon?: string }> = [
     {
         name: 'home',
-        icon: require('../assets/Tabs/home.png'),
+        icon: require('../assets/Tabs/Home.png'),
     },
     {
         name: 'messages',
-        icon: require('../assets/Tabs/chat.png'),
+        icon: require('../assets/Tabs/Chat.png'),
     },
     {
         name: 'courses',
-        icon: require('../assets/Tabs/bot.png'),
+        mcIcon: 'book-open-blank-variant-outline',
     },
     {
         name: 'profile',
-        icon: require('../assets/Tabs/user.png'),
+        icon: require('../assets/Tabs/User.png'),
     },
 ];
 
@@ -88,16 +91,23 @@ export function TrainerTabBar({ state, descriptors, navigation }: TabBarProps) {
                                     { transform: [{ scale: scaleAnims[visibleIndex] }] },
                                 ]}
                             >
-                                <Image
-                                    source={tab.icon}
-                                    style={[
-                                        styles.icon,
-                                        tab.name === 'courses' && { width: 30, height: 30 }, // example fix
-                                        tab.name === 'messages' && { width: 30, height: 30 }, // example fix
-                                        { opacity: isFocused ? 1 : 0.5 },
-                                    ]}
-                                    resizeMode="contain"
-                                />
+                                {tab.mcIcon ? (
+                                    <MaterialCommunityIcons
+                                        name={tab.mcIcon as any}
+                                        size={26}
+                                        color={`rgba(255,255,255,${isFocused ? 1 : 0.5})`}
+                                    />
+                                ) : (
+                                    <Image
+                                        source={tab.icon}
+                                        style={[
+                                            styles.icon,
+                                            tab.name === 'messages' && { width: 33, height: 33 },
+                                            { opacity: isFocused ? 1 : 0.5 },
+                                        ]}
+                                        resizeMode="contain"
+                                    />
+                                )}
                             </Animated.View>
                         </TouchableOpacity>
                     );

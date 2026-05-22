@@ -19,6 +19,10 @@ public interface TrainerRepository extends JpaRepository<Trainer, String> {
 
     long countByCreatedAtAfter(LocalDateTime date);
 
+    /** Counts trainers who logged in after the given timestamp. Backs the
+     *  "Active Today" dashboard tile alongside the equivalent on students. */
+    long countByLastLoginAtAfter(LocalDateTime date);
+
     List<Trainer> findByIsVerified(Boolean isVerified);
 
     List<Trainer> findByIsActiveTrue();

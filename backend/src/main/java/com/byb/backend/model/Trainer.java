@@ -117,7 +117,8 @@ public class Trainer extends BaseEntity {
         boolean page2 = specializations != null && specializations.length > 0 &&
                 experienceYears != null && education != null &&
                 skills != null && skills.length > 0;
-        boolean page3 = profilePictureUrl != null && bio != null;
+        // profilePictureUrl is optional — only bio is required to complete page 3
+        boolean page3 = bio != null;
 
         return page1 && page2 && page3;
     }

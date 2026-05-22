@@ -1,17 +1,41 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, Modal, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState } from 'react';
-import { authService } from '../../../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { authService, fetchUpload, API_BASE_URL } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
 
 export default function TrainerOnboardingStep3() {
     const router = useRouter();
-    const params = useLocalSearchParams();
     const [bio, setBio] = useState('');
     const [loading, setLoading] = useState(false);
+    const [localPicUri, setLocalPicUri] = useState<string | null>(null);
+    const [showPicModal, setShowPicModal] = useState(false);
+    const [uploading, setUploading] = useState(false);
+
+    const handlePickImage = async (source: 'camera' | 'gallery') => {
+        setShowPicModal(false);
+        try {
+            let result;
+            if (source === 'camera') {
+                const perm = await ImagePicker.requestCameraPermissionsAsync();
+                if (!perm.granted) { Alert.alert('Permission needed', 'Camera permission is required.'); return; }
+                result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+            } else {
+                const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (!perm.granted) { Alert.alert('Permission needed', 'Gallery permission is required.'); return; }
+                result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+            }
+            if (!result.canceled && result.assets?.[0]) {
+                setLocalPicUri(result.assets[0].uri);
+            }
+        } catch (e) {
+            console.log('Image pick error', e);
+        }
+    };
 
     const handleNext = async () => {
         if (!bio || bio.length < 50) {
@@ -28,14 +52,44 @@ export default function TrainerOnboardingStep3() {
                 return;
             }
 
+            // Upload profile picture if the trainer picked one
+            let profilePictureUrl: string | null = null;
+            if (localPicUri) {
+                setUploading(true);
+                try {
+                    const filename = localPicUri.split('/').pop() || 'profile.jpg';
+                    const ext = filename.split('.').pop()?.toLowerCase() || 'jpg';
+                    const mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+                    const formData = new FormData();
+                    formData.append('file', { uri: localPicUri, name: filename, type: mimeType } as any);
+                    formData.append('userId', String(user.userId));
+                    formData.append('userType', 'TRAINER');
+
+                    const uploadData = await fetchUpload('/files/upload/profile-picture', formData);
+                    profilePictureUrl = API_BASE_URL + uploadData.fileUrl;
+                } catch (uploadErr) {
+                    console.log('Picture upload failed', uploadErr);
+                    Alert.alert('Upload failed', 'Could not upload your profile picture. You can add one later from your profile.');
+                    // Continue without the picture rather than blocking onboarding
+                } finally {
+                    setUploading(false);
+                }
+            }
+
             await api.put(`/trainers/me/profile/page3?trainerId=${user.userId}`, {
-                profilePictureUrl: null,
+                profilePictureUrl,
                 bio,
             });
 
-            router.push({
-                pathname: '/onboarding/trainer/step4' as any,
-                params: { ...params, bio },
+            // Onboarding done — trainer's courses are now assigned by the admin,
+            // so there's no longer a step 4 for course creation.
+            router.replace({
+                pathname: '/success' as any,
+                params: {
+                    message: 'Profile setup complete! 🎉',
+                    nextRoute: '/(trainer-tabs)/home',
+                },
             });
         } catch (error) {
             console.error('Error:', error);
@@ -55,24 +109,34 @@ export default function TrainerOnboardingStep3() {
                 <View style={styles.header}>
                     <Text style={styles.title}>Your Profile</Text>
                     <Text style={styles.subtitle}>Tell students about yourself</Text>
-                    <Text style={styles.step}>Step 3 of 4</Text>
+                    <Text style={styles.step}>Step 3 of 3 — Final Step! 🎉</Text>
                 </View>
 
                 <View style={styles.progressContainer}>
-                    <View style={[styles.progressBar, { width: '75%' }]} />
+                    <View style={[styles.progressBar, { width: '100%' }]} />
                 </View>
 
-                {/* Profile picture placeholder */}
+                {/* Profile picture picker */}
                 <TouchableOpacity
                     style={styles.imageContainer}
-                    onPress={() => Alert.alert('Image Picker', 'Coming soon')}
+                    onPress={() => setShowPicModal(true)}
+                    activeOpacity={0.85}
                 >
-                    <View style={styles.placeholder}>
-                        <BlurView intensity={25} tint="light" style={StyleSheet.absoluteFill} />
-                        <Ionicons name="camera" size={40} color="#666" />
-                        <Text style={styles.placeholderText}>Add Profile Picture</Text>
-                        <Text style={styles.placeholderSubtext}>(Optional)</Text>
-                    </View>
+                    {localPicUri ? (
+                        <View style={styles.previewWrap}>
+                            <Image source={{ uri: localPicUri }} style={styles.preview} />
+                            <View style={styles.editOverlay}>
+                                <Ionicons name="camera" size={20} color="#ffffff" />
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={styles.placeholder}>
+                            <BlurView intensity={25} tint="light" style={StyleSheet.absoluteFill} />
+                            <Ionicons name="camera" size={40} color="#666" />
+                            <Text style={styles.placeholderText}>Add Profile Picture</Text>
+                            <Text style={styles.placeholderSubtext}>(Optional)</Text>
+                        </View>
+                    )}
                 </TouchableOpacity>
 
                 {/* Glass card wrapping bio input and button */}
@@ -98,17 +162,60 @@ export default function TrainerOnboardingStep3() {
 
                     {/* Continue Button inside card */}
                     <TouchableOpacity
-                        style={[styles.continueButton, loading && { opacity: 0.6 }]}
+                        style={[styles.continueButton, (loading || uploading) && { opacity: 0.6 }]}
                         onPress={handleNext}
-                        disabled={loading}
+                        disabled={loading || uploading}
                         activeOpacity={0.85}
                     >
-                        <Text style={styles.continueButtonText}>
-                            {loading ? 'Saving...' : 'Continue'}
-                        </Text>
+                        {(loading || uploading) ? (
+                            <ActivityIndicator size="small" color="#1a1a1a" />
+                        ) : (
+                            <Text style={styles.continueButtonText}>Continue</Text>
+                        )}
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Picker source modal */}
+            <Modal visible={showPicModal} transparent animationType="fade" onRequestClose={() => setShowPicModal(false)}>
+                <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowPicModal(false)} />
+                <View style={styles.modalSheet}>
+                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalTitle}>Add profile picture</Text>
+
+                    <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('camera')} activeOpacity={0.7}>
+                        <View style={styles.modalIconWrap}>
+                            <Ionicons name="camera" size={20} color="#7cce06" />
+                        </View>
+                        <Text style={styles.modalOptionText}>Take a photo</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('gallery')} activeOpacity={0.7}>
+                        <View style={styles.modalIconWrap}>
+                            <Ionicons name="images" size={20} color="#7cce06" />
+                        </View>
+                        <Text style={styles.modalOptionText}>Choose from gallery</Text>
+                    </TouchableOpacity>
+
+                    {localPicUri && (
+                        <TouchableOpacity
+                            style={styles.modalOption}
+                            onPress={() => { setLocalPicUri(null); setShowPicModal(false); }}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(255,84,84,0.12)' }]}>
+                                <Ionicons name="trash-outline" size={20} color="#ff5454" />
+                            </View>
+                            <Text style={[styles.modalOptionText, { color: '#ff7070' }]}>Remove picture</Text>
+                        </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity style={styles.modalCancel} onPress={() => setShowPicModal(false)} activeOpacity={0.7}>
+                        <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
         </ScreenBackground>
     );
 }
@@ -137,6 +244,44 @@ const styles = StyleSheet.create({
     },
     placeholderText: { fontSize: 14, color: '#aaaaaa', marginTop: 8, fontWeight: '500' },
     placeholderSubtext: { fontSize: 12, color: '#666', marginTop: 4 },
+
+    previewWrap: { width: 140, height: 140, borderRadius: 70, position: 'relative' },
+    preview: {
+        width: 140, height: 140, borderRadius: 70,
+        borderWidth: 2, borderColor: '#7cce06',
+    },
+    editOverlay: {
+        position: 'absolute', bottom: 4, right: 4,
+        width: 38, height: 38, borderRadius: 19,
+        backgroundColor: '#7cce06',
+        justifyContent: 'center', alignItems: 'center',
+        borderWidth: 2, borderColor: '#0a0520',
+    },
+
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+    modalSheet: {
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        backgroundColor: 'rgba(10,5,32,0.96)',
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        paddingHorizontal: 16, paddingTop: 12, paddingBottom: 30,
+        borderTopWidth: 1, borderColor: 'rgba(124,206,6,0.2)',
+        overflow: 'hidden',
+    },
+    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 16 },
+    modalTitle: { fontSize: 16, fontWeight: '700', color: '#ffffff', marginBottom: 14, paddingHorizontal: 4 },
+    modalOption: {
+        flexDirection: 'row', alignItems: 'center', gap: 14,
+        paddingVertical: 12, paddingHorizontal: 8,
+        borderRadius: 12,
+    },
+    modalIconWrap: {
+        width: 40, height: 40, borderRadius: 12,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    modalOptionText: { fontSize: 15, fontWeight: '600', color: '#ffffff' },
+    modalCancel: { paddingVertical: 14, alignItems: 'center', marginTop: 8 },
+    modalCancelText: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.5)' },
 
     glassCard: {
         borderRadius: 20,

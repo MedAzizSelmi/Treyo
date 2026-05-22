@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { authService, courseService, notificationService } from '../../services/api';
+import { authService, courseService, notificationService, groupService } from '../../services/api';
 import api from '../../services/api';
 import { ScreenBackground } from '../../components/ScreenBackground';
 
@@ -15,6 +15,7 @@ export default function TrainerHomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [courses, setCourses] = useState<any[]>([]);
+    const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
     const [stats, setStats] = useState({ students: 0, courses: 0, rating: 0, revenue: 0 });
 
@@ -23,25 +24,48 @@ export default function TrainerHomeScreen() {
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
 
+            let trainerData: any = null;
             try {
                 const res = await api.get('/trainers/me');
+                trainerData = res.data;
                 setProfilePicUrl(res.data.profilePictureUrl || null);
                 setImageTs(Date.now());
-
-                setStats({
-                    students: res.data.totalStudents || 0,
-                    courses: res.data.totalCourses || 0,
-                    rating: res.data.averageRating || 0,
-                    revenue: res.data.totalRevenue || 0,
-                });
             } catch (_) {}
 
             if (currentUser?.userId) {
+                let trainerCourses: any[] = [];
                 try {
-                    const trainerCourses = await courseService.getTrainerCourses(currentUser.userId);
-                    setCourses(trainerCourses || []);
+                    trainerCourses = await courseService.getTrainerCourses(currentUser.userId) || [];
+                    setCourses(trainerCourses);
                 } catch (_) {
                     setCourses([]);
+                }
+
+                // Stats are derived from the courses list because the
+                // trainer entity's totalStudentsTaught / totalRevenue fields
+                // don't auto-update on enrollment — they were originally
+                // designed as lifetime aggregates and are commonly zero.
+                // Summing across courses gives us a live number that
+                // matches what shows in the My Courses section below.
+                const studentsCount = trainerCourses.reduce(
+                    (sum: number, c: any) =>
+                        sum + (c.totalEnrolled ?? c.interestedStudentsCount ?? 0),
+                    0,
+                );
+                setStats({
+                    students: studentsCount,
+                    courses: trainerCourses.length,
+                    rating: trainerData?.averageRating
+                        ? Number(trainerData.averageRating)
+                        : 0,
+                    revenue: 0, // No payment system yet — see admin dashboard rewrite
+                });
+
+                try {
+                    const sessions = await groupService.getUpcomingSessions(currentUser.userId);
+                    setUpcomingSessions(Array.isArray(sessions) ? sessions : []);
+                } catch (_) {
+                    setUpcomingSessions([]);
                 }
 
                 try {
@@ -76,10 +100,11 @@ export default function TrainerHomeScreen() {
         return `$${v}`;
     };
 
-    const activeCourses = courses.filter((c: any) => {
-        const s = (c.status || c.courseStatus || '').toString().toUpperCase();
-        return s === 'PUBLISHED' || s === 'ACTIVE';
-    });
+    // Courses returned by /api/courses/trainer/{id} carry isPublished /
+    // isActive booleans, NOT a stringly-typed "status" field — the
+    // earlier filter checked phantom fields and dropped everything.
+    // Drafts were removed app-wide, so every active row is live.
+    const activeCourses = courses.filter((c: any) => c.isActive !== false);
 
     return (
         <ScreenBackground>
@@ -137,6 +162,34 @@ export default function TrainerHomeScreen() {
                             />
                         </View>
 
+                        {/* ── Upcoming Sessions ── */}
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
+                                <Text style={styles.sessionCount}>
+                                    {upcomingSessions.length > 0 ? `${upcomingSessions.length} scheduled` : ''}
+                                </Text>
+                            </View>
+                            {upcomingSessions.length > 0 ? (
+                                upcomingSessions.slice(0, 4).map((s: any) => (
+                                    <SessionCard key={s.groupId} session={s} />
+                                ))
+                            ) : (
+                                <View style={styles.sessionsEmpty}>
+                                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <View style={styles.sessionsEmptyIcon}>
+                                        <Ionicons name="calendar-outline" size={28} color="rgba(124,206,6,0.5)" />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.sessionsEmptyTitle}>No sessions scheduled</Text>
+                                        <Text style={styles.sessionsEmptyText}>
+                                            You'll see upcoming groups here once enough students enroll in your courses.
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
                         {/* ── My Courses ── */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
@@ -150,8 +203,16 @@ export default function TrainerHomeScreen() {
                                     <FormationCard
                                         key={c.courseId || c.id}
                                         title={c.title || 'Untitled'}
-                                        students={c.enrolledCount ?? 0}
-                                        groups={c.groupsCount ?? 0}
+                                        // CourseResponse uses totalEnrolled (paid) +
+                                        // interestedStudentsCount (queue) — fall back
+                                        // through both before the legacy enrolledCount.
+                                        students={
+                                            c.totalEnrolled
+                                            ?? c.interestedStudentsCount
+                                            ?? c.enrolledCount
+                                            ?? 0
+                                        }
+                                        groups={c.currentGroupsCount ?? c.groupsCount ?? 0}
                                         status="Active"
                                     />
                                 ))
@@ -178,6 +239,73 @@ function StatCard({ title, value, icon, color }: any) {
             <Text style={styles.statValue}>{value}</Text>
             <Text style={styles.statTitle}>{title}</Text>
         </View>
+    );
+}
+
+function formatSessionDate(iso: string | null | undefined): { day: string; time: string; relative: string } {
+    // Short labels — these get rendered into a 64dp pill so anything
+    // longer than ~6 chars wraps to a second line (the old "Forming"
+    // and "Tomorrow" both did). Keeping each label ≤ 5 chars keeps the
+    // pill on a single line for all states.
+    if (!iso) return { day: 'Date TBA', time: '', relative: 'Soon' };
+    const d = new Date(iso);
+    const now = new Date();
+    const day = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+    const diffMs = d.getTime() - now.getTime();
+    const diffDays = Math.floor(diffMs / 86400000);
+    let relative: string;
+    if (diffDays < 0) relative = 'Now';
+    else if (diffDays === 0) relative = 'Today';
+    else if (diffDays === 1) relative = 'Tmrw';
+    else if (diffDays < 7) relative = `In ${diffDays}d`;
+    else relative = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return { day, time, relative };
+}
+
+function SessionCard({ session }: { session: any }) {
+    const { day, time, relative } = formatSessionDate(session.startDate);
+    const status = (session.groupStatus || '').toLowerCase();
+    const statusColor = status === 'active' ? '#7cce06' : status === 'ready' ? '#FFA500' : '#888';
+    const studentRatio = `${session.currentSize ?? 0}/${session.maxSize ?? 0}`;
+    const locationLabel = session.isOnline
+        ? (session.meetingLink ? 'Online · Link ready' : 'Online')
+        : (session.meetingLocation || 'Location TBA');
+
+    return (
+        <TouchableOpacity style={styles.sessionCard} activeOpacity={0.85}>
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+
+            {/* Date pill on the left */}
+            <View style={styles.sessionDatePill}>
+                <Text style={styles.sessionDateRelative}>{relative}</Text>
+                {!!time && <Text style={styles.sessionDateTime}>{time}</Text>}
+            </View>
+
+            {/* Body */}
+            <View style={styles.sessionBody}>
+                <Text style={styles.sessionTitle} numberOfLines={1}>
+                    {session.courseTitle || session.groupName || 'Session'}
+                </Text>
+                {!!session.groupName && session.courseTitle && (
+                    <Text style={styles.sessionSubtitle} numberOfLines={1}>{session.groupName}</Text>
+                )}
+                <View style={styles.sessionMetaRow}>
+                    <View style={styles.sessionMetaChip}>
+                        <Ionicons name={session.isOnline ? 'videocam-outline' : 'location-outline'} size={11} color="#aaa" />
+                        <Text style={styles.sessionMetaText} numberOfLines={1}>{locationLabel}</Text>
+                    </View>
+                    <View style={styles.sessionMetaChip}>
+                        <Ionicons name="people-outline" size={11} color="#aaa" />
+                        <Text style={styles.sessionMetaText}>{studentRatio}</Text>
+                    </View>
+                </View>
+            </View>
+
+            {/* Status dot */}
+            <View style={[styles.sessionStatusDot, { backgroundColor: statusColor }]} />
+        </TouchableOpacity>
     );
 }
 
@@ -261,4 +389,46 @@ const styles = StyleSheet.create({
         padding: 20, alignItems: 'center',
     },
     emptyInlineText: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
+
+    // Sessions
+    sessionCount: { fontSize: 12, color: '#7cce06', fontWeight: '600' },
+    sessionCard: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        borderRadius: 16, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.2)',
+        padding: 12, marginBottom: 10,
+    },
+    sessionDatePill: {
+        width: 64, paddingVertical: 8, alignItems: 'center',
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        borderRadius: 12,
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
+    },
+    // Dropped textTransform: 'uppercase' + letterSpacing: 0.4. With both
+    // applied, "FORMING" (7 chars) wrapped to "FORMIN\nG" in the 64dp
+    // pill. Mixed case fits the labels we now use (Soon / Today / Tmrw
+    // / In Nd / Now) on a single line.
+    sessionDateRelative: { fontSize: 12, fontWeight: '700', color: '#7cce06' },
+    sessionDateTime: { fontSize: 12, color: '#ffffff', marginTop: 2, fontWeight: '600' },
+    sessionBody: { flex: 1 },
+    sessionTitle: { fontSize: 14, fontWeight: '700', color: '#ffffff', marginBottom: 2 },
+    sessionSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 6 },
+    sessionMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+    sessionMetaChip: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 160 },
+    sessionMetaText: { fontSize: 11, color: '#aaaaaa' },
+    sessionStatusDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 4 },
+
+    sessionsEmpty: {
+        flexDirection: 'row', alignItems: 'center', gap: 14,
+        borderRadius: 16, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+        padding: 16,
+    },
+    sessionsEmptyIcon: {
+        width: 48, height: 48, borderRadius: 14,
+        backgroundColor: 'rgba(124,206,6,0.08)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    sessionsEmptyTitle: { fontSize: 14, fontWeight: '600', color: '#ffffff', marginBottom: 2 },
+    sessionsEmptyText: { fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 17 },
 });

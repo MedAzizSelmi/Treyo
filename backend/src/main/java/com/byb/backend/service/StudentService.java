@@ -23,6 +23,26 @@ public class StudentService {
         return mapToProfileResponse(student);
     }
 
+    /**
+     * Returns only the fields that are safe to expose to other users
+     * (e.g. group-chat members tapping an avatar). NO email / phone /
+     * address — those stay on /me and never leak through this endpoint.
+     */
+    public java.util.Map<String, Object> getPublicProfile(String studentId) {
+        Student s = studentRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found: " + studentId));
+
+        java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("studentId", s.getStudentId());
+        m.put("name", s.getName());
+        m.put("profilePictureUrl", s.getProfilePictureUrl());
+        m.put("bio", s.getBio());
+        m.put("primaryDomains", s.getPrimaryDomains());
+        m.put("specificInterests", s.getSpecificInterests());
+        m.put("experienceLevel", s.getExperienceLevel());
+        return m;
+    }
+
     @Transactional
     public StudentProfileResponse updateInterests(String studentId, UpdateInterestsRequest request) {
         Student student = studentRepository.findByStudentId(studentId)
@@ -47,6 +67,8 @@ public class StudentService {
         student.setKeySkills(request.getKeySkills());
         student.setEducationLevel(request.getEducationLevel());
         student.setTrainingDomain(request.getTrainingDomain());
+        student.setLinkedinUrl(request.getLinkedinUrl());
+        student.setPortfolioUrl(request.getPortfolioUrl());
 
         student = studentRepository.save(student);
         return mapToProfileResponse(student);
@@ -75,6 +97,8 @@ public class StudentService {
                 .totalCoursesEnrolled(student.getTotalCoursesEnrolled())
                 .totalCoursesCompleted(student.getTotalCoursesCompleted())
                 .isOnboardingComplete(student.isOnboardingComplete())
+                .linkedinUrl(student.getLinkedinUrl())
+                .portfolioUrl(student.getPortfolioUrl())
                 .build();
     }
 

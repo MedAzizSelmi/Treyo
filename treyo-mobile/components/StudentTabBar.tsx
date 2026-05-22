@@ -11,19 +11,19 @@ type TabBarProps = {
 const VISIBLE_TABS = [
     {
         name: 'home',
-        icon: require('../assets/Tabs/home.png'),
+        icon: require('../assets/Tabs/Home.png'),
     },
     {
         name: 'messages',
-        icon: require('../assets/Tabs/chat.png'),
+        icon: require('../assets/Tabs/Chat.png'),
     },
     {
         name: 'chatbot',
-        icon: require('../assets/Tabs/bot.png'),
+        icon: require('../assets/Tabs/Bot.png'),
     },
     {
         name: 'profile',
-        icon: require('../assets/Tabs/user.png'),
+        icon: require('../assets/Tabs/User.png'),
     },
 ];
 
@@ -96,7 +96,7 @@ export function StudentTabBar({ state, descriptors, navigation }: TabBarProps) {
                                     style={[
                                         styles.icon,
                                         tab.name === 'chatbot' && { width: 30, height: 30 }, // example fix
-                                        tab.name === 'messages' && { width: 30, height: 30 }, // example fix
+                                        tab.name === 'messages' && { width: 33, height: 33 }, // example fix
                                         { opacity: isFocused ? 1 : 0.5 },
                                     ]}
                                     resizeMode="contain"

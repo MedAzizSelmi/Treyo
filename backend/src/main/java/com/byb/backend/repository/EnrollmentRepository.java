@@ -22,6 +22,13 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, String> 
 
     long countByEnrollmentStatus(String status);
 
+    /** All enrollments for a course (used to count "real" enrolled students). */
+    long countByCourseId(String courseId);
+
+    /** Confirmed/active enrollments — students who have committed to a group. */
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.courseId = :courseId AND e.enrollmentStatus IN ('confirmed','active','completed')")
+    long countCommittedEnrollments(String courseId);
+
     long countByCreatedAtAfter(LocalDateTime date);
 
     long countByStudentId(String studentId);

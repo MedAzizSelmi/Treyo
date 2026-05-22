@@ -115,45 +115,63 @@ export default function TrainerMessagesScreen() {
                     </View>
                 ) : conversations.length > 0 ? (
                     <View style={styles.listWrap}>
-                        {conversations.map((conv: any, index: number) => (
-                            <TouchableOpacity
-                                key={conv.conversationId || index}
-                                style={[styles.convCard, index < conversations.length - 1 && styles.convCardBorder]}
-                                activeOpacity={0.7}
-                            >
-                                <View style={styles.convAvatarWrap}>
-                                    <View style={[styles.convAvatar, (conv.unreadCount || 0) > 0 && styles.convAvatarUnread]}>
-                                        {conv.otherUserPhotoUrl ? (
-                                            <Image source={{ uri: `${conv.otherUserPhotoUrl}?t=${imageTs}` }} style={{ width: 50, height: 50, borderRadius: 25 }} />
-                                        ) : (
-                                            <Text style={styles.convAvatarText}>{(conv.otherUserName || '?')[0].toUpperCase()}</Text>
-                                        )}
+                        {conversations.map((conv: any, index: number) => {
+                            // Group chats route to the dedicated chat screen; DMs
+                            // stay no-op for now (the 1-to-1 trainer chat screen
+                            // isn't wired up yet — out of scope here).
+                            const isGroup = !!conv.isGroup;
+                            const onPress = () => {
+                                if (isGroup && conv.groupId) {
+                                    router.push({
+                                        pathname: '/group-chat' as any,
+                                        params: { groupId: conv.groupId, groupName: conv.otherUserName || '' },
+                                    });
+                                }
+                            };
+                            return (
+                                <TouchableOpacity
+                                    key={conv.conversationId || index}
+                                    style={[styles.convCard, index < conversations.length - 1 && styles.convCardBorder]}
+                                    activeOpacity={0.7}
+                                    onPress={onPress}
+                                >
+                                    <View style={styles.convAvatarWrap}>
+                                        <View style={[styles.convAvatar, (conv.unreadCount || 0) > 0 && styles.convAvatarUnread]}>
+                                            {isGroup ? (
+                                                <Ionicons name="people" size={24} color="#7cce06" />
+                                            ) : conv.otherUserPhotoUrl ? (
+                                                <Image source={{ uri: `${conv.otherUserPhotoUrl}?t=${imageTs}` }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                                            ) : (
+                                                <Text style={styles.convAvatarText}>{(conv.otherUserName || '?')[0].toUpperCase()}</Text>
+                                            )}
+                                        </View>
+                                        {!isGroup && conv.isOnline && <View style={styles.onlineDot} />}
                                     </View>
-                                    {conv.isOnline && <View style={styles.onlineDot} />}
-                                </View>
 
-                                <View style={styles.convInfo}>
-                                    <View style={styles.convTopRow}>
-                                        <Text style={[styles.convName, (conv.unreadCount || 0) > 0 && styles.convNameUnread]}>
-                                            {conv.otherUserName || 'Unknown'}
-                                        </Text>
-                                        <Text style={[styles.convTime, (conv.unreadCount || 0) > 0 && styles.convTimeUnread]}>
-                                            {formatTime(conv.lastMessageTime)}
-                                        </Text>
+                                    <View style={styles.convInfo}>
+                                        <View style={styles.convTopRow}>
+                                            <Text style={[styles.convName, (conv.unreadCount || 0) > 0 && styles.convNameUnread]} numberOfLines={1}>
+                                                {conv.otherUserName || 'Unknown'}
+                                                {isGroup && conv.memberCount != null && ` · ${conv.memberCount}`}
+                                            </Text>
+                                            <Text style={[styles.convTime, (conv.unreadCount || 0) > 0 && styles.convTimeUnread]}>
+                                                {formatTime(conv.lastMessageTime)}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.convBottomRow}>
+                                            <Text style={[styles.convMessage, (conv.unreadCount || 0) > 0 && styles.convMessageUnread]} numberOfLines={1}>
+                                                {conv.lastMessage || 'No messages yet'}
+                                            </Text>
+                                            {(conv.unreadCount || 0) > 0 && (
+                                                <View style={styles.unreadBadge}>
+                                                    <Text style={styles.unreadText}>{conv.unreadCount}</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
-                                    <View style={styles.convBottomRow}>
-                                        <Text style={[styles.convMessage, (conv.unreadCount || 0) > 0 && styles.convMessageUnread]} numberOfLines={1}>
-                                            {conv.lastMessage || 'No messages yet'}
-                                        </Text>
-                                        {(conv.unreadCount || 0) > 0 && (
-                                            <View style={styles.unreadBadge}>
-                                                <Text style={styles.unreadText}>{conv.unreadCount}</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 ) : (
                     <View style={styles.emptyState}>

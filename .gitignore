@@ -1,0 +1,30 @@
+# ===================================================================
+# ROOT .gitignore — keeps secrets and local junk out of the repo.
+# Each sub-project (backend/, treyo-mobile/, ml-service/, admin-dashboard/)
+# also has its own .gitignore for build artifacts; this one covers
+# things that span the whole repo or were missing coverage.
+# ===================================================================
+
+# ── Secrets — NEVER commit these ──
+# Plain-text key dumps
+Treyo API Keys.txt
+*api-keys*.txt
+*API Keys*.txt
+
+# Env files (real values). The *.example variants ARE committed as
+# templates — the negation rules below keep them tracked.
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Backend secrets — the real application.properties carries DB password,
+# JWT secret, Gemini + Konnect keys. Only the .example template is tracked.
+backend/src/main/resources/application.properties
+
+# ── Claude Code local settings ──
+.claude/settings.local.json
+
+# ── OS junk ──
+.DS_Store
+Thumbs.db

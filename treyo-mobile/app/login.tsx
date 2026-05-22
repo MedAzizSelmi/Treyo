@@ -5,7 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { authService } from '../services/api';
 
-const { width, height } = Dimensions.get('window');
+// Use 'screen' (full physical screen) not 'window' (safe area). On Android
+// 'window' excludes the system nav bar, which shrinks the gradient view
+// and pulls the strong-green bottom of the glow into the visible area.
+const { width, height } = Dimensions.get('screen');
 
 export default function LoginScreen() {
     const router = useRouter();

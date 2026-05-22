@@ -39,7 +39,7 @@ export default function TrainerOnboardingStep1() {
                 postalCode: postCode,
             });
 
-            router.push({
+            router.replace({
                 pathname: '/onboarding/trainer/step2' as any,
                 params: { phone, address, town, state, postCode },
             });
@@ -65,11 +65,11 @@ export default function TrainerOnboardingStep1() {
                     <View style={styles.header}>
                         <Text style={styles.title}>Contact Information</Text>
                         <Text style={styles.subtitle}>Help students reach you</Text>
-                        <Text style={styles.step}>Step 1 of 4</Text>
+                        <Text style={styles.step}>Step 1 of 3</Text>
                     </View>
 
                     <View style={styles.progressContainer}>
-                        <View style={[styles.progressBar, { width: '25%' }]} />
+                        <View style={[styles.progressBar, { width: '33%' }]} />
                     </View>
 
                     {/* Glass form card with button inside */}

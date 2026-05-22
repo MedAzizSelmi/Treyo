@@ -1,7 +1,15 @@
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const { width, height } = Dimensions.get('window');
+// Use 'screen' (full physical screen) instead of 'window' (safe area).
+//
+// On iOS the two are essentially identical. On Android, 'window' excludes
+// the system navigation bar — that made the bottomGlow view shorter than
+// designed, which pulled the strong-green bottom of its gradient up into
+// the visible area. Since every page uses this background component, the
+// bug showed up app-wide as a green bleed near the nav bar. Switching to
+// 'screen' restores the original off-screen positioning the design used.
+const { width, height } = Dimensions.get('screen');
 
 type Props = {
     children: React.ReactNode;

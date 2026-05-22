@@ -48,5 +48,8 @@ public class CreateCourseRequest {
     @Min(value = 1, message = "Maximum students must be at least 1")
     private Integer maxStudentsPerGroup = 30;
 
+    @Min(value = 1, message = "Max groups allowed must be at least 1")
+    private Integer maxGroupsAllowed = 1;
+
     private Boolean hasCertificate = false;
 }

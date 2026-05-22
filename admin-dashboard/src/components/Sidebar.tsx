@@ -11,6 +11,11 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  GitBranch,
+  Mail,
+  FileText,
+  Activity,
+  MessageSquare,
 } from 'lucide-react';
 import { logout } from '@/lib/api';
 import { useState } from 'react';
@@ -18,8 +23,13 @@ import { useState } from 'react';
 const NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Users', href: '/dashboard/users', icon: Users },
+  { label: 'Templates', href: '/dashboard/templates', icon: FileText },
   { label: 'Courses', href: '/dashboard/courses', icon: BookOpen },
+  { label: 'Requests', href: '/dashboard/requests', icon: Mail },
+  { label: 'Groups', href: '/dashboard/groups', icon: GitBranch },
+  { label: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+  { label: 'System Health', href: '/dashboard/system', icon: Activity },
 ];
 
 export default function Sidebar() {
@@ -34,7 +44,7 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-6 border-b border-border">
-        <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+        <div className="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
           <Image
             src="/logo.png"
             alt="Treyo"

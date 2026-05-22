@@ -3,7 +3,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useRef } from 'react';
 import PagerView from 'react-native-pager-view';
 
-const { width, height } = Dimensions.get('window');
+// Use 'screen' (full physical screen) not 'window' (safe area). On Android
+// 'window' excludes the system nav bar, which shrinks the gradient view
+// and pulls the strong-green bottom of the glow into the visible area.
+const { width, height } = Dimensions.get('screen');
 
 type OnboardingCarouselProps = {
     onFinish: () => void;

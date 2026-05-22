@@ -115,47 +115,83 @@ export default function MessagesScreen() {
                     </View>
                 ) : conversations.length > 0 ? (
                     <View style={styles.listWrap}>
-                        {conversations.map((conv: any, index: number) => (
-                            <TouchableOpacity
-                                key={conv.conversationId || index}
-                                style={[styles.convCard, index < conversations.length - 1 && styles.convCardBorder]}
-                                activeOpacity={0.7}
-                            >
-                                {/* Avatar */}
-                                <View style={styles.convAvatarWrap}>
-                                    <View style={[styles.convAvatar, (conv.unreadCount || 0) > 0 && styles.convAvatarUnread]}>
-                                        {conv.otherUserPhotoUrl ? (
-                                            <Image source={{ uri: `${conv.otherUserPhotoUrl}?t=${imageTs}` }} style={{ width: 50, height: 50, borderRadius: 25 }} />
-                                        ) : (
-                                            <Text style={styles.convAvatarText}>{(conv.otherUserName || '?')[0].toUpperCase()}</Text>
-                                        )}
+                        {conversations.map((conv: any, index: number) => {
+                            // Backend now flags group conversations with isGroup=true.
+                            // We use a different avatar (people icon) and route taps
+                            // to the dedicated /group-chat screen.
+                            const isGroup = !!conv.isGroup;
+                            const onPress = () => {
+                                if (isGroup && conv.groupId) {
+                                    router.push({
+                                        pathname: '/group-chat' as any,
+                                        params: { groupId: conv.groupId, groupName: conv.otherUserName || '' },
+                                    });
+                                }
+                                // DM taps are intentionally a no-op for now — the
+                                // 1-to-1 chat screen isn't wired up yet (separate concern).
+                            };
+                            return (
+                                <TouchableOpacity
+                                    key={conv.conversationId || index}
+                                    style={[styles.convCard, index < conversations.length - 1 && styles.convCardBorder]}
+                                    activeOpacity={0.7}
+                                    onPress={onPress}
+                                >
+                                    {/* Avatar */}
+                                    <View style={styles.convAvatarWrap}>
+                                        <View style={[
+                                            styles.convAvatar,
+                                            (conv.unreadCount || 0) > 0 && styles.convAvatarUnread,
+                                            isGroup && styles.convAvatarGroup,
+                                        ]}>
+                                            {isGroup ? (
+                                                <Ionicons name="people" size={24} color="#7cce06" />
+                                            ) : conv.otherUserPhotoUrl ? (
+                                                <Image source={{ uri: `${conv.otherUserPhotoUrl}?t=${imageTs}` }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+                                            ) : (
+                                                <Text style={styles.convAvatarText}>{(conv.otherUserName || '?')[0].toUpperCase()}</Text>
+                                            )}
+                                        </View>
+                                        {!isGroup && conv.isOnline && <View style={styles.onlineDot} />}
                                     </View>
-                                    {conv.isOnline && <View style={styles.onlineDot} />}
-                                </View>
 
-                                {/* Info */}
-                                <View style={styles.convInfo}>
-                                    <View style={styles.convTopRow}>
-                                        <Text style={[styles.convName, (conv.unreadCount || 0) > 0 && styles.convNameUnread]}>
-                                            {conv.otherUserName || 'Unknown'}
-                                        </Text>
-                                        <Text style={[styles.convTime, (conv.unreadCount || 0) > 0 && styles.convTimeUnread]}>
-                                            {formatTime(conv.lastMessageTime)}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.convBottomRow}>
-                                        <Text style={[styles.convMessage, (conv.unreadCount || 0) > 0 && styles.convMessageUnread]} numberOfLines={1}>
-                                            {conv.lastMessage || 'No messages yet'}
-                                        </Text>
-                                        {(conv.unreadCount || 0) > 0 && (
-                                            <View style={styles.unreadBadge}>
-                                                <Text style={styles.unreadText}>{conv.unreadCount}</Text>
+                                    {/* Info */}
+                                    <View style={styles.convInfo}>
+                                        <View style={styles.convTopRow}>
+                                            <View style={styles.convNameWrap}>
+                                                <Text style={[styles.convName, (conv.unreadCount || 0) > 0 && styles.convNameUnread]} numberOfLines={1}>
+                                                    {conv.otherUserName || 'Unknown'}
+                                                </Text>
+                                                {isGroup && (
+                                                    // Tiny pill so the user can tell at a glance
+                                                    // this is a group chat (not a DM with a person
+                                                    // named "Node.js Fundamentals — Group 1").
+                                                    <View style={styles.groupPill}>
+                                                        <Ionicons name="people-outline" size={9} color="#7cce06" />
+                                                        <Text style={styles.groupPillText}>
+                                                            {conv.memberCount ?? '—'}
+                                                        </Text>
+                                                    </View>
+                                                )}
                                             </View>
-                                        )}
+                                            <Text style={[styles.convTime, (conv.unreadCount || 0) > 0 && styles.convTimeUnread]}>
+                                                {formatTime(conv.lastMessageTime)}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.convBottomRow}>
+                                            <Text style={[styles.convMessage, (conv.unreadCount || 0) > 0 && styles.convMessageUnread]} numberOfLines={1}>
+                                                {conv.lastMessage || 'No messages yet'}
+                                            </Text>
+                                            {(conv.unreadCount || 0) > 0 && (
+                                                <View style={styles.unreadBadge}>
+                                                    <Text style={styles.unreadText}>{conv.unreadCount}</Text>
+                                                </View>
+                                            )}
+                                        </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 ) : (
                     <View style={styles.emptyState}>
@@ -195,13 +231,42 @@ const styles = StyleSheet.create({
     convAvatarWrap: { position: 'relative', marginRight: 14 },
     convAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(124,206,6,0.12)', borderWidth: 1.5, borderColor: 'rgba(124,206,6,0.2)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
     convAvatarUnread: { borderColor: 'rgba(124,206,6,0.45)', backgroundColor: 'rgba(124,206,6,0.15)' },
+    convAvatarGroup: { backgroundColor: 'rgba(124,206,6,0.16)', borderColor: 'rgba(124,206,6,0.35)' },
     convAvatarText: { fontSize: 20, fontWeight: '700', color: '#7cce06' },
+    // Title + group pill sit on one line. The flex hierarchy is fiddly:
+    //   - convNameWrap   flex:1, minWidth:0  → claims remaining space after the
+    //     timestamp on the right, AND allows its children to compress (the
+    //     default for a flex item is `minWidth: auto`, which prevents Text
+    //     children from shrinking below their content width — that was the
+    //     bug, causing the pill to spill into the timestamp).
+    //   - convName       flex:1, flexShrink:1 → truncates with ellipsis when
+    //     the pill is present, keeping the pill visible.
+    //   - groupPill      flexShrink:0 → never shrinks; always its natural width.
+    convNameWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flex: 1,
+        minWidth: 0,
+        marginRight: 8,
+    },
+    groupPill: {
+        flexDirection: 'row', alignItems: 'center', gap: 3,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
+        flexShrink: 0,
+    },
+    groupPillText: { fontSize: 10, color: '#7cce06', fontWeight: '700' },
     onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: '#7cce06', borderWidth: 2, borderColor: '#0a0520' },
     convInfo: { flex: 1 },
     convTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-    convName: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.75)' },
+    // flexShrink:1 so the title compresses (with numberOfLines={1} ellipsis)
+    // rather than spilling past convNameWrap and overlapping the timestamp.
+    convName: { fontSize: 15, fontWeight: '600', color: 'rgba(255,255,255,0.75)', flexShrink: 1 },
     convNameUnread: { color: '#ffffff', fontWeight: '700' },
-    convTime: { fontSize: 12, color: 'rgba(255,255,255,0.3)' },
+    // flexShrink:0 so "3d ago" / "Xm ago" never compresses to "…".
+    convTime: { fontSize: 12, color: 'rgba(255,255,255,0.3)', flexShrink: 0 },
     convTimeUnread: { color: '#7cce06' },
     convBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     convMessage: { fontSize: 13.5, color: 'rgba(255,255,255,0.4)', flex: 1, marginRight: 10 },

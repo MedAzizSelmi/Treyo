@@ -31,3 +31,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Secrets ###
+# The real application.properties carries the DB password, JWT secret,
+# and the Gemini + Konnect API keys. Only application.properties.example
+# (a placeholder template) is committed — copy it on first setup.
+src/main/resources/application.properties
+
+### Uploaded files (runtime) ###
+uploads/

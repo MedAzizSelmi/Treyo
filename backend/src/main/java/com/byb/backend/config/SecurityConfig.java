@@ -38,6 +38,12 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/files/download/**",
                                 "/api/trainers",
+                                // Konnect's webhook is server-to-server and
+                                // has no JWT — has to be permitAll. The
+                                // handler still verifies every event against
+                                // Konnect's API before doing anything, so
+                                // a forged webhook can't create an enrollment.
+                                "/api/payments/konnect-webhook",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",

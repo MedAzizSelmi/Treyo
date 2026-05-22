@@ -1,5 +1,13 @@
 # ===================================================================
-# BYB MATCH BACKEND - APPLICATION CONFIGURATION
+# BYB MATCH BACKEND - APPLICATION CONFIGURATION (TEMPLATE)
+# ===================================================================
+# This is the TEMPLATE. The real application.properties is gitignored
+# because it carries live secrets.
+#
+# FIRST-TIME SETUP:
+#   1. Copy this file to `application.properties` (same folder)
+#   2. Replace every CHANGE_ME / YOUR_* placeholder with a real value
+#   3. Never commit application.properties — it's in .gitignore
 # ===================================================================
 
 # ===================================================================
@@ -14,7 +22,7 @@ server.error.include-stacktrace=never
 # ===================================================================
 spring.datasource.url=jdbc:postgresql://localhost:5432/Matching
 spring.datasource.username=postgres
-spring.datasource.password=postgres
+spring.datasource.password=CHANGE_ME
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 # JPA / Hibernate
@@ -40,7 +48,9 @@ server.tomcat.max-swallow-size=-1
 # ===================================================================
 # JWT CONFIGURATION
 # ===================================================================
-jwt.secret=your-256-bit-secret-change-this-in-production-make-it-very-long-and-random
+# Use a long random string (>= 256 bits). Generate one with e.g.:
+#   openssl rand -base64 48
+jwt.secret=CHANGE_ME_TO_A_LONG_RANDOM_SECRET
 jwt.expiration=86400000
 jwt.refresh-expiration=604800000
 
@@ -91,8 +101,29 @@ info.app.version=1.0.0
 # ===================================================================
 # GEMINI AI CONFIGURATION
 # ===================================================================
-gemini.api.key=AIzaSyC8ZF-qUV3Yy10sFEaFRUQcaV-sJp1YRk8
+# Generate / rotate at https://aistudio.google.com (API keys).
+gemini.api.key=YOUR_GEMINI_API_KEY
 # Models tried in order (fallback handled in GeminiService): gemini-2.0-flash-lite, gemini-2.0-flash, gemini-flash-lite-latest, gemini-flash-latest
+
+# ===================================================================
+# KONNECT PAYMENTS (Tunisian PSP — replaced Stripe so we can charge in TND)
+# ===================================================================
+# api-key  : "<wallet_owner_id>:<secret>", sent as the x-api-key header
+#            on every Konnect call. SERVER-ONLY — never expose to the app.
+# wallet-id: the receiverWalletId for the merchant account. Konnect routes
+#            funds to this wallet when a payment completes.
+# base-url : preprod for sandbox testing, prod for real charges.
+#              preprod -> https://api.preprod.konnect.network/api/v2
+#              prod    -> https://api.konnect.network/api/v2
+# return-url : custom scheme the mobile app handles to detect "user finished
+#              the Konnect-hosted payment page and is coming back to us".
+# webhook-url: Konnect calls this when a payment changes state. Leave empty
+#              in dev (falls back to polling).
+konnect.api.key=YOUR_KONNECT_API_KEY
+konnect.api.wallet-id=YOUR_KONNECT_WALLET_ID
+konnect.api.base-url=https://api.preprod.konnect.network/api/v2
+konnect.api.return-url=treyomobile://payment-return
+konnect.api.webhook-url=
 
 # File Storage
 file.storage.upload-dir=uploads

@@ -6,18 +6,48 @@
   <component name="ChangeListManager">
     <list default="true" id="db9c8ad5-87db-4caf-bab0-4454e7ceae47" name="Changes" comment="second commit">
       <change beforePath="$PROJECT_DIR$/../.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/../.claude/settings.local.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../admin-dashboard/src/app/dashboard/courses/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../admin-dashboard/src/app/dashboard/courses/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../admin-dashboard/src/app/dashboard/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../admin-dashboard/src/app/dashboard/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../admin-dashboard/src/components/Sidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/../admin-dashboard/src/components/Sidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../admin-dashboard/src/lib/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../admin-dashboard/src/lib/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/pom.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/BackendApplication.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/BackendApplication.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/config/SecurityConfig.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/AdminController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/AdminController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/ChatbotController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/ChatbotController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/CourseController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/CourseController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/EnrollmentController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/EnrollmentController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/InteractionController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/InteractionController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/RecommendationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/RecommendationController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/TrainerController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/controller/TrainerController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/admin/CourseManagementResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/admin/CourseManagementResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/admin/DashboardStatsResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/admin/DashboardStatsResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/course/CreateCourseRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/course/CreateCourseRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/student/StudentProfileResponse.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/student/StudentProfileResponse.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/student/UpdateStudentProfileRequest.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/dto/student/UpdateStudentProfileRequest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Course.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Course.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Enrollment.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Enrollment.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Interaction.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Interaction.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Student.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Student.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Trainer.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/model/Trainer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/CourseRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/CourseRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/EnrollmentRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/EnrollmentRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/InteractionRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/InteractionRepository.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/StudentRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/StudentRepository.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/TrainerRepository.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/repository/TrainerRepository.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/AdminService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/AdminService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/AuthService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/AuthService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/GeminiService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/GeminiService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/CourseService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/CourseService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/EnrollmentService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/EnrollmentService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/InteractionService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/InteractionService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/MLRecommendationService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/MLRecommendationService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/StudentService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/StudentService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/TrainerService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/java/com/byb/backend/service/TrainerService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/../backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/main/resources/application.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/uploads/profiles/students/STU_2878A42E_profile_.jpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/uploads/profiles/students/STU_47823D6D_profile_.jpeg" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/uploads/profiles/students/STU_47823D6D_profile_.jpeg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/uploads/profiles/trainers/STU_47823D6D_profile_.jpeg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../backend/uploads/profiles/students/STU_47823D6D_profile_.jpeg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ml-service/course_recommendation_system.py" beforeDir="false" afterPath="$PROJECT_DIR$/../ml-service/course_recommendation_system.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ml-service/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/../ml-service/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ml-service/recommendation_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/../ml-service/recommendation_engine.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../ml-service/requirement.txt" beforeDir="false" afterPath="$PROJECT_DIR$/../ml-service/requirement.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,7 +80,7 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feature/profile-picture-chatbot-ai&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/1/BYB_Match/treyo-mobile/assets/Tabs&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -102,6 +132,10 @@
       <workItem from="1775478188892" duration="52219000" />
       <workItem from="1776347918615" duration="2994000" />
       <workItem from="1776588961155" duration="3912000" />
+      <workItem from="1777458175794" duration="8904000" />
+      <workItem from="1777901745177" duration="8658000" />
+      <workItem from="1778580120638" duration="24468000" />
+      <workItem from="1779270518359" duration="5681000" />
     </task>
     <task id="LOCAL-00001" summary="first commit">
       <option name="closed" value="true" />

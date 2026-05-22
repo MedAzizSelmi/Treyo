@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -85,7 +85,7 @@ export default function TrainerProfileScreen() {
                         )}
                     </View>
                     <View style={styles.iconRow}>
-                        <TouchableOpacity onPress={() => router.push('/edit-profile' as any)}>
+                        <TouchableOpacity onPress={() => router.push('/trainer-edit-profile' as any)}>
                             <Ionicons name="settings-outline" size={22} color="#7cce06" />
                         </TouchableOpacity>
                         <Ionicons name="heart" size={22} color="#7cce06" />
@@ -153,8 +153,59 @@ export default function TrainerProfileScreen() {
                     </View>
                 ) : null}
 
+                {/* ── LinkedIn / Portfolio links ── */}
+                {(profile?.linkedinUrl || profile?.portfolioUrl) && (
+                    <View style={styles.sectionWrap}>
+                        <Text style={styles.sectionLabel}>Links</Text>
+                        <View style={styles.glassCard}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={styles.linksRow}>
+                                {profile.linkedinUrl && (
+                                    <TouchableOpacity
+                                        style={styles.linkBtn}
+                                        onPress={() => Linking.openURL(profile.linkedinUrl)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="logo-linkedin" size={16} color="#0A66C2" />
+                                        <Text style={styles.linkBtnText}>LinkedIn</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {profile.portfolioUrl && (
+                                    <TouchableOpacity
+                                        style={styles.linkBtn}
+                                        onPress={() => Linking.openURL(profile.portfolioUrl)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Ionicons name="globe-outline" size={16} color="#7cce06" />
+                                        <Text style={styles.linkBtnText}>Portfolio</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                )}
+
+                {/* ── Settings & Privacy ── */}
+                <View style={styles.settingsWrap}>
+                    <TouchableOpacity
+                        style={styles.settingsRow}
+                        onPress={() => router.push('/settings-privacy' as any)}
+                        activeOpacity={0.8}
+                    >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.settingsIconWrap}>
+                            <Ionicons name="settings-outline" size={22} color="#7cce06" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.settingsTitle}>Settings & Privacy</Text>
+                            <Text style={styles.settingsSubtitle}>Language, security, notifications and more</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
+                </View>
+
                 {/* ── Edit Profile ── */}
-                <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/edit-profile' as any)} activeOpacity={0.8}>
+                <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/trainer-edit-profile' as any)} activeOpacity={0.8}>
                     <Text style={styles.editBtnText}>Edit Profile</Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -219,6 +270,30 @@ const styles = StyleSheet.create({
     overviewCell: { width: '50%', marginBottom: 18, paddingRight: 10 },
     overviewTitle: { fontSize: 11, fontWeight: '700', color: '#7cce06', marginBottom: 6, letterSpacing: 0.3 },
     overviewValue: { fontSize: 13, color: '#cccccc', lineHeight: 19 },
+
+    linksRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+    linkBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+    },
+    linkBtnText: { fontSize: 13, color: '#ffffff', fontWeight: '500' },
+
+    settingsWrap: { paddingHorizontal: 20, marginBottom: 16 },
+    settingsRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 14,
+        borderRadius: 16, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
+        paddingHorizontal: 16, paddingVertical: 14,
+    },
+    settingsIconWrap: {
+        width: 42, height: 42, borderRadius: 12,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    settingsTitle: { fontSize: 15, fontWeight: '700', color: '#ffffff' },
+    settingsSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
 
     editBtn: {
         alignSelf: 'center',

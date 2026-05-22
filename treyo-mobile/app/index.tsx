@@ -2,7 +2,11 @@ import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions } from 'rea
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const { width, height } = Dimensions.get('window');
+// Use 'screen' (full physical screen) not 'window' (safe area). On Android
+// 'window' excludes the system nav bar, which shrinks the gradient view
+// and pulls the strong-green bottom of the glow into the visible area.
+// 'screen' restores the off-screen positioning the design assumes.
+const { width, height } = Dimensions.get('screen');
 
 export default function WelcomeScreen() {
     const router = useRouter();

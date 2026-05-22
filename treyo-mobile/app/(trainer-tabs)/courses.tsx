@@ -7,12 +7,16 @@ import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService, courseService, notificationService } from '../../services/api';
 import api from '../../services/api';
 
+// Drafts were removed — every course is born live the moment the admin
+// assigns a template to this trainer. The status filter now shows just
+// All / Active / Completed.
+
 export default function TrainerCoursesScreen() {
     const router = useRouter();
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
-    const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'Draft' | 'Completed'>('All');
+    const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'Completed'>('All');
     const [courses, setCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -54,20 +58,21 @@ export default function TrainerCoursesScreen() {
         }
     };
 
-    const mapStatus = (c: any): 'Active' | 'Draft' | 'Completed' => {
+    // Drafts are gone — every assigned course is live unless it's been
+    // archived/completed. We treat anything else (including the legacy
+    // PUBLISHED status) as Active.
+    const mapStatus = (c: any): 'Active' | 'Completed' => {
         const s = (c.status || c.courseStatus || '').toString().toUpperCase();
-        if (s === 'PUBLISHED' || s === 'ACTIVE') return 'Active';
         if (s === 'COMPLETED' || s === 'ARCHIVED') return 'Completed';
-        return 'Draft';
+        return 'Active';
     };
 
-    const filters: Array<'All' | 'Active' | 'Draft' | 'Completed'> = ['All', 'Active', 'Draft', 'Completed'];
+    const filters: Array<'All' | 'Active' | 'Completed'> = ['All', 'Active', 'Completed'];
     const filtered = activeFilter === 'All' ? courses : courses.filter(c => mapStatus(c) === activeFilter);
 
     const statusColor = (status: string) => {
         switch (status) {
             case 'Active': return '#7cce06';
-            case 'Draft': return '#aaaaaa';
             case 'Completed': return '#3b5bdb';
             default: return '#aaaaaa';
         }
@@ -104,18 +109,14 @@ export default function TrainerCoursesScreen() {
                     </View>
                 </View>
 
-                {/* ── Title + Add button ── */}
+                {/* ── Title (no Add — courses are now assigned by admin) ── */}
                 <View style={styles.titleRow}>
                     <View>
                         <Text style={styles.pageTitle}>My Courses</Text>
                         <Text style={styles.pageSubtitle}>
-                            {courses.length} course{courses.length === 1 ? '' : 's'} total
+                            {courses.length} course{courses.length === 1 ? '' : 's'} assigned by admin
                         </Text>
                     </View>
-                    <TouchableOpacity style={styles.addBtn} activeOpacity={0.8}>
-                        <Ionicons name="add" size={20} color="#000" />
-                        <Text style={styles.addBtnText}>New</Text>
-                    </TouchableOpacity>
                 </View>
 
                 {/* ── Filter chips ── */}
@@ -139,8 +140,14 @@ export default function TrainerCoursesScreen() {
                     </View>
                 ) : filtered.length > 0 ? filtered.map((course: any) => {
                     const status = mapStatus(course);
+                    const cId = course.courseId || course.id;
                     return (
-                        <TouchableOpacity key={course.courseId || course.id} style={styles.courseCard} activeOpacity={0.85}>
+                        <TouchableOpacity
+                            key={cId}
+                            style={styles.courseCard}
+                            activeOpacity={0.85}
+                            onPress={() => router.push({ pathname: '/trainer-course-manage' as any, params: { courseId: cId, courseTitle: course.title || '' } })}
+                        >
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
                             <View style={styles.cardTop}>
@@ -166,16 +173,19 @@ export default function TrainerCoursesScreen() {
                                 <View style={styles.cardStat}>
                                     <Ionicons name="people-outline" size={14} color="#7cce06" />
                                     <Text style={styles.cardStatText}>
-                                        {course.enrolledCount ?? course.students ?? 0} students
+                                        {course.enrolledCount ?? course.students ?? course.totalEnrolled ?? 0} students
                                     </Text>
                                 </View>
                                 <View style={styles.cardStat}>
                                     <Ionicons name="git-branch-outline" size={14} color="#7cce06" />
                                     <Text style={styles.cardStatText}>
-                                        {course.groupsCount ?? course.groups ?? 0} groups
+                                        {course.groupsCount ?? course.groups ?? course.currentGroupsCount ?? 0} groups
                                     </Text>
                                 </View>
-                                <TouchableOpacity style={styles.manageBtn}>
+                                <TouchableOpacity
+                                    style={styles.manageBtn}
+                                    onPress={(e) => { e.stopPropagation(); router.push({ pathname: '/trainer-course-manage' as any, params: { courseId: cId, courseTitle: course.title || '' } }); }}
+                                >
                                     <Text style={styles.manageBtnText}>Manage</Text>
                                     <Ionicons name="chevron-forward" size={13} color="#7cce06" />
                                 </TouchableOpacity>
@@ -190,9 +200,13 @@ export default function TrainerCoursesScreen() {
                         <Text style={styles.emptyTitle}>
                             No {activeFilter !== 'All' ? activeFilter.toLowerCase() + ' ' : ''}courses
                         </Text>
-                        <Text style={styles.emptySubtitle}>Tap "New" to create your first course.</Text>
+                        <Text style={styles.emptySubtitle}>
+                            You have no courses assigned yet. The admin will assign you to courses they create.
+                        </Text>
                     </View>
                 )}
+                {/* (Draft state + Publish action were removed — admin-assigned
+                    courses are live the moment they appear in this list.) */}
             </ScrollView>
         </ScreenBackground>
     );

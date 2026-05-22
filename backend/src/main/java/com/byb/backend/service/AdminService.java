@@ -31,6 +31,7 @@ public class AdminService {
     private final MessageRepository messageRepository;
     private final AdminRepository adminRepository;
     private final NotificationRepository notificationRepository;
+    private final AdminGroupFormationService groupFormationService;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -55,8 +56,14 @@ public class AdminService {
         long newTrainersThisMonth = trainerRepository.countByCreatedAtAfter(monthAgo);
         long newUsersThisMonth = newStudentsThisMonth + newTrainersThisMonth;
 
-        // TODO: Track active users (last login)
-        long activeUsersToday = 0;
+        // Active users today = anyone whose lastLoginAt is past midnight today.
+        // AuthService updates lastLoginAt on every successful login, so this
+        // reflects "people who signed in at least once today" rather than the
+        // looser "people who have any activity at all". For a per-session
+        // metric we'd add a sessions table; this is enough for the dashboard.
+        long activeStudentsToday = studentRepository.countByLastLoginAtAfter(todayStart);
+        long activeTrainersToday = trainerRepository.countByLastLoginAtAfter(todayStart);
+        long activeUsersToday = activeStudentsToday + activeTrainersToday;
 
         // Course statistics
         long totalCourses = courseRepository.count();
@@ -95,6 +102,8 @@ public class AdminService {
                 .activeUsersToday(activeUsersToday)
                 .newUsersThisWeek(newUsersThisWeek)
                 .newUsersThisMonth(newUsersThisMonth)
+                .newStudentsThisWeek(newStudentsThisWeek)
+                .newTrainersThisWeek(newTrainersThisWeek)
                 .totalCourses(totalCourses)
                 .publishedCourses(publishedCourses)
                 .pendingCourses(pendingCourses)
@@ -420,6 +429,8 @@ public class AdminService {
     private CourseManagementResponse mapCourseToResponse(Course course) {
         Trainer trainer = trainerRepository.findById(course.getTrainerId()).orElse(null);
         int currentGroups = groupRepository.countByCourseId(course.getCourseId());
+        long actualEnrolled = enrollmentRepository.countByCourseId(course.getCourseId());
+        long requestedCount = groupFormationService.countActiveRequests(course.getCourseId());
 
         return CourseManagementResponse.builder()
                 .courseId(course.getCourseId())
@@ -438,11 +449,12 @@ public class AdminService {
                 .approvalStatus(course.getIsPublished() ? "APPROVED" : "PENDING")
                 .averageRating(course.getAverageRating() != null ? course.getAverageRating().doubleValue() : 0.0)
                 .totalRatings(course.getTotalRatings())
-                .totalEnrolled(course.getTotalEnrolled())
+                .totalEnrolled((int) actualEnrolled)
                 .totalCompleted(course.getTotalCompleted())
                 .minStudentsRequired(course.getMinStudentsRequired())
                 .maxStudentsPerGroup(course.getMaxStudentsPerGroup())
                 .currentGroups(currentGroups)
+                .requestedCount((int) requestedCount)
                 .createdAt(course.getCreatedAt())
                 .publishedAt(null) // TODO: Add publishedAt field to Course
                 .lastModifiedAt(course.getUpdatedAt())

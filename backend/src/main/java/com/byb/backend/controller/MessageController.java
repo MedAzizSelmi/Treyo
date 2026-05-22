@@ -127,4 +127,38 @@ public class MessageController {
         String senderId = payload.get("senderId");
         // messagingTemplate.convertAndSendToUser(receiverId, "/queue/typing", senderId);
     }
+
+    // ─── Group chat ─────────────────────────────────────────────────
+
+    /**
+     * List all messages in a group's chat. Membership check happens in
+     * the service — non-members get a 403-equivalent (SecurityException
+     * → translated by GlobalExceptionHandler). Sender ID has to be in
+     * the query so the service can verify the caller belongs.
+     */
+    @GetMapping("/group/{groupId}")
+    @Operation(summary = "Get all messages in a group chat")
+    public ResponseEntity<List<MessageResponse>> getGroupMessages(
+            @PathVariable String groupId,
+            @RequestParam String viewerId) {
+        return ResponseEntity.ok(messageService.getGroupMessages(groupId, viewerId));
+    }
+
+    /**
+     * Post a message to a group's chat. Service rejects non-members and
+     * empty content. Returns the saved message so the client can update
+     * its UI optimistically.
+     */
+    @PostMapping("/group/{groupId}")
+    @Operation(summary = "Send a message to a group chat")
+    public ResponseEntity<MessageResponse> sendGroupMessage(
+            @PathVariable String groupId,
+            @RequestBody Map<String, String> body) {
+        String senderId = body.get("senderId");
+        String content = body.get("content");
+        String messageType = body.getOrDefault("messageType", "text");
+        String attachmentUrl = body.get("attachmentUrl");
+        return ResponseEntity.ok(messageService.sendGroupMessage(
+                senderId, groupId, content, messageType, attachmentUrl));
+    }
 }

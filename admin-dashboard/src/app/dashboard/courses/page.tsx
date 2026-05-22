@@ -4,9 +4,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   getAllCourses,
-  getPendingCourses,
-  approveCourse,
-  rejectCourse,
   deleteCourse,
   updateCourseMinStudents,
 } from '@/lib/api';
@@ -16,24 +13,21 @@ import Badge from '@/components/Badge';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import {
-  CheckCircle,
-  XCircle,
   Trash2,
   BookOpen,
-  Clock,
   Users,
   Layers,
-  DollarSign,
   Pencil,
   X,
+  Mail,
 } from 'lucide-react';
 
-type Tab = 'all' | 'pending';
+// Drafts/pending courses were removed — every offering is created live the
+// moment the admin assigns a template to a trainer. This page now shows a
+// single flat list of live courses.
 
 export default function CoursesPage() {
-  const [tab, setTab] = useState<Tab>('all');
   const [courses, setCourses] = useState<any[]>([]);
-  const [pendingList, setPendingList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<{
     open: boolean;
@@ -55,9 +49,8 @@ export default function CoursesPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, p] = await Promise.all([getAllCourses(), getPendingCourses()]);
+      const c = await getAllCourses();
       setCourses(c.data || []);
-      setPendingList(p.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -135,6 +128,27 @@ export default function CoursesPage() {
       ),
     },
     {
+      key: 'requestedCount',
+      label: 'Requested',
+      sortable: true,
+      render: (r: any) => {
+        const requested = r.requestedCount || 0;
+        const min = r.minStudentsRequired || 5;
+        const reached = requested >= min;
+        return (
+          <div className="flex items-center gap-1.5">
+            <Mail className={`w-3.5 h-3.5 ${reached ? 'text-success' : 'text-warning'}`} />
+            <span className={`font-medium ${reached ? 'text-success' : 'text-foreground'}`}>
+              {requested}
+            </span>
+            {reached && requested > 0 && (
+              <span className="text-[10px] text-success">✓ min met</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: 'totalEnrolled',
       label: 'Enrolled',
       sortable: true,
@@ -147,38 +161,28 @@ export default function CoursesPage() {
     },
     {
       key: 'minStudentsRequired',
-      label: 'Min Students',
+      label: 'Min',
       sortable: true,
       render: (r: any) => {
         const min = r.minStudentsRequired || 5;
-        const enrolled = r.totalEnrolled || 0;
         return (
-          <div className="flex items-center gap-1.5">
-            <Layers className="w-3.5 h-3.5 text-muted" />
-            <span className="text-foreground">{min}</span>
-            {enrolled >= min ? (
-              <CheckCircle className="w-3.5 h-3.5 text-success" />
-            ) : (
-              <span className="text-xs text-muted">
-                ({min - enrolled} more needed)
-              </span>
-            )}
-            <button
-              onClick={() =>
-                setMinStudentsModal({
-                  open: true,
-                  course: r,
-                  value: String(min),
-                  saving: false,
-                  error: '',
-                })
-              }
-              className="ml-1 p-1 rounded-md hover:bg-card-hover text-muted hover:text-accent transition"
-              title="Edit minimum students"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={() =>
+              setMinStudentsModal({
+                open: true,
+                course: r,
+                value: String(min),
+                saving: false,
+                error: '',
+              })
+            }
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-card-hover text-foreground hover:text-accent transition group"
+            title="Click to edit minimum students"
+          >
+            <Layers className="w-3.5 h-3.5 text-muted group-hover:text-accent transition" />
+            <span className="font-medium">{min}</span>
+            <Pencil className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition" />
+          </button>
         );
       },
     },
@@ -193,11 +197,11 @@ export default function CoursesPage() {
       ),
     },
     {
-      key: 'isPublished',
+      key: 'isActive',
       label: 'Status',
       render: (r: any) => (
-        <Badge variant={r.isPublished ? 'success' : r.isActive ? 'warning' : 'danger'}>
-          {r.isPublished ? 'Published' : r.isActive ? 'Draft' : 'Deleted'}
+        <Badge variant={r.isActive ? 'success' : 'danger'}>
+          {r.isActive ? 'Live' : 'Deleted'}
         </Badge>
       ),
     },
@@ -206,24 +210,6 @@ export default function CoursesPage() {
       label: 'Actions',
       render: (r: any) => (
         <div className="flex items-center gap-2">
-          {!r.isPublished && r.isActive && (
-            <button
-              onClick={() =>
-                setDialog({
-                  open: true,
-                  title: 'Approve Course',
-                  message: `Publish "${r.title}" and make it visible to students?`,
-                  variant: 'success',
-                  confirmLabel: 'Approve',
-                  action: () => approveCourse(r.courseId),
-                })
-              }
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-success/10 text-success hover:bg-success/20 transition"
-            >
-              <CheckCircle className="w-3.5 h-3.5" />
-              Approve
-            </button>
-          )}
           {r.isActive && (
             <button
               onClick={() =>
@@ -246,171 +232,38 @@ export default function CoursesPage() {
     },
   ];
 
-  const pendingColumns = [
-    {
-      key: 'title',
-      label: 'Course',
-      sortable: true,
-      render: (r: any) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-warning/12 flex items-center justify-center">
-            <Clock className="w-5 h-5 text-warning" />
-          </div>
-          <div>
-            <p className="font-medium text-white">{r.title}</p>
-            <p className="text-xs text-muted">{r.domain || '—'}</p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'level',
-      label: 'Level',
-      render: (r: any) => <Badge variant={levelVariant(r.level) as any}>{r.level || '—'}</Badge>,
-    },
-    {
-      key: 'minStudentsRequired',
-      label: 'Min Students',
-      render: (r: any) => <span className="text-foreground">{r.minStudentsRequired || 5}</span>,
-    },
-    {
-      key: 'price',
-      label: 'Price',
-      render: (r: any) => (
-        <span className="text-foreground">
-          {r.price ? `${r.price} ${r.currency || 'TND'}` : 'Free'}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (r: any) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() =>
-              setDialog({
-                open: true,
-                title: 'Approve Course',
-                message: `Publish "${r.title}" and make it visible to students?`,
-                variant: 'success',
-                confirmLabel: 'Approve',
-                action: () => approveCourse(r.courseId),
-              })
-            }
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/10 text-success hover:bg-success/20 transition"
-          >
-            <CheckCircle className="w-3.5 h-3.5" />
-            Approve
-          </button>
-          <button
-            onClick={() =>
-              setDialog({
-                open: true,
-                title: 'Reject Course',
-                message: `Reject "${r.title}"? This will deactivate it.`,
-                variant: 'danger',
-                confirmLabel: 'Reject',
-                action: () => rejectCourse(r.courseId),
-              })
-            }
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger/10 text-danger hover:bg-danger/20 transition"
-          >
-            <XCircle className="w-3.5 h-3.5" />
-            Reject
-          </button>
-        </div>
-      ),
-    },
-  ];
-
-  const tabs = [
-    { key: 'all' as Tab, label: 'All Courses', icon: BookOpen, count: courses.length },
-    { key: 'pending' as Tab, label: 'Pending Approval', icon: Clock, count: pendingList.length },
-  ];
-
   if (loading) return <LoadingSpinner />;
 
   return (
     <div>
       <PageHeader
-        title="Course Management"
-        subtitle={`${courses.length} courses — ${pendingList.length} pending approval`}
+        title="Courses"
+        subtitle={`${courses.length} live ${courses.length === 1 ? 'course' : 'courses'}`}
       />
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-success/12 flex items-center justify-center">
-            <CheckCircle className="w-5 h-5 text-success" />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-white">
-              {courses.filter((c) => c.isPublished).length}
-            </p>
-            <p className="text-xs text-muted">Published</p>
-          </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-warning/12 flex items-center justify-center">
-            <Clock className="w-5 h-5 text-warning" />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-white">{pendingList.length}</p>
-            <p className="text-xs text-muted">Pending</p>
-          </div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-accent/12 flex items-center justify-center">
-            <DollarSign className="w-5 h-5 text-accent" />
-          </div>
-          <div>
-            <p className="text-lg font-bold text-white">
-              {courses.length > 0
-                ? `${(courses.reduce((sum: number, c: any) => sum + (c.price || 0), 0) / courses.length).toFixed(0)} TND`
-                : '—'}
-            </p>
-            <p className="text-xs text-muted">Avg Price</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-2 mb-6">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              tab === t.key
-                ? 'bg-accent/15 text-accent border border-accent/30'
-                : 'text-muted hover:text-foreground border border-border'
-            }`}
-          >
-            <t.icon className="w-4 h-4" />
-            {t.label}
-            <span
-              className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${
-                tab === t.key ? 'bg-accent/20 text-accent' : 'bg-card-hover text-muted'
-              }`}
-            >
-              {t.count}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {tab === 'all' && (
-        <DataTable columns={allColumns} data={courses} searchKeys={['title', 'domain', 'level']} />
-      )}
-      {tab === 'pending' && (
-        <DataTable
-          columns={pendingColumns}
-          data={pendingList}
-          searchKeys={['title', 'domain']}
-          emptyMessage="No courses pending approval"
+        <SummaryCard
+          icon={BookOpen}
+          color="success"
+          value={courses.filter((c) => c.isActive).length}
+          label="Live"
         />
-      )}
+        <SummaryCard
+          icon={Mail}
+          color="info"
+          value={courses.reduce((s: number, c: any) => s + (c.requestedCount || 0), 0)}
+          label="Total Requests"
+        />
+        <SummaryCard
+          icon={Users}
+          color="accent"
+          value={courses.reduce((s: number, c: any) => s + (c.totalEnrolled || 0), 0)}
+          label="Total Enrolled"
+        />
+      </div>
+
+      <DataTable columns={allColumns} data={courses} searchKeys={['title', 'domain', 'level']} />
 
       <ConfirmDialog
         open={dialog.open}
@@ -513,6 +366,37 @@ export default function CoursesPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SummaryCard({
+  icon: Icon,
+  color,
+  value,
+  label,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon: any;
+  color: 'success' | 'warning' | 'info' | 'accent';
+  value: number;
+  label: string;
+}) {
+  const cls = {
+    success: 'bg-success/12 text-success',
+    warning: 'bg-warning/12 text-warning',
+    info: 'bg-info/12 text-info',
+    accent: 'bg-accent/12 text-accent',
+  };
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-4">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${cls[color]}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-lg font-bold text-white">{value}</p>
+        <p className="text-xs text-muted">{label}</p>
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { ScreenBackground } from '../../components/ScreenBackground';
-import { authService } from '../../services/api';
+import { authService, notificationService } from '../../services/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import api from '../../services/api';
@@ -101,6 +101,7 @@ export default function ChatbotScreen() {
     const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>('idle');
     const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
     const [recordSeconds, setRecordSeconds] = useState(0);
+    const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
     const scrollRef = useRef<ScrollView>(null);
     const recordingRef = useRef<Audio.Recording | null>(null);
@@ -118,7 +119,7 @@ export default function ChatbotScreen() {
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }, []);
 
-    // Reload profile picture every time this tab comes into focus
+    // Reload profile picture and unread-notification count every time this tab comes into focus
     useFocusEffect(
         useCallback(() => {
             (async () => {
@@ -126,6 +127,14 @@ export default function ChatbotScreen() {
                     const res = await api.get('/students/me');
                     setProfilePicUrl(res.data.profilePictureUrl || null);
                     setImageTs(Date.now());
+                } catch (_) {}
+
+                try {
+                    const user = await authService.getCurrentUser();
+                    if (user?.userId) {
+                        const count = await notificationService.getUnreadCount(user.userId);
+                        setUnreadNotifCount(typeof count === 'number' ? count : 0);
+                    }
                 } catch (_) {}
             })();
         }, [])
@@ -338,7 +347,11 @@ export default function ChatbotScreen() {
                                 style={styles.headerIconBtn}
                             >
                                 <Ionicons name="notifications-outline" size={24} color="rgba(255,255,255,0.7)" />
-                                <View style={styles.badge}><Text style={styles.badgeText}>2</Text></View>
+                                {unreadNotifCount > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => router.push('/(student-tabs)/profile' as any)}>
                                 {profilePicUrl ? (

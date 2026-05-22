@@ -23,6 +23,11 @@ public class DashboardStatsResponse {
     private Long activeUsersToday;
     private Long newUsersThisWeek;
     private Long newUsersThisMonth;
+    // Per-role weekly trend — the admin dashboard's Students / Trainers
+    // StatCards show these as "+N this week" deltas. Previously missing
+    // from the response, so the cards always rendered "+0 this week".
+    private Long newStudentsThisWeek;
+    private Long newTrainersThisWeek;
 
     // Course statistics
     private Long totalCourses;

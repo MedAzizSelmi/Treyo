@@ -31,7 +31,7 @@ export default function StudentOnboardingStep1() {
             alert('Please select at least one field');
             return;
         }
-        router.push({ pathname: '/onboarding/student/step2' as any, params: { fields: selectedFields.join(',') } });
+        router.replace({ pathname: '/onboarding/student/step2' as any, params: { fields: selectedFields.join(',') } });
     };
 
     return (

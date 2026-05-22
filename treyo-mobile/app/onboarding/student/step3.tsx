@@ -8,7 +8,11 @@ import { authService } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
 
-const AFFINDA_API_KEY = 'aff_843f6171e970155a546144a7181ae56e0e1d74ec';
+// Read from a gitignored .env file (see .env.example). Expo auto-loads
+// EXPO_PUBLIC_-prefixed vars at build time. Empty string if unset — the
+// CV-parse call then fails gracefully and the user fills the form
+// manually, which this screen already handles.
+const AFFINDA_API_KEY = process.env.EXPO_PUBLIC_AFFINDA_API_KEY ?? '';
 
 const EDUCATION_LEVELS = [
     "High School",
@@ -42,6 +46,8 @@ export default function StudentOnboardingStep3() {
     const [professionalExperience, setProfessionalExperience] = useState('');
     const [keySkills, setKeySkills] = useState('');
     const [educationLevel, setEducationLevel] = useState('');
+    const [linkedinUrl, setLinkedinUrl] = useState('');
+    const [portfolioUrl, setPortfolioUrl] = useState('');
     const [showEduPicker, setShowEduPicker] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -135,6 +141,8 @@ export default function StudentOnboardingStep3() {
                 keySkills: keySkills.split(',').map((s: string) => s.trim()).filter(Boolean),
                 educationLevel,
                 trainingDomain: null,
+                linkedinUrl: linkedinUrl.trim() || null,
+                portfolioUrl: portfolioUrl.trim() || null,
             });
 
             router.replace({
@@ -267,6 +275,50 @@ export default function StudentOnboardingStep3() {
                         </TouchableOpacity>
                     </View>
 
+                    {/* LinkedIn URL */}
+                    <View style={styles.fieldGroup}>
+                        <View style={styles.optionalLabelRow}>
+                            <Text style={styles.fieldLabel}>LinkedIn</Text>
+                            <Text style={styles.optionalTag}>Optional</Text>
+                        </View>
+                        <View style={styles.urlInputContainer}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <Ionicons name="logo-linkedin" size={18} color="#7cce06" style={{ marginRight: 8 }} />
+                            <TextInput
+                                style={styles.urlInput}
+                                placeholder="https://linkedin.com/in/your-profile"
+                                placeholderTextColor="#555"
+                                value={linkedinUrl}
+                                onChangeText={setLinkedinUrl}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                keyboardType="url"
+                            />
+                        </View>
+                    </View>
+
+                    {/* Portfolio URL */}
+                    <View style={styles.fieldGroup}>
+                        <View style={styles.optionalLabelRow}>
+                            <Text style={styles.fieldLabel}>Portfolio</Text>
+                            <Text style={styles.optionalTag}>Optional</Text>
+                        </View>
+                        <View style={styles.urlInputContainer}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <Ionicons name="globe-outline" size={18} color="#7cce06" style={{ marginRight: 8 }} />
+                            <TextInput
+                                style={styles.urlInput}
+                                placeholder="https://your-portfolio.com"
+                                placeholderTextColor="#555"
+                                value={portfolioUrl}
+                                onChangeText={setPortfolioUrl}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                keyboardType="url"
+                            />
+                        </View>
+                    </View>
+
                     {/* Finish Button */}
                     <TouchableOpacity
                         style={[styles.continueButton, loading && { opacity: 0.6 }]}
@@ -392,6 +444,20 @@ const styles = StyleSheet.create({
     },
     dropdownText: { fontSize: 15, color: '#ffffff', flex: 1 },
     dropdownPlaceholder: { color: '#555' },
+
+    optionalLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    optionalTag: {
+        fontSize: 11, fontWeight: '600', color: '#888',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8,
+    },
+    urlInputContainer: {
+        flexDirection: 'row', alignItems: 'center',
+        borderRadius: 14, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+        paddingHorizontal: 16, paddingVertical: 12,
+    },
+    urlInput: { flex: 1, fontSize: 15, color: '#ffffff', padding: 0 },
 
     continueButton: {
         backgroundColor: '#f5f0e0',

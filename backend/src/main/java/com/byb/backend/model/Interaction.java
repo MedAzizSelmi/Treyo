@@ -9,7 +9,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "interactions")
+@Table(
+        name = "interactions",
+        // Enforce one interaction per (student, course, type) — prevents the
+        // double-tap race from inserting two "clicked_interested" rows.
+        uniqueConstraints = @UniqueConstraint(
+                name = "uq_interaction_student_course_type",
+                columnNames = {"student_id", "course_id", "interaction_type"}
+        )
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

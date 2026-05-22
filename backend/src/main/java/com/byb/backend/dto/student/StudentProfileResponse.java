@@ -32,4 +32,6 @@ public class StudentProfileResponse {
     private Integer totalCoursesEnrolled;
     private Integer totalCoursesCompleted;
     private boolean isOnboardingComplete;
+    private String linkedinUrl;
+    private String portfolioUrl;
 }

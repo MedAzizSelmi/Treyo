@@ -73,4 +73,18 @@ public class StudentController {
         StudentProfileResponse profile = studentService.updateInterestsByEmail(email, request);
         return ResponseEntity.ok(profile);
     }
+
+    /**
+     * Limited public profile for one student — used when other users
+     * (group-chat members, e.g.) tap a sender's avatar. Returns only
+     * fields safe to expose to any authenticated user: name, photo, bio
+     * and chosen domains. Personal data (email, phone, address) stays
+     * server-side; if you need it, call /me as that user.
+     */
+    @GetMapping("/{studentId}/public")
+    @Operation(summary = "Get a student's public profile (name / photo / bio / domains)")
+    public ResponseEntity<java.util.Map<String, Object>> getPublicStudentProfile(
+            @PathVariable String studentId) {
+        return ResponseEntity.ok(studentService.getPublicProfile(studentId));
+    }
 }

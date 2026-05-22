@@ -43,6 +43,7 @@ public class CourseManagementResponse {
     private Integer minStudentsRequired;
     private Integer maxStudentsPerGroup;
     private Integer currentGroups;
+    private Integer requestedCount; // students who clicked "Request to Join" (interested)
 
     private LocalDateTime createdAt;
     private LocalDateTime publishedAt;

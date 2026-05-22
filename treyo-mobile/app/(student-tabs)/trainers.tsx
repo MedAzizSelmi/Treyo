@@ -2,12 +2,13 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { trainerService } from '../../services/api';
 
 export default function TrainersScreen() {
+    const router = useRouter();
     const { colors } = useTheme();
     const [trainers, setTrainers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -47,6 +48,8 @@ export default function TrainersScreen() {
                         <TouchableOpacity
                             key={trainer.trainerId || trainer.userId}
                             style={[styles.trainerCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                            onPress={() => router.push({ pathname: '/trainer-profile' as any, params: { trainerId: trainer.trainerId || trainer.userId } })}
+                            activeOpacity={0.85}
                         >
                             {trainer.profilePictureUrl ? (
                                 <Image source={{ uri: trainer.profilePictureUrl }} style={styles.avatar} />
@@ -88,10 +91,6 @@ export default function TrainersScreen() {
                                     )}
                                 </View>
                             </View>
-
-                            <TouchableOpacity style={styles.messageButton}>
-                                <Ionicons name="chatbubble-outline" size={20} color="#7cce06" />
-                            </TouchableOpacity>
                         </TouchableOpacity>
                     ))}
 
@@ -125,7 +124,6 @@ const styles = StyleSheet.create({
     stats: { flexDirection: 'row', gap: 16 },
     statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     statText: { fontSize: 13 },
-    messageButton: { width: 44, height: 44, backgroundColor: '#f0fde4', borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
     emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
     emptyText: { fontSize: 18, fontWeight: 'bold', marginTop: 16 },
     emptySubtext: { fontSize: 14, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 },

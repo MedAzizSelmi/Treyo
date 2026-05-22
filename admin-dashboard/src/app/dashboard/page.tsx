@@ -5,14 +5,14 @@ import {
   Users,
   GraduationCap,
   BookOpen,
-  DollarSign,
+  ClipboardList,
   UserPlus,
   Activity,
   MessageSquare,
   BarChart3,
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { getDashboardStats } from '@/lib/api';
@@ -46,22 +46,34 @@ export default function DashboardPage() {
     { name: 'Trainers', value: stats.totalTrainers || 0, color: '#3b82f6' },
   ];
 
+  // Two separate enrollment buckets — dropped the "Total" bar because it's
+  // just Active + Completed by definition, so it always rendered as the
+  // tallest bar and made the chart visually misleading. The "total" number
+  // is already shown in the Active Enrollments StatCard above.
   const enrollmentData = [
-    { name: 'Active', value: stats.activeEnrollments || 0 },
-    { name: 'Completed', value: stats.completedEnrollments || 0 },
-    { name: 'Total', value: stats.totalEnrollments || 0 },
+    { name: 'Active', value: stats.activeEnrollments || 0, color: '#7cce06' },
+    { name: 'Completed', value: stats.completedEnrollments || 0, color: '#3b82f6' },
   ];
 
+  // This Week's Activity — three categorical counts. Previously rendered as
+  // an AreaChart, which implies a time series the data isn't (the smooth
+  // fill between unrelated categories was meaningless). Now a clean grouped
+  // bar with one colour per category so each value reads independently.
   const weeklyActivity = [
-    { day: 'New Users', value: stats.newUsersThisWeek || 0 },
-    { day: 'New Enrollments', value: stats.enrollmentsThisWeek || 0 },
-    { day: 'New Courses', value: stats.coursesCreatedThisWeek || 0 },
+    { name: 'New Users', value: stats.newUsersThisWeek || 0, color: '#7cce06' },
+    { name: 'New Enrollments', value: stats.enrollmentsThisWeek || 0, color: '#3b82f6' },
+    { name: 'New Courses', value: stats.coursesCreatedThisWeek || 0, color: '#a855f7' },
   ];
 
+  // Drafts and pending approval were removed — every course is created live
+  // when admin assigns a template. Pie chart now just shows live vs deleted.
   const courseStatus = [
-    { name: 'Published', value: stats.publishedCourses || 0, color: '#22c55e' },
-    { name: 'Pending', value: stats.pendingCourses || 0, color: '#f59e0b' },
-    { name: 'Draft', value: (stats.totalCourses || 0) - (stats.publishedCourses || 0) - (stats.pendingCourses || 0), color: '#71717a' },
+    { name: 'Live', value: stats.publishedCourses || 0, color: '#22c55e' },
+    {
+      name: 'Deleted',
+      value: Math.max(0, (stats.totalCourses || 0) - (stats.publishedCourses || 0)),
+      color: '#71717a',
+    },
   ].filter(item => item.value > 0);
 
   return (
@@ -94,12 +106,19 @@ export default function DashboardPage() {
           color="#f59e0b"
           trend={{ value: `+${stats.newTrainersThisWeek || 0} this week`, up: true }}
         />
+        {/*
+          Revenue card removed — the backend was returning
+          SUM(price * total_enrolled) which is "potential revenue if every
+          enrolled student had paid", not real money. Until a payment system
+          exists, that number is fiction. Replaced with Total Enrollments,
+          which is a real platform-activity number we already track.
+        */}
         <StatCard
-          label="Total Revenue"
-          value={`$${((stats.totalRevenue || 0) / 1000).toFixed(1)}k`}
-          icon={DollarSign}
+          label="Total Enrollments"
+          value={stats.totalEnrollments || 0}
+          icon={ClipboardList}
           color="#22c55e"
-          trend={{ value: `$${((stats.revenueThisMonth || 0) / 1000).toFixed(1)}k this month`, up: true }}
+          trend={{ value: `+${stats.enrollmentsThisWeek || 0} this week`, up: true }}
         />
       </div>
 
@@ -184,15 +203,21 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Enrollments bar chart */}
+      {/* Enrollments Overview — Active vs Completed only (no redundant Total bar). */}
       <div className="bg-card border border-border rounded-2xl p-6 mb-8">
-        <h3 className="text-base font-bold text-white mb-6">Enrollments Overview</h3>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-base font-bold text-white">Enrollments Overview</h3>
+          <p className="text-xs text-muted">
+            {stats.totalEnrollments || 0} total · {stats.enrollmentsThisWeek || 0} this week
+          </p>
+        </div>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={enrollmentData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip
+              cursor={{ fill: 'rgba(124,206,6,0.05)' }}
               contentStyle={{
                 background: '#1a1a23',
                 border: '1px solid #2a2a3a',
@@ -201,26 +226,27 @@ export default function DashboardPage() {
                 fontSize: 13,
               }}
             />
-            <Bar dataKey="value" fill="#7cce06" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+              {enrollmentData.map((entry, i) => (
+                <Cell key={i} fill={entry.color} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Weekly activity */}
+      {/* This Week's Activity — a real bar chart, one bar per category.
+          The old AreaChart drew a smooth fill across three unrelated counts
+          which implied a time series the data isn't. */}
       <div className="bg-card border border-border rounded-2xl p-6">
         <h3 className="text-base font-bold text-white mb-6">This Week&apos;s Activity</h3>
         <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={weeklyActivity}>
-            <defs>
-              <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#7cce06" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#7cce06" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" />
-            <XAxis dataKey="day" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} />
+          <BarChart data={weeklyActivity}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3a" vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: '#71717a', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip
+              cursor={{ fill: 'rgba(124,206,6,0.05)' }}
               contentStyle={{
                 background: '#1a1a23',
                 border: '1px solid #2a2a3a',
@@ -229,15 +255,12 @@ export default function DashboardPage() {
                 fontSize: 13,
               }}
             />
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke="#7cce06"
-              strokeWidth={2}
-              fillOpacity={1}
-              fill="url(#colorVal)"
-            />
-          </AreaChart>
+            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+              {weeklyActivity.map((entry, i) => (
+                <Cell key={i} fill={entry.color} />
+              ))}
+            </Bar>
+          </BarChart>
         </ResponsiveContainer>
       </div>
 
@@ -255,9 +278,13 @@ export default function DashboardPage() {
           <p className="text-2xl font-bold text-white">{stats.totalMessages || 0}</p>
           <p className="text-xs text-muted mt-1">Total Messages</p>
         </div>
+        {/* "Avg Course Price" was here — dropped because it's payment-system-
+            adjacent and reads as a $ metric on a platform that has no payments
+            yet. Total Groups is real data we already collect and is more
+            meaningful for monitoring matching activity. */}
         <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-white">${(stats.averageCoursePrice || 0).toFixed(0)}</p>
-          <p className="text-xs text-muted mt-1">Avg Course Price</p>
+          <p className="text-2xl font-bold text-white">{stats.totalGroups || 0}</p>
+          <p className="text-xs text-muted mt-1">Total Groups</p>
         </div>
       </div>
     </div>
