@@ -4,11 +4,14 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { ReviewsList } from '../components/ReviewsList';
 import { trainerService, courseService, API_BASE_URL } from '../services/api';
 
 export default function TrainerProfileScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const { trainerId } = useLocalSearchParams<{ trainerId: string }>();
     const [trainer, setTrainer] = useState<any>(null);
     const [courses, setCourses] = useState<any[]>([]);
@@ -111,7 +114,7 @@ export default function TrainerProfileScreen() {
                             <View style={styles.statItem}>
                                 <Ionicons name="star" size={16} color="#FFD700" />
                                 <Text style={styles.statValue}>{Number(trainer.averageRating).toFixed(1)}</Text>
-                                <Text style={styles.statLabel}>Rating</Text>
+                                <Text style={styles.statLabel}>{t('profile.rating')}</Text>
                             </View>
                         )}
                         {typeof trainer.experienceYears === 'number' && (
@@ -125,7 +128,7 @@ export default function TrainerProfileScreen() {
                             <View style={styles.statItem}>
                                 <Ionicons name="book" size={16} color="#3b5bdb" />
                                 <Text style={styles.statValue}>{trainer.coursesCount}</Text>
-                                <Text style={styles.statLabel}>Courses</Text>
+                                <Text style={styles.statLabel}>{t('profile.courses')}</Text>
                             </View>
                         )}
                     </View>
@@ -152,7 +155,7 @@ export default function TrainerProfileScreen() {
                 {/* Bio */}
                 {!!trainer.bio && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>About</Text>
+                        <Text style={styles.sectionTitle}>{t('profile.bio')}</Text>
                         <View style={styles.glassBox}>
                             <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
                             <Text style={styles.bioText}>{trainer.bio}</Text>
@@ -163,7 +166,7 @@ export default function TrainerProfileScreen() {
                 {/* Specializations */}
                 {specializations.length > 0 && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Specializations</Text>
+                        <Text style={styles.sectionTitle}>{t('trainers.specializations')}</Text>
                         <View style={styles.chipsWrap}>
                             {specializations.map((s: string, i: number) => (
                                 <View key={i} style={styles.chip}>
@@ -176,7 +179,7 @@ export default function TrainerProfileScreen() {
 
                 {/* Courses */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Courses ({courses.length})</Text>
+                    <Text style={styles.sectionTitle}>{t('profile.courses')} ({courses.length})</Text>
                     {courses.length === 0 ? (
                         <View style={styles.emptyCoursesWrap}>
                             <Ionicons name="book-outline" size={36} color="rgba(124,206,6,0.3)" />
@@ -216,6 +219,13 @@ export default function TrainerProfileScreen() {
                             </TouchableOpacity>
                         ))
                     )}
+                </View>
+
+                {/* Reviews this trainer has received — same component
+                    the course page uses; backend filters by trainerId. */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('reviews.byStudents')}</Text>
+                    <ReviewsList mode="trainer" id={String(trainerId)} />
                 </View>
 
                 <View style={{ height: 80 }} />

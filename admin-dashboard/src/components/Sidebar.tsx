@@ -16,6 +16,9 @@ import {
   FileText,
   Activity,
   MessageSquare,
+  Star,
+  Clock,
+  Settings,
 } from 'lucide-react';
 import { logout } from '@/lib/api';
 import { useState } from 'react';
@@ -23,13 +26,16 @@ import { useState } from 'react';
 const NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Users', href: '/dashboard/users', icon: Users },
-  { label: 'Templates', href: '/dashboard/templates', icon: FileText },
+  { label: 'Modules', href: '/dashboard/modules', icon: FileText },
   { label: 'Courses', href: '/dashboard/courses', icon: BookOpen },
+  { label: 'Pending Courses', href: '/dashboard/pending-courses', icon: Clock },
   { label: 'Requests', href: '/dashboard/requests', icon: Mail },
   { label: 'Groups', href: '/dashboard/groups', icon: GitBranch },
   { label: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
+  { label: 'Reviews', href: '/dashboard/reviews', icon: Star },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'System Health', href: '/dashboard/system', icon: Activity },
+  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
 export default function Sidebar() {

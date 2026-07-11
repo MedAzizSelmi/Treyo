@@ -1,12 +1,14 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { ScreenBackground } from '../components/ScreenBackground';
 
 export default function HelpSupportScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { t } = useTranslation();
 
     const handleContactSupport = () => {
         Linking.openURL('mailto:support@treyo.com?subject=Help Request');
@@ -27,19 +29,19 @@ export default function HelpSupportScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Help & Support</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('help.title')}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Contact Us</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('help.contactUs')}</Text>
 
                 <TouchableOpacity style={[styles.contactCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]} onPress={handleContactSupport}>
                     <View style={styles.contactIcon}>
                         <Ionicons name="mail" size={24} color="#7cce06" />
                     </View>
                     <View style={styles.contactInfo}>
-                        <Text style={[styles.contactTitle, { color: colors.text }]}>Email Support</Text>
+                        <Text style={[styles.contactTitle, { color: colors.text }]}>{t('help.emailSupport')}</Text>
                         <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>support@treyo.com</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
@@ -50,66 +52,66 @@ export default function HelpSupportScreen() {
                         <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                     </View>
                     <View style={styles.contactInfo}>
-                        <Text style={[styles.contactTitle, { color: colors.text }]}>WhatsApp</Text>
+                        <Text style={[styles.contactTitle, { color: colors.text }]}>{t('help.whatsapp')}</Text>
                         <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>+216 12 345 678</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
 
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('help.faq')}</Text>
 
                 <FAQItem
-                    question="How do I enroll in a course?"
-                    answer="Browse courses, click on one you like, and tap the 'Enroll' button."
+                    question={t('help.faqEnrollQ')}
+                    answer={t('help.faqEnrollA')}
                     onPress={() => handleFAQ('enroll')}
                     colors={colors}
                 />
                 <FAQItem
-                    question="How do I contact my trainer?"
-                    answer="Go to the Messages tab and select your trainer from the list."
+                    question={t('help.faqContactQ')}
+                    answer={t('help.faqContactA')}
                     onPress={() => handleFAQ('contact')}
                     colors={colors}
                 />
                 <FAQItem
-                    question="Can I get a refund?"
-                    answer="Refunds are available within 7 days of enrollment if you haven't completed more than 20% of the course."
+                    question={t('help.faqRefundQ')}
+                    answer={t('help.faqRefundA')}
                     onPress={() => handleFAQ('refund')}
                     colors={colors}
                 />
                 <FAQItem
-                    question="How do I earn certificates?"
-                    answer="Complete all course modules and pass the final assessment to earn your certificate."
+                    question={t('help.faqCertsQ')}
+                    answer={t('help.faqCertsA')}
                     onPress={() => handleFAQ('certificates')}
                     colors={colors}
                 />
 
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Resources</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('help.resources')}</Text>
 
                 <ResourceItem
                     icon="book-outline"
-                    title="User Guide"
-                    description="Learn how to use Treyo effectively"
+                    title={t('help.userGuide')}
+                    description={t('help.userGuideDesc')}
                     onPress={() => console.log('User Guide')}
                     colors={colors}
                 />
                 <ResourceItem
                     icon="videocam-outline"
-                    title="Video Tutorials"
-                    description="Watch step-by-step video guides"
+                    title={t('help.videoTutorials')}
+                    description={t('help.videoTutorialsDesc')}
                     onPress={() => console.log('Videos')}
                     colors={colors}
                 />
                 <ResourceItem
                     icon="shield-checkmark-outline"
-                    title="Privacy Policy"
-                    description="How we protect your data"
+                    title={t('help.privacyPolicy')}
+                    description={t('help.privacyPolicyDesc')}
                     onPress={() => console.log('Privacy')}
                     colors={colors}
                 />
                 <ResourceItem
                     icon="document-text-outline"
-                    title="Terms of Service"
-                    description="Our terms and conditions"
+                    title={t('help.termsOfService')}
+                    description={t('help.termsOfServiceDesc')}
                     onPress={() => console.log('Terms')}
                     colors={colors}
                 />

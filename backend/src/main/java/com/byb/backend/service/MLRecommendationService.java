@@ -4,6 +4,7 @@ import com.byb.backend.dto.recommendation.RecommendationResponse;
 import com.byb.backend.model.Course;
 import com.byb.backend.model.Trainer;
 import com.byb.backend.repository.CourseRepository;
+import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.TrainerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,10 @@ public class MLRecommendationService {
     private final WebClient.Builder webClientBuilder;
     private final CourseRepository courseRepository;
     private final TrainerRepository trainerRepository;
+    // Live enrolled-count source — same source the course-detail
+    // screen uses, so the recommendation card and the detail page
+    // always agree.
+    private final EnrollmentRepository enrollmentRepository;
 
     @Value("${ml.service.url}")
     private String mlServiceUrl;
@@ -141,20 +146,46 @@ public class MLRecommendationService {
                         trainer = trainerRepository.findByTrainerId(course.getTrainerId()).orElse(null);
                     }
 
+                    // Prefer the live DB value for rating + enrolled
+                    // count over what the ML service cached. The ML
+                    // model refreshes on a schedule (every X min), so
+                    // reviews submitted between refreshes would
+                    // otherwise show stale stars/numbers. Falling back
+                    // to the ML value only if the course row is missing.
+                    java.math.BigDecimal liveRating = course != null
+                            ? course.getAverageRating()
+                            : null;
+                    if (liveRating == null && rec.get("rating") != null) {
+                        liveRating = java.math.BigDecimal.valueOf((Double) rec.get("rating"));
+                    }
+                    // `Course.totalEnrolled` is never auto-bumped on
+                    // the enrollment table — every other read path
+                    // computes it dynamically. Match that here so
+                    // recommendation cards show the same number as
+                    // course-detail's "X enrolled" pill.
+                    int liveEnrolled = course != null
+                            ? (int) enrollmentRepository.countByCourseId(course.getCourseId())
+                            : 0;
+
                     return RecommendationResponse.RecommendedCourse.builder()
                             .courseId(courseId)
                             .title((String) rec.get("title"))
                             .domain((String) rec.get("domain"))
                             .specificTopic((String) rec.get("specific_topic"))
                             .level((String) rec.get("level"))
-                            .rating(rec.get("rating") != null ?
-                                    java.math.BigDecimal.valueOf((Double) rec.get("rating")) : null)
+                            .rating(liveRating)
+                            // Mirror to averageRating so the mobile (which
+                            // already reads `course.averageRating`) gets
+                            // the value without a second client-side
+                            // normalisation step.
+                            .averageRating(liveRating)
                             .score((Double) rec.get("score"))
                             .reason((String) rec.get("reason"))
                             .trainerId(course != null ? course.getTrainerId() : null)
                             .trainerName(trainer != null ? trainer.getName() : null)
                             .price(course != null ? course.getPrice() : null)
                             .durationHours(course != null ? course.getDurationHours() : null)
+                            .totalEnrolled(liveEnrolled)
                             .build();
                 })
                 .collect(Collectors.toList());

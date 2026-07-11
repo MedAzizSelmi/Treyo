@@ -31,6 +31,11 @@ public class AdminService {
     private final MessageRepository messageRepository;
     private final AdminRepository adminRepository;
     private final NotificationRepository notificationRepository;
+    // Used to email the trainer when their approval verdict lands.
+    private final EmailService emailService;
+    // Reused for the CourseResponse mapper so the admin pending-courses
+    // list and the mobile trainer's own list return identical shapes.
+    private final CourseService courseService;
     private final AdminGroupFormationService groupFormationService;
     private final PasswordEncoder passwordEncoder;
 
@@ -160,10 +165,13 @@ public class AdminService {
     }
 
     /**
-     * Get pending trainer approvals
+     * Trainers waiting for an approval decision.
+     * Filters by the dedicated approvalStatus field rather than
+     * isVerified (which now means email-confirmed, not admin-approved).
      */
     public List<UserManagementResponse> getPendingTrainers() {
-        return trainerRepository.findByIsVerified(false).stream()
+        return trainerRepository.findAll().stream()
+                .filter(t -> "PENDING".equalsIgnoreCase(t.getApprovalStatus()))
                 .map(this::mapTrainerToUserResponse)
                 .collect(Collectors.toList());
     }
@@ -187,25 +195,113 @@ public class AdminService {
     }
 
     /**
-     * Approve trainer profile
+     * Approve trainer profile.
+     * Flips approvalStatus → APPROVED and emails the trainer so they
+     * know they can sign in now. Idempotent — re-approving an already
+     * approved trainer is a no-op aside from refreshing the
+     * decided-at timestamp.
      */
     @Transactional
     public void approveTrainer(String trainerId) {
         trainerRepository.findById(trainerId).ifPresent(trainer -> {
-            trainer.setIsVerified(true);
+            trainer.setApprovalStatus("APPROVED");
+            trainer.setApprovalDecidedAt(java.time.LocalDateTime.now());
+            // Cleared so a previous rejection note doesn't leak into a
+            // future second rejection.
+            trainer.setApprovalNote(null);
+            // isActive stays as the trainer set it (or defaults to true
+            // for first-time approvals).
             trainerRepository.save(trainer);
+            try {
+                emailService.sendTrainerApprovalEmail(trainer.getEmail(), trainer.getName());
+            } catch (Exception ignored) { /* email failure shouldn't fail the API call */ }
         });
     }
 
     /**
-     * Reject trainer profile
+     * Reject trainer profile.
+     * Flips approvalStatus → REJECTED and emails the trainer. The
+     * optional {@code note} gets included in the email so they know
+     * what to improve before re-applying.
+     */
+    // ── V2 course lifecycle: pending → approved / rejected ──────────
+
+    /** Trainer-submitted courses waiting for admin review, newest first. */
+    public java.util.List<com.byb.backend.dto.course.CourseResponse> getPendingTrainerCourses() {
+        return courseRepository.findByApprovalStatusOrderByCreatedAtDesc("PENDING").stream()
+                .map(c -> {
+                    Trainer trainer = trainerRepository.findByTrainerId(c.getTrainerId()).orElse(null);
+                    String name = trainer != null ? trainer.getName() : "Unknown";
+                    return courseService.toResponse(c, name);
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Approve a pending course + set its price at the same time.
+     *
+     * Trainers submit courses without a price — pricing is the admin's
+     * call so we can't approve without one. Both {@code price} and
+     * {@code currency} are required. Currency is normalized to upper-
+     * case. Idempotent for already-approved rows if the caller re-
+     * submits identical values, but a fresh price on an approved row
+     * will still overwrite.
      */
     @Transactional
-    public void rejectTrainer(String trainerId) {
+    public void approveTrainerCourse(String courseId, java.math.BigDecimal price, String currency) {
+        if (price == null || price.signum() < 0) {
+            throw new IllegalArgumentException("Price is required and must be non-negative.");
+        }
+        if (currency == null || currency.isBlank()) {
+            throw new IllegalArgumentException("Currency is required.");
+        }
+        String normalized = currency.trim().toUpperCase();
+        courseRepository.findByCourseId(courseId).ifPresent(c -> {
+            c.setPrice(price);
+            c.setCurrency(normalized);
+            c.setApprovalStatus("APPROVED");
+            c.setApprovalNote(null);
+            c.setApprovalDecidedAt(java.time.LocalDateTime.now());
+            courseRepository.save(c);
+            Trainer trainer = trainerRepository.findByTrainerId(c.getTrainerId()).orElse(null);
+            if (trainer != null) {
+                try {
+                    emailService.sendCourseApprovalEmail(
+                            trainer.getEmail(), trainer.getName(), c.getTitle());
+                } catch (Exception ignored) { /* email is best-effort */ }
+            }
+        });
+    }
+
+    /** Reject a pending course with an optional reason. */
+    @Transactional
+    public void rejectTrainerCourse(String courseId, String note) {
+        courseRepository.findByCourseId(courseId).ifPresent(c -> {
+            c.setApprovalStatus("REJECTED");
+            c.setApprovalNote(note);
+            c.setApprovalDecidedAt(java.time.LocalDateTime.now());
+            courseRepository.save(c);
+            Trainer trainer = trainerRepository.findByTrainerId(c.getTrainerId()).orElse(null);
+            if (trainer != null) {
+                try {
+                    emailService.sendCourseRejectionEmail(
+                            trainer.getEmail(), trainer.getName(), c.getTitle(), note);
+                } catch (Exception ignored) { /* email is best-effort */ }
+            }
+        });
+    }
+
+    @Transactional
+    public void rejectTrainer(String trainerId, String note) {
         trainerRepository.findById(trainerId).ifPresent(trainer -> {
-            trainer.setIsVerified(false);
+            trainer.setApprovalStatus("REJECTED");
+            trainer.setApprovalNote(note);
+            trainer.setApprovalDecidedAt(java.time.LocalDateTime.now());
             trainer.setIsActive(false);
             trainerRepository.save(trainer);
+            try {
+                emailService.sendTrainerRejectionEmail(trainer.getEmail(), trainer.getName(), note);
+            } catch (Exception ignored) { /* same — log-only */ }
         });
     }
 
@@ -268,6 +364,17 @@ public class AdminService {
     public void updateCourseMinStudents(String courseId, int minStudents) {
         courseRepository.findById(courseId).ifPresent(course -> {
             course.setMinStudentsRequired(minStudents);
+            courseRepository.save(course);
+        });
+    }
+
+    /** Set the trainer's daily-training earnings for a course. Null
+     *  clears the value; the trainer's earnings screen skips courses
+     *  with no rate set. */
+    @Transactional
+    public void updateTrainerDailyRevenue(String courseId, java.math.BigDecimal amount) {
+        courseRepository.findById(courseId).ifPresent(course -> {
+            course.setTrainerDailyRevenue(amount);
             courseRepository.save(course);
         });
     }
@@ -420,7 +527,24 @@ public class AdminService {
                 .experienceYears(trainer.getExperienceYears())
                 .rating(null) // TODO: Calculate trainer rating
                 .profileComplete(null) // TODO: Check profile completeness
-                .verificationStatus(trainer.getIsVerified() ? "APPROVED" : "PENDING")
+                .verificationStatus(trainer.getApprovalStatus() == null
+                        ? "PENDING"
+                        : trainer.getApprovalStatus())
+                .approvalDecidedAt(trainer.getApprovalDecidedAt())
+                .approvalNote(trainer.getApprovalNote())
+                .bio(trainer.getBio())
+                .education(trainer.getEducation())
+                .professionalExperience(trainer.getProfessionalExperience())
+                .phone(trainer.getPhone())
+                .address(trainer.getAddress())
+                .city(trainer.getCity())
+                .state(trainer.getState())
+                .postalCode(trainer.getPostalCode())
+                .linkedinUrl(trainer.getLinkedinUrl())
+                .portfolioUrl(trainer.getPortfolioUrl())
+                .githubUrl(trainer.getGithubUrl())
+                .cvUrl(trainer.getCvUrl())
+                .profilePictureUrl(trainer.getProfilePictureUrl())
                 .coursesCreated(coursesCreated)
                 .messagesCount(messagesCount)
                 .build();
@@ -444,6 +568,8 @@ public class AdminService {
                 .durationHours(course.getDurationHours())
                 .format(course.getFormat())
                 .price(course.getPrice())
+                .currency(course.getCurrency())
+                .trainerDailyRevenue(course.getTrainerDailyRevenue())
                 .isPublished(course.getIsPublished())
                 .isActive(course.getIsActive())
                 .approvalStatus(course.getIsPublished() ? "APPROVED" : "PENDING")

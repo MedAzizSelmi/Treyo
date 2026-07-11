@@ -70,6 +70,16 @@ public class Course extends BaseEntity {
     @Column(length = 10)
     private String currency = "TND";
 
+    /**
+     * How much the trainer earns per day they train this course, in
+     * the same currency as {@link #currency}. Admin-set from the
+     * courses management page. Null = "not set yet"; the trainer's
+     * earnings screen will simply skip that course's sessions until
+     * the admin sets a value.
+     */
+    @Column(name = "trainer_daily_revenue", precision = 10, scale = 2)
+    private BigDecimal trainerDailyRevenue;
+
     @Column(name = "has_certificate")
     private Boolean hasCertificate = false;
 
@@ -113,6 +123,52 @@ public class Course extends BaseEntity {
 
     @Column(name = "is_published")
     private Boolean isPublished = false;
+
+    /**
+     * Reference to the admin-managed module (category) this course
+     * belongs to. Set by the trainer when creating the course from a
+     * picker of active modules. Null on legacy rows created before
+     * the module system landed.
+     */
+    @Column(name = "module_id", length = 50)
+    private String moduleId;
+
+    /**
+     * Public URL to the training material the trainer uploaded (PDF,
+     * PPT, ZIP, etc.). The admin previews this during approval; it's
+     * NOT shown to students on the public course page. Stored as
+     * whatever /files/upload returns — usually a relative path like
+     * "/files/course-materials/xyz.pdf".
+     */
+    @Column(name = "material_url", length = 500)
+    private String materialUrl;
+
+    /** Original filename of the uploaded material — used for the
+     *  download link label so admins see "syllabus.pdf" rather than
+     *  the mangled storage filename. */
+    @Column(name = "material_name", length = 255)
+    private String materialName;
+
+    /**
+     * Admin's approval verdict for a trainer-submitted course.
+     *   PENDING  — waiting for admin review, invisible to students.
+     *   APPROVED — visible everywhere (search, home recs, browse).
+     *   REJECTED — hidden from students; trainer sees a "rejected"
+     *              badge in their courses list.
+     * Legacy rows (admin-assigned templates) default to APPROVED so
+     * the switchover doesn't hide historical courses.
+     */
+    @Column(name = "approval_status", length = 20, nullable = false)
+    private String approvalStatus = "APPROVED";
+
+    /** Optional note the admin attached when rejecting. Emailed to
+     *  the trainer verbatim + surfaced on the trainer's course card
+     *  so they know what to fix. */
+    @Column(name = "approval_note", columnDefinition = "TEXT")
+    private String approvalNote;
+
+    @Column(name = "approval_decided_at")
+    private LocalDateTime approvalDecidedAt;
 
     // Helper method to check if course can form a group
     @Transient

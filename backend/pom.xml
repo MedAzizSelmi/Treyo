@@ -50,6 +50,14 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
+        <!-- SMTP email — powers forgot-password and email-verification flows.
+             Works with Mailgun, SendGrid, Gmail SMTP, AWS SES, etc. The
+             provider is just config in application.properties. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>

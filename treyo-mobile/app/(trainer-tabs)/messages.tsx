@@ -3,12 +3,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService, messageService, notificationService } from '../../services/api';
 import api from '../../services/api';
 
 export default function TrainerMessagesScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
@@ -98,8 +100,8 @@ export default function TrainerMessagesScreen() {
                 </View>
 
                 {/* ── Title ── */}
-                <Text style={styles.pageTitle}>Messages</Text>
-                <Text style={styles.pageSubtitle}>Chat with your students</Text>
+                <Text style={styles.pageTitle}>{t('messages.title')}</Text>
+                <Text style={styles.pageSubtitle}>{t('messages.tapToOpen')}</Text>
 
                 {/* ── Search bar ── */}
                 <TouchableOpacity style={styles.searchBar} activeOpacity={0.7}>
@@ -178,7 +180,7 @@ export default function TrainerMessagesScreen() {
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="chatbubbles-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>No messages yet</Text>
+                        <Text style={styles.emptyTitle}>{t('messages.noConversations')}</Text>
                         <Text style={styles.emptySubtitle}>Start a conversation with your students.</Text>
                     </View>
                 )}

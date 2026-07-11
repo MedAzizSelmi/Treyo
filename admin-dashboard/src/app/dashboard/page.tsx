@@ -10,12 +10,13 @@ import {
   Activity,
   MessageSquare,
   BarChart3,
+  Coins,
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { getDashboardStats } from '@/lib/api';
+import { getDashboardStats, getRevenueCurrency } from '@/lib/api';
 import StatCard from '@/components/StatCard';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -23,12 +24,17 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState<string>('TND');
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await getDashboardStats();
-        setStats(res.data);
+        const [statsRes, currencyRes] = await Promise.all([
+          getDashboardStats(),
+          getRevenueCurrency(),
+        ]);
+        setStats(statsRes.data);
+        setCurrency(currencyRes.data.currency || 'TND');
       } catch (err) {
         console.error('Failed to load stats', err);
       } finally {
@@ -107,12 +113,27 @@ export default function DashboardPage() {
           trend={{ value: `+${stats.newTrainersThisWeek || 0} this week`, up: true }}
         />
         {/*
-          Revenue card removed — the backend was returning
-          SUM(price * total_enrolled) which is "potential revenue if every
-          enrolled student had paid", not real money. Until a payment system
-          exists, that number is fiction. Replaced with Total Enrollments,
-          which is a real platform-activity number we already track.
+          Revenue card was previously removed because backend computes
+          SUM(price × total_enrolled) — "potential revenue if every
+          enrolled student had paid", not real money. Kept the metric
+          but labelled it explicitly + made the currency admin-tunable
+          via /dashboard/settings so it can be re-denominated without
+          a code change once payments are wired up.
         */}
+        <StatCard
+          label={`Revenue (${currency})`}
+          value={formatMoney(stats.totalRevenue, currency)}
+          icon={Coins}
+          color="#eab308"
+          trend={{
+            value: `${formatMoney(stats.revenueThisMonth, currency)} this month`,
+            up: true,
+          }}
+        />
+      </div>
+
+      {/* ── Second row stats ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           label="Total Enrollments"
           value={stats.totalEnrollments || 0}
@@ -120,14 +141,9 @@ export default function DashboardPage() {
           color="#22c55e"
           trend={{ value: `+${stats.enrollmentsThisWeek || 0} this week`, up: true }}
         />
-      </div>
-
-      {/* ── Second row stats ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Total Courses" value={stats.totalCourses || 0} icon={BookOpen} color="#a855f7" />
         <StatCard label="Active Enrollments" value={stats.activeEnrollments || 0} icon={Activity} color="#ef4444" />
         <StatCard label="Messages Today" value={stats.messagesToday || 0} icon={MessageSquare} color="#06b6d4" />
-        <StatCard label="Active Groups" value={stats.activeGroups || 0} icon={BarChart3} color="#f97316" />
       </div>
 
       {/* ── Charts ── */}
@@ -289,4 +305,20 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * Format a numeric revenue value using the admin's chosen currency
+ * code. Falls back to a plain "0" when the backend hasn't computed
+ * anything yet. Uses en-US grouping — locale-aware formatting would
+ * need a separate locale setting we don't have.
+ */
+function formatMoney(value: unknown, currency: string): string {
+  const n = typeof value === 'number' ? value : Number(value || 0);
+  if (!isFinite(n)) return `0 ${currency}`;
+  const formatted = n.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  return `${formatted} ${currency}`;
 }

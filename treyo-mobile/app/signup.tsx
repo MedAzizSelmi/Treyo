@@ -3,25 +3,58 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authService } from '../services/api';
+import { registerForPushNotifications } from '../services/push';
 
 // Use 'screen' (full physical screen) not 'window' (safe area). On Android
 // 'window' excludes the system nav bar, which shrinks the gradient view
 // and pulls the strong-green bottom of the glow into the visible area.
 const { width, height } = Dimensions.get('screen');
 
+
 export default function SignupScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [userType, setUserType] = useState<'STUDENT' | 'TRAINER'>('STUDENT');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    // Tracks the social-signup flow so the email-password button can
+    // grey out while a Google / Apple / LinkedIn flow is in flight.
+    const [socialLoading, setSocialLoading] = useState(false);
+
+    /**
+     * Social signup stub.
+     *
+     * The Google / Apple / LinkedIn flows aren't wired to real OAuth
+     * yet — the underlying methods (registerWith…) don't exist on
+     * authService. This handler keeps the UI matching login (so the
+     * visual flow is identical) and shows a clear "coming soon"
+     * message until we do the EAS production build + per-provider
+     * console setup.
+     *
+     * When OAuth lands, replace the Alert with calls like
+     * authService.registerWithGoogle(userType) etc.
+     */
+    const handleSocialSignup = async (provider: 'google' | 'apple' | 'linkedin') => {
+        setSocialLoading(true);
+        try {
+            const label = provider.charAt(0).toUpperCase() + provider.slice(1);
+            Alert.alert(
+                label,
+                `Sign up with ${label} will land once we ship the production build. Use email + password for now.`,
+            );
+        } finally {
+            setSocialLoading(false);
+        }
+    };
 
     const handleSignup = async () => {
         if (!name || !email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+            Alert.alert(t('common.error'), t('common.error'));
             return;
         }
 
@@ -33,6 +66,11 @@ export default function SignupScreen() {
                 password,
                 userType,
             });
+
+            // Hook up push notifications for the freshly-created account.
+            if (response?.userId) {
+                registerForPushNotifications(response.userId, userType).catch(() => {});
+            }
 
             // Determine where to go after the success screen
             let nextRoute: string;
@@ -64,31 +102,34 @@ export default function SignupScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Splash Screen Background */}
-            <LinearGradient
-                colors={['#160e45', '#02000e']}
-                style={StyleSheet.absoluteFill}
-            />
-            <LinearGradient
-                colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
-                style={styles.topGlow}
-            />
-            <LinearGradient
-                colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
-                style={styles.bottomGlow}
-            />
-            <LinearGradient
-                colors={['rgba(19,5,107,1)', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.leftGlow}
-            />
-            <LinearGradient
-                colors={['transparent', 'rgba(19,5,107,1)']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.rightGlow}
-            />
+            {/* Splash Screen Background — wrapped in `direction: 'ltr'`
+                so the side glows aren't auto-mirrored in Arabic. */}
+            <View style={[StyleSheet.absoluteFill, { direction: 'ltr' }]} pointerEvents="none">
+                <LinearGradient
+                    colors={['#160e45', '#02000e']}
+                    style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                    colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
+                    style={styles.topGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
+                    style={styles.bottomGlow}
+                />
+                <LinearGradient
+                    colors={['rgba(19,5,107,1)', 'transparent']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.leftGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(19,5,107,1)']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.rightGlow}
+                />
+            </View>
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -107,8 +148,8 @@ export default function SignupScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.header}>
-                        <Text style={styles.title}>Create Account</Text>
-                        <Text style={styles.subtitle}>Start your learning journey</Text>
+                        <Text style={styles.title}>{t('auth.signupTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('auth.signupSubtitle')}</Text>
                     </View>
 
                     {/* User Type Selector */}
@@ -124,7 +165,7 @@ export default function SignupScreen() {
                                 color={userType === 'STUDENT' ? '#ffffff' : '#aaaaaa'}
                             />
                             <Text style={[styles.userTypeText, userType === 'STUDENT' && styles.userTypeTextActive]}>
-                                I want to learn
+                                {t('auth.student')}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -138,19 +179,19 @@ export default function SignupScreen() {
                                 color={userType === 'TRAINER' ? '#ffffff' : '#aaaaaa'}
                             />
                             <Text style={[styles.userTypeText, userType === 'TRAINER' && styles.userTypeTextActive]}>
-                                I want to teach
+                                {t('auth.trainer')}
                             </Text>
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.form}>
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Full Name</Text>
+                            <Text style={styles.label}>{t('auth.name')}</Text>
                             <View style={styles.inputContainer}>
                                 <Ionicons name="person-outline" size={20} color="#aaaaaa" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Enter your name"
+                                    placeholder={t('auth.name')}
                                     placeholderTextColor="#888888"
                                     value={name}
                                     onChangeText={setName}
@@ -160,12 +201,12 @@ export default function SignupScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Email</Text>
+                            <Text style={styles.label}>{t('auth.email')}</Text>
                             <View style={styles.inputContainer}>
                                 <Ionicons name="mail-outline" size={20} color="#aaaaaa" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Enter your email"
+                                    placeholder={t('auth.email')}
                                     placeholderTextColor="#888888"
                                     value={email}
                                     onChangeText={setEmail}
@@ -177,12 +218,12 @@ export default function SignupScreen() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Password</Text>
+                            <Text style={styles.label}>{t('auth.password')}</Text>
                             <View style={styles.inputContainer}>
                                 <Ionicons name="lock-closed-outline" size={20} color="#aaaaaa" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Create a password (min 6 characters)"
+                                    placeholder={t('auth.password')}
                                     placeholderTextColor="#888888"
                                     value={password}
                                     onChangeText={setPassword}
@@ -210,21 +251,61 @@ export default function SignupScreen() {
                                 style={styles.buttonGradient}
                             >
                                 <Text style={styles.signupButtonText}>
-                                    {loading ? 'Creating Account...' : 'Create Account'}
+                                    {loading ? t('common.loading') : t('auth.signUp')}
                                 </Text>
                             </LinearGradient>
                         </TouchableOpacity>
 
-                        <Text style={styles.terms}>
-                            By signing up, you agree to our{'\n'}
-                            <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                            <Text style={styles.termsLink}>Privacy Policy</Text>
-                        </Text>
+                        {/* Social signup — same layout as the login screen
+                            so the two flows feel symmetric. Buttons are
+                            stubbed until the EAS production build and
+                            per-provider OAuth setup land. */}
+                        <View style={styles.socialSection}>
+                            <View style={styles.socialDivider}>
+                                <View style={styles.socialDividerLine} />
+                                <Text style={styles.socialDividerText}>{t('auth.orSignUpWith')}</Text>
+                                <View style={styles.socialDividerLine} />
+                            </View>
+
+                            <View style={styles.socialButtons}>
+                                <TouchableOpacity
+                                    style={styles.socialButton}
+                                    onPress={() => handleSocialSignup('google')}
+                                    disabled={loading || socialLoading}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="logo-google" size={22} color="#DB4437" />
+                                    <Text style={styles.socialButtonText}>Google</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.socialButton}
+                                    onPress={() => handleSocialSignup('apple')}
+                                    disabled={loading || socialLoading}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="logo-apple" size={22} color="#ffffff" />
+                                    <Text style={styles.socialButtonText}>Apple</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.socialButton}
+                                    onPress={() => handleSocialSignup('linkedin')}
+                                    disabled={loading || socialLoading}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="logo-linkedin" size={22} color="#0A66C2" />
+                                    <Text style={styles.socialButtonText}>LinkedIn</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        <Text style={styles.terms}>{t('auth.terms')}</Text>
 
                         <View style={styles.loginContainer}>
-                            <Text style={styles.loginText}>Already have an account? </Text>
+                            <Text style={styles.loginText}>{t('auth.haveAccount')} </Text>
                             <TouchableOpacity onPress={() => router.push('/login' as any)}>
-                                <Text style={styles.loginLink}>Sign In</Text>
+                                <Text style={styles.loginLink}>{t('auth.signIn')}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -373,6 +454,47 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#ffffff',
         textAlign: 'center',
+    },
+
+    // Social signup section — mirrored from login.tsx so the two
+    // screens look like siblings. Style names differ ("socialDivider")
+    // because signup already has a "divider" used elsewhere.
+    socialSection: { marginTop: 24 },
+    socialDivider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 18,
+    },
+    socialDividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+    },
+    socialDividerText: {
+        color: '#aaa',
+        paddingHorizontal: 12,
+        fontSize: 13,
+    },
+    socialButtons: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    socialButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 14,
+        paddingVertical: 12,
+        gap: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    socialButtonText: {
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: '600',
     },
     terms: {
         fontSize: 13,

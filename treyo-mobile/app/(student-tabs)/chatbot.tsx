@@ -13,6 +13,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService, notificationService } from '../../services/api';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useCallback } from 'react';
 import api from '../../services/api';
 
@@ -91,6 +92,7 @@ function TypingDots() {
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function ChatbotScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
@@ -337,7 +339,7 @@ export default function ChatbotScreen() {
                                 <Image source={require('../../assets/images/AI_Robot_small.png')} style={styles.aiIcon} resizeMode="contain" />
                             </View>
                             <View>
-                                <Text style={styles.headerTitle}>Treyo AI</Text>
+                                <Text style={styles.headerTitle}>{t('chatbot.title')}</Text>
                                 <Text style={styles.headerSubtitle}>Always here to help</Text>
                             </View>
                         </View>
@@ -391,10 +393,10 @@ export default function ChatbotScreen() {
                             <Image source={require('../../assets/images/AI_Robot.png')} style={styles.robotBig} resizeMode="contain" />
                         </View>
                         <Text style={styles.emptyTitle}>
-                            {userName ? `Hey ${userName}!` : 'Hello!'}
+                            {userName ? t('home.greeting', { name: userName }) : t('common.loading')}
                         </Text>
                         <Text style={styles.emptySubtitle}>
-                            I'm your AI assistant. Ask me anything{'\n'}about training, courses, or your profile.
+                            {t('chatbot.greeting')}
                         </Text>
 
                         {/* Quick action chips */}
@@ -490,9 +492,9 @@ export default function ChatbotScreen() {
                                 value={input}
                                 onChangeText={setInput}
                                 placeholder={
-                                    recordingStatus === 'recording' ? `Recording  ${formatDuration(recordSeconds)}`
-                                    : recordingStatus === 'transcribing' ? 'Transcribing...'
-                                    : 'Message Treyo AI...'
+                                    recordingStatus === 'recording' ? `${formatDuration(recordSeconds)}`
+                                    : recordingStatus === 'transcribing' ? t('common.loading')
+                                    : t('chatbot.placeholder')
                                 }
                                 placeholderTextColor="rgba(255,255,255,0.35)"
                                 multiline

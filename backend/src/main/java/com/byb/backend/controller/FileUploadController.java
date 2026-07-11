@@ -83,6 +83,33 @@ public class FileUploadController {
     }
 
     /**
+     * v2: Upload a course material file before the course row exists.
+     * Trainer's create-course flow uploads the PDF/PPT first to get a
+     * URL, then submits the course with that URL attached. Uses the
+     * trainerId as the storage grouping key since the material doesn't
+     * have a course to belong to yet.
+     */
+    @PostMapping("/upload/pending-material")
+    @Operation(summary = "Upload a course material file before the course row exists")
+    public ResponseEntity<Map<String, String>> uploadPendingMaterial(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("trainerId") String trainerId
+    ) {
+        // Same storage location as regular course materials — grouped
+        // by trainer instead of course so the file has a home while
+        // the trainer is still filling out the form.
+        String filePath = fileStorageService.storeCourseMaterial(file, "pending-" + trainerId);
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Material uploaded");
+        response.put("filePath", filePath);
+        response.put("url", "/api/files/download/" + filePath.replace("/", "$"));
+        response.put("name", file.getOriginalFilename() != null ? file.getOriginalFilename() : "material");
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Upload course material
      */
     @PostMapping("/upload/course-material")

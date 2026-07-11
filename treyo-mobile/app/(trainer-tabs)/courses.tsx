@@ -8,15 +8,18 @@ import { authService, courseService, notificationService } from '../../services/
 import api from '../../services/api';
 
 // Drafts were removed — every course is born live the moment the admin
-// assigns a template to this trainer. The status filter now shows just
-// All / Active / Completed.
+// assigns a template to this trainer. "Completed" was dropped too
+// because the lifecycle service flips a group to completed at the
+// group level, not the course level — a course can have one finished
+// group and still be very much active for the next batch. So the
+// filter is now just All / Active.
 
 export default function TrainerCoursesScreen() {
     const router = useRouter();
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
-    const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'Completed'>('All');
+    const [activeFilter, setActiveFilter] = useState<'All' | 'Active' | 'Pending' | 'Rejected'>('All');
     const [courses, setCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -58,22 +61,23 @@ export default function TrainerCoursesScreen() {
         }
     };
 
-    // Drafts are gone — every assigned course is live unless it's been
-    // archived/completed. We treat anything else (including the legacy
-    // PUBLISHED status) as Active.
-    const mapStatus = (c: any): 'Active' | 'Completed' => {
-        const s = (c.status || c.courseStatus || '').toString().toUpperCase();
-        if (s === 'COMPLETED' || s === 'ARCHIVED') return 'Completed';
+    // Course status is now driven by the admin's approvalStatus verdict.
+    // Legacy rows report APPROVED so they still show as Active.
+    const mapStatus = (c: any): 'Active' | 'Pending' | 'Rejected' => {
+        const s = String(c?.approvalStatus || '').toUpperCase();
+        if (s === 'PENDING') return 'Pending';
+        if (s === 'REJECTED') return 'Rejected';
         return 'Active';
     };
 
-    const filters: Array<'All' | 'Active' | 'Completed'> = ['All', 'Active', 'Completed'];
+    const filters: Array<'All' | 'Active' | 'Pending' | 'Rejected'> = ['All', 'Active', 'Pending', 'Rejected'];
     const filtered = activeFilter === 'All' ? courses : courses.filter(c => mapStatus(c) === activeFilter);
 
     const statusColor = (status: string) => {
         switch (status) {
             case 'Active': return '#7cce06';
-            case 'Completed': return '#3b5bdb';
+            case 'Pending': return '#ffa500';
+            case 'Rejected': return '#ff5454';
             default: return '#aaaaaa';
         }
     };
@@ -114,9 +118,20 @@ export default function TrainerCoursesScreen() {
                     <View>
                         <Text style={styles.pageTitle}>My Courses</Text>
                         <Text style={styles.pageSubtitle}>
-                            {courses.length} course{courses.length === 1 ? '' : 's'} assigned by admin
+                            {courses.length} course{courses.length === 1 ? '' : 's'} you created
                         </Text>
                     </View>
+                    {/* Trainer creates courses under the admin's modules
+                        and submits them for admin review. The "+" jumps
+                        into the create screen. */}
+                    <TouchableOpacity
+                        style={styles.createBtn}
+                        onPress={() => router.push('/trainer-course-create' as any)}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="add" size={18} color="#000" />
+                        <Text style={styles.createBtnText}>New course</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* ── Filter chips ── */}
@@ -229,6 +244,12 @@ const styles = StyleSheet.create({
     titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
     pageTitle: { fontSize: 24, fontWeight: 'bold', color: '#ffffff' },
     pageSubtitle: { fontSize: 15, color: '#aaaaaa', marginTop: 2 },
+    createBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: '#7cce06', borderRadius: 12,
+        paddingHorizontal: 12, paddingVertical: 9,
+    },
+    createBtnText: { color: '#000', fontSize: 13, fontWeight: '700' },
     addBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: '#7cce06', borderRadius: 12,

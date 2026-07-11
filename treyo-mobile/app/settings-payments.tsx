@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService, enrollmentService } from '../services/api';
 
@@ -15,6 +16,7 @@ import { authService, enrollmentService } from '../services/api';
  */
 export default function PaymentsScreen() {
     const router = useRouter();
+    const { t, i18n } = useTranslation();
     const [items, setItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -44,8 +46,8 @@ export default function PaymentsScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Payment History</Text>
-                        <Text style={styles.headerSubtitle}>Your enrollments and transactions</Text>
+                        <Text style={styles.headerTitle}>{t('settings.paymentHistory')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('payments.subtitle')}</Text>
                     </View>
                 </View>
 
@@ -53,23 +55,23 @@ export default function PaymentsScreen() {
                 <View style={styles.summaryCard}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Total spent</Text>
+                        <Text style={styles.summaryLabel}>{t('payments.totalSpent')}</Text>
                         <Text style={styles.summaryValue}>${totalSpent.toFixed(2)}</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Paid courses</Text>
+                        <Text style={styles.summaryLabel}>{t('payments.paidCourses')}</Text>
                         <Text style={styles.summaryValue}>{paidCount}</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Total courses</Text>
+                        <Text style={styles.summaryLabel}>{t('payments.totalCourses')}</Text>
                         <Text style={styles.summaryValue}>{items.length}</Text>
                     </View>
                 </View>
 
                 {/* Payment methods (placeholder section) */}
-                <Text style={styles.sectionLabel}>PAYMENT METHODS</Text>
+                <Text style={styles.sectionLabel}>{t('payments.paymentMethods')}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <TouchableOpacity style={styles.methodRow} activeOpacity={0.7}
@@ -78,15 +80,15 @@ export default function PaymentsScreen() {
                             <Ionicons name="add" size={20} color="#7cce06" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.methodTitle}>Add a payment method</Text>
-                            <Text style={styles.methodSubtitle}>Card, PayPal, or bank transfer</Text>
+                            <Text style={styles.methodTitle}>{t('payments.addMethod')}</Text>
+                            <Text style={styles.methodSubtitle}>{t('payments.addMethodBody')}</Text>
                         </View>
-                        <Text style={styles.soonBadge}>Soon</Text>
+                        <Text style={styles.soonBadge}>{t('payments.soon')}</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Transactions */}
-                <Text style={styles.sectionLabel}>TRANSACTIONS</Text>
+                <Text style={styles.sectionLabel}>{t('payments.transactions')}</Text>
 
                 {loading ? (
                     <View style={{ paddingTop: 40, alignItems: 'center' }}>
@@ -97,10 +99,8 @@ export default function PaymentsScreen() {
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="card-outline" size={42} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>No transactions yet</Text>
-                        <Text style={styles.emptySubtitle}>
-                            When you enroll in a paid course, your receipts will appear here.
-                        </Text>
+                        <Text style={styles.emptyTitle}>{t('payments.noTransactions')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('payments.noTransactionsBody')}</Text>
                     </View>
                 ) : (
                     items.map((e: any, i: number) => {
@@ -114,15 +114,15 @@ export default function PaymentsScreen() {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.txnTitle} numberOfLines={1}>
-                                        {e.courseTitle || e.courseName || 'Course'}
+                                        {e.courseTitle || e.courseName || t('home.course')}
                                     </Text>
                                     <Text style={styles.txnDate}>
-                                        {e.enrolledAt ? new Date(e.enrolledAt).toLocaleDateString() : ''}
+                                        {e.enrolledAt ? new Date(e.enrolledAt).toLocaleDateString(i18n.language || undefined) : ''}
                                         {e.enrollmentStatus ? ` · ${e.enrollmentStatus}` : ''}
                                     </Text>
                                 </View>
                                 <Text style={[styles.txnPrice, free && { color: '#aaaaaa' }]}>
-                                    {free ? 'Free' : `$${price.toFixed(2)}`}
+                                    {free ? t('payments.free') : `$${price.toFixed(2)}`}
                                 </Text>
                             </View>
                         );

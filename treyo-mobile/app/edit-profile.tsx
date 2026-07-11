@@ -5,12 +5,14 @@ import { BlurView } from 'expo-blur';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
+import { useTranslation } from 'react-i18next';
 import { authService, fetchUpload, API_BASE_URL, enrollmentService } from '../services/api';
 import api from '../services/api';
 import { ScreenBackground } from '../components/ScreenBackground';
 
 export default function EditProfileScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [name, setName] = useState('');
     const [bio, setBio] = useState('');
     const [profilePic, setProfilePic] = useState<string | null>(null);
@@ -146,7 +148,7 @@ export default function EditProfileScreen() {
                         <TouchableOpacity onPress={() => router.back()}>
                             <Ionicons name="arrow-back" size={22} color="#ffffff" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Edit Profile</Text>
+                        <Text style={styles.headerTitle}>{t('editProfile.title')}</Text>
                         <View style={{ width: 22 }} />
                     </View>
                 </View>
@@ -169,41 +171,41 @@ export default function EditProfileScreen() {
                             </View>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShowPicModal(true)}>
-                            <Text style={styles.editPicText}>Edit Picture</Text>
+                            <Text style={styles.editPicText}>{t('editProfile.editPicture')}</Text>
                         </TouchableOpacity>
                     </View>
 
                     {/* Section: Basic Info */}
-                    <Text style={styles.sectionTitle}>Basic Info</Text>
+                    <Text style={styles.sectionTitle}>{t('editProfile.basicInfo')}</Text>
 
-                    <Text style={styles.fieldLabel}>Username</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.username')}</Text>
                     <View style={styles.inputWrap}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor="#555" />
+                        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('editProfile.yourName')} placeholderTextColor="#555" />
                     </View>
 
-                    <Text style={styles.fieldLabel}>Bio</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.bio')}</Text>
                     <View style={[styles.inputWrap, styles.bioWrap]}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput style={[styles.input, styles.bioInput]} value={bio} onChangeText={setBio} placeholder="Tell us about yourself..." placeholderTextColor="#555" multiline textAlignVertical="top" />
+                        <TextInput style={[styles.input, styles.bioInput]} value={bio} onChangeText={setBio} placeholder={t('editProfile.tellAboutYou')} placeholderTextColor="#555" multiline textAlignVertical="top" />
                     </View>
 
                     {/* Section: Professional Profile */}
-                    <Text style={styles.sectionTitle}>Professional Profile</Text>
+                    <Text style={styles.sectionTitle}>{t('editProfile.professionalProfile')}</Text>
 
-                    <Text style={styles.fieldLabel}>Education Level</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.educationLevel')}</Text>
                     <View style={styles.inputWrap}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput style={styles.input} value={educationLevel} onChangeText={setEducationLevel} placeholder="e.g. Bachelor's, Master's..." placeholderTextColor="#555" />
+                        <TextInput style={styles.input} value={educationLevel} onChangeText={setEducationLevel} placeholder={t('editProfile.educationPlaceholder')} placeholderTextColor="#555" />
                     </View>
 
-                    <Text style={styles.fieldLabel}>Professional Experience</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.professionalExperience')}</Text>
                     <View style={[styles.inputWrap, styles.bioWrap]}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput style={[styles.input, styles.bioInput]} value={professionalExperience} onChangeText={setProfessionalExperience} placeholder="Describe your work experience..." placeholderTextColor="#555" multiline textAlignVertical="top" />
+                        <TextInput style={[styles.input, styles.bioInput]} value={professionalExperience} onChangeText={setProfessionalExperience} placeholder={t('editProfile.experiencePlaceholder')} placeholderTextColor="#555" multiline textAlignVertical="top" />
                     </View>
 
-                    <Text style={styles.fieldLabel}>Key Skills</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.keySkills')}</Text>
                     <View style={styles.tagInputRow}>
                         <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
                             <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
@@ -211,7 +213,7 @@ export default function EditProfileScreen() {
                                 style={styles.input}
                                 value={skillInput}
                                 onChangeText={setSkillInput}
-                                placeholder="Add a skill..."
+                                placeholder={t('editProfile.addSkill')}
                                 placeholderTextColor="#555"
                                 onSubmitEditing={addSkill}
                                 returnKeyType="done"
@@ -235,9 +237,9 @@ export default function EditProfileScreen() {
                     )}
 
                     {/* Section: Links */}
-                    <Text style={styles.sectionTitle}>Links <Text style={styles.optionalPill}>Optional</Text></Text>
+                    <Text style={styles.sectionTitle}>{t('editProfile.links')} <Text style={styles.optionalPill}>{t('editProfile.optional')}</Text></Text>
 
-                    <Text style={styles.fieldLabel}>LinkedIn URL</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.linkedinUrl')}</Text>
                     <View style={styles.inputWrap}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.inputWithIcon}>
@@ -246,7 +248,7 @@ export default function EditProfileScreen() {
                         </View>
                     </View>
 
-                    <Text style={styles.fieldLabel}>Portfolio URL</Text>
+                    <Text style={styles.fieldLabel}>{t('editProfile.portfolioUrl')}</Text>
                     <View style={styles.inputWrap}>
                         <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.inputWithIcon}>
@@ -262,7 +264,7 @@ export default function EditProfileScreen() {
                         disabled={loading}
                         activeOpacity={0.85}
                     >
-                        {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+                        {loading ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>{t('editProfile.saveChanges')}</Text>}
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>

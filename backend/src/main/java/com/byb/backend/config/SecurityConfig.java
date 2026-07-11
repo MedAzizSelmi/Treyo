@@ -38,6 +38,8 @@ public class SecurityConfig {
                                 "/api/auth/**",
                                 "/api/files/download/**",
                                 "/api/trainers",
+                                "/api/settings/revenue-currency",
+                                "/api/modules",
                                 // Konnect's webhook is server-to-server and
                                 // has no JWT — has to be permitAll. The
                                 // handler still verifies every event against

@@ -1,6 +1,10 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { authService } from '../services/api';
+import * as SecureStore from 'expo-secure-store';
 
 // Use 'screen' (full physical screen) not 'window' (safe area). On Android
 // 'window' excludes the system nav bar, which shrinks the gradient view
@@ -8,33 +12,87 @@ import { LinearGradient } from 'expo-linear-gradient';
 // 'screen' restores the off-screen positioning the design assumes.
 const { width, height } = Dimensions.get('screen');
 
+
 export default function WelcomeScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
+    // `checking` covers the brief moment between mount and "we've decided
+    // where to send you". We render a spinner instead of the welcome
+    // buttons so a logged-in user never sees Sign In / Get Started flash
+    // before being redirected to their tabs.
+    const [checking, setChecking] = useState(true);
+
+    // Persistent session: on mount, look for a stored JWT + user. If both
+    // exist, route straight to the role's tab home (the JWT is good for
+    // 90 days, and any API call that hits an expired token will 401 and
+    // get caught downstream — at which point we re-route to login from
+    // here). This is what gives the app its "always signed in until you
+    // tap log out" behavior.
+    useEffect(() => {
+        (async () => {
+            try {
+                const token = await SecureStore.getItemAsync('jwt_token');
+                const user = await authService.getCurrentUser();
+                if (token && user?.userId) {
+                    // Onboarding gate — if the user hasn't finished step 3,
+                    // we still want them to land back where they left off
+                    // rather than the tabs.
+                    if (user.onboardingComplete === false) {
+                        const isTrainer = String(user.role || user.userType || '').toUpperCase().includes('TRAINER');
+                        router.replace(isTrainer ? '/onboarding/trainer/step1' as any : '/onboarding/student/step1' as any);
+                        return;
+                    }
+                    const isTrainer = String(user.role || user.userType || '').toUpperCase().includes('TRAINER');
+                    router.replace(isTrainer ? '/(trainer-tabs)/home' as any : '/(student-tabs)/home' as any);
+                    return;
+                }
+            } catch (_) {
+                // Fall through to welcome screen on any error.
+            }
+            setChecking(false);
+        })();
+    }, []);
+
+    if (checking) {
+        return (
+            <View style={styles.container}>
+                <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
+                <View style={styles.checkingWrap}>
+                    <ActivityIndicator size="large" color="#7cce06" />
+                </View>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
-            {/* Background (same as onboarding) */}
-            <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
-            <LinearGradient
-                colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
-                style={styles.topGlow}
-            />
-            <LinearGradient
-                colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
-                style={styles.bottomGlow}
-            />
-            <LinearGradient
-                colors={['rgba(19,5,107,1)', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.leftGlow}
-            />
-            <LinearGradient
-                colors={['transparent', 'rgba(19,5,107,1)']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.rightGlow}
-            />
+            {/* Background (same as onboarding).
+                Wrapped in a `direction: 'ltr'` layer so RN's RTL auto-flip
+                doesn't move the side glows in Arabic — keeps the background
+                identical in every language. */}
+            <View style={[StyleSheet.absoluteFill, { direction: 'ltr' }]} pointerEvents="none">
+                <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
+                <LinearGradient
+                    colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
+                    style={styles.topGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
+                    style={styles.bottomGlow}
+                />
+                <LinearGradient
+                    colors={['rgba(19,5,107,1)', 'transparent']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.leftGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(19,5,107,1)']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.rightGlow}
+                />
+            </View>
 
             {/* Content */}
             <View style={styles.content}>
@@ -67,7 +125,7 @@ export default function WelcomeScreen() {
                         colors={['#7cce06', '#6bb805']}
                         style={styles.buttonGradient}
                     >
-                        <Text style={styles.primaryButtonText}>Get Started</Text>
+                        <Text style={styles.primaryButtonText}>{t('auth.getStarted')}</Text>
                     </LinearGradient>
                 </TouchableOpacity>
 
@@ -76,14 +134,10 @@ export default function WelcomeScreen() {
                     onPress={() => router.push('/login' as any)}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.secondaryButtonText}>Sign In</Text>
+                    <Text style={styles.secondaryButtonText}>{t('auth.signIn')}</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.terms}>
-                    By continuing, you agree to our{' '}
-                    <Text style={styles.termsLink}>Terms</Text> and{' '}
-                    <Text style={styles.termsLink}>Privacy Policy</Text>
-                </Text>
+                <Text style={styles.terms}>{t('auth.terms')}</Text>
             </View>
         </View>
     );
@@ -93,6 +147,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#02000e',
+    },
+
+    checkingWrap: {
+        flex: 1, alignItems: 'center', justifyContent: 'center',
     },
 
     content: {

@@ -13,7 +13,7 @@ import Constants from 'expo-constants';
 // If that's `localhost`/`127.0.0.1`, we're in USB mode.
 // ─────────────────────────────────────────────────────────────────
 const BACKEND_PORT = 8085;
-const MANUAL_OVERRIDE = 'http://192.168.100.88:8085';
+const MANUAL_OVERRIDE = 'http://192.168.0.188:8085';
 
 function resolveApiBase(): string {
     // hostUri looks like "192.168.100.68:8081" or "localhost:8081"
@@ -53,6 +53,29 @@ api.interceptors.request.use(
         return config;
     },
     (error) => Promise.reject(error)
+);
+
+// ── Auth expiry handling ──
+// If the backend tells us the JWT is invalid/expired, wipe the stored
+// session so the next app open lands on the welcome screen instead of
+// silently retrying with a dead token. Endpoints listed in
+// AUTH_FAILURE_SAFE_PATHS skip this — those legitimately 401 (e.g. login
+// with wrong password) and we don't want to nuke an unrelated session.
+const AUTH_FAILURE_SAFE_PATHS = ['/auth/login', '/auth/register', '/auth/refresh'];
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const status = error?.response?.status;
+        const url = String(error?.config?.url || '');
+        const isSafe = AUTH_FAILURE_SAFE_PATHS.some(p => url.includes(p));
+        if (status === 401 && !isSafe) {
+            try {
+                await SecureStore.deleteItemAsync('jwt_token');
+                await SecureStore.deleteItemAsync('user_data');
+            } catch (_) {}
+        }
+        return Promise.reject(error);
+    }
 );
 
 /**
@@ -113,6 +136,13 @@ export const authService = {
     },
 
     logout: async () => {
+        // Drop the push token first so the next account on this device
+        // doesn't keep getting the previous user's notifications. Lazy
+        // import avoids a circular dep with services/push.ts.
+        try {
+            const { unregisterCurrentDevice } = await import('./push');
+            await unregisterCurrentDevice();
+        } catch (_) {}
         await SecureStore.deleteItemAsync('jwt_token');
         await SecureStore.deleteItemAsync('user_data');
     },
@@ -130,6 +160,34 @@ export const authService = {
     /** Change password for the currently logged-in user. Backend verifies the current password. */
     changePassword: async (currentPassword: string, newPassword: string) => {
         const response = await api.post('/account/change-password', { currentPassword, newPassword });
+        return response.data;
+    },
+
+    /** Trigger a password-reset email. Backend responds 200 even for
+     *  unknown emails so the endpoint can't be used to enumerate
+     *  accounts — the UI should show the same "if an account exists,
+     *  check your inbox" message regardless. */
+    forgotPassword: async (email: string) => {
+        const response = await api.post('/auth/forgot-password', { email });
+        return response.data;
+    },
+
+    /** Complete a password reset using the token from the email. */
+    resetPassword: async (token: string, newPassword: string) => {
+        const response = await api.post('/auth/reset-password', { token, newPassword });
+        return response.data;
+    },
+
+    /** Verify an email using the token from the verification email. */
+    verifyEmail: async (token: string) => {
+        const response = await api.post('/auth/verify-email', { token });
+        return response.data;
+    },
+
+    /** Resend the verification email. Same silent-on-unknown behaviour
+     *  as forgotPassword — UI must not differentiate. */
+    resendVerification: async (email: string) => {
+        const response = await api.post('/auth/resend-verification', { email });
         return response.data;
     },
 };
@@ -441,6 +499,202 @@ export const groupService = {
         const response = await api.get(`/groups/trainer/${trainerId}/upcoming`);
         return response.data;
     },
+
+    /** Single group + its course info (title, durationHours, saved
+     *  schedule). Backs the trainer's session-scheduling screen. */
+    getGroup: async (groupId: string) => {
+        const response = await api.get(`/groups/${groupId}`);
+        return response.data;
+    },
+
+    /** Persist the trainer's session schedule for a group.
+     *  Each session carries its own duration (hours), so a schedule can
+     *  mix e.g. a 2h session and a 1h session.
+     *  payload: { sessions: [{date, time, hours}] } */
+    saveGroupSchedule: async (
+        groupId: string,
+        payload: { sessions: { date: string; time: string; hours: number }[] },
+    ) => {
+        const response = await api.put(`/groups/${groupId}/schedule`, payload);
+        return response.data;
+    },
+
+    /** Session-completion progress for a single group. Returns:
+     *    { sessionsCompleted, totalSessions, percentage,
+     *      groupStatus, isCompleted } */
+    getProgress: async (groupId: string) => {
+        const response = await api.get(`/groups/${groupId}/progress`);
+        return response.data as {
+            sessionsCompleted: number;
+            totalSessions: number;
+            percentage: number;
+            groupStatus: string;
+            isCompleted: boolean;
+        };
+    },
+
+    /** Flat list of every upcoming session across all the student's
+     *  enrolled groups. Each entry has courseId/courseTitle, groupId/
+     *  groupName, date, time, hours, datetime, and meeting info.
+     *  Powers My Schedule, home Upcoming strip, and course-detail
+     *  schedule section (filter by courseId on the client). */
+    getStudentSessions: async (studentId: string) => {
+        const response = await api.get(`/groups/student/${studentId}/sessions`);
+        return response.data;
+    },
+};
+
+// ══════════════════════════════════════════════
+// Module + trainer-submitted course flow (v2)
+// ══════════════════════════════════════════════
+export const moduleService = {
+    /** Public list of active modules for the trainer's create-course picker. */
+    listActive: async () => {
+        const response = await api.get('/modules');
+        return response.data as any[];
+    },
+};
+
+export const trainerCourseService = {
+    /** Trainer submits a new course. Starts as PENDING until admin reviews. */
+    create: async (trainerId: string, payload: any) => {
+        const response = await api.post('/courses', payload, { params: { trainerId } });
+        return response.data;
+    },
+    /** Trainer edits their own course. Only works while status is
+     *  PENDING or REJECTED — backend refuses APPROVED. */
+    update: async (courseId: string, trainerId: string, payload: any) => {
+        const response = await api.put(`/courses/${courseId}`, payload, { params: { trainerId } });
+        return response.data;
+    },
+    /** Upload the course material (PDF/PPT/ZIP) BEFORE the course
+     *  row exists — the returned url + name are then submitted with
+     *  the create call. Returns { url, name, filePath }. */
+    uploadMaterial: async (trainerId: string, file: { uri: string; name: string; type: string }) => {
+        const form = new FormData();
+        form.append('file', file as any);
+        form.append('trainerId', trainerId);
+        const res = await fetchUpload('/files/upload/pending-material', form);
+        return res as { url: string; name: string; filePath: string };
+    },
+};
+
+// ══════════════════════════════════════════════
+// Feed Services (AI-generated daily learning feed)
+// ══════════════════════════════════════════════
+export const feedService = {
+    /** Paged feed. Pass studentId so the response includes the user's
+     *  liked/saved state per post. `lang` is the i18n language code —
+     *  backend serves the translation if it has one, English otherwise. */
+    getFeed: async (userId?: string, lang?: string, page = 0, size = 20) => {
+        const response = await api.get('/feed', { params: { userId, lang, page, size } });
+        return response.data as {
+            items: any[];
+            page: number; size: number; totalElements: number; hasMore: boolean;
+        };
+    },
+
+    /** Saved posts for the "Saved" entry in the profile screen. */
+    getSaved: async (userId: string, lang?: string) => {
+        const response = await api.get('/feed/saved', { params: { userId, lang } });
+        return response.data as any[];
+    },
+
+    /** Toggle like — returns the new state. */
+    toggleLike: async (postId: string, userId: string) => {
+        const response = await api.post(`/feed/${postId}/like`, { userId });
+        return response.data as { liked: boolean };
+    },
+
+    /** Toggle save — returns the new state. */
+    toggleSave: async (postId: string, userId: string) => {
+        const response = await api.post(`/feed/${postId}/save`, { userId });
+        return response.data as { saved: boolean };
+    },
+
+    /** Manual regenerate (dev / admin seeding). */
+    generate: async () => {
+        const response = await api.post('/feed/generate', {});
+        return response.data;
+    },
+};
+
+// ══════════════════════════════════════════════
+// Search log — records queries for the ML recommendation engine
+// ══════════════════════════════════════════════
+export const searchLogService = {
+    /** Record a search the student executed. Fire-and-forget on the
+     *  client side; backend writes to the search_logs table which the
+     *  recommendation engine reads on its next refresh. */
+    log: async (payload: { studentId: string; query: string; clickedCourseId?: string }) => {
+        try {
+            await api.post('/searches/log', payload);
+        } catch (_) {
+            // Network / 500 — drop silently. Search history UX on the
+            // device still works; only the ML signal is lost.
+        }
+    },
+};
+
+// ══════════════════════════════════════════════
+// Device Services (Expo push token registration)
+// ══════════════════════════════════════════════
+export const deviceService = {
+    /** Register / re-register this device's Expo push token to the user.
+     *  Idempotent — safe to call on every login. */
+    register: async (payload: { userId: string; userType?: string; token: string; platform?: string }) => {
+        const response = await api.post('/devices/register', payload);
+        return response.data;
+    },
+
+    /** Drop the token on the backend so a previous user doesn't keep
+     *  receiving pushes after the next user signs in (or after logout). */
+    unregister: async (payload: { token: string }) => {
+        const response = await api.post('/devices/unregister', payload);
+        return response.data;
+    },
+};
+
+// ══════════════════════════════════════════════
+// Review Services (course + trainer ratings)
+// ══════════════════════════════════════════════
+export const reviewService = {
+    /** Has this student already submitted a review for this course? */
+    check: async (studentId: string, courseId: string) => {
+        const response = await api.get('/reviews/check', { params: { studentId, courseId } });
+        return response.data as { reviewed: boolean; courseRating?: number; trainerRating?: number; feedback?: string };
+    },
+
+    /** Submit the end-of-course survey. trainerId is optional — the
+     *  backend will pull the canonical one off the course if missing.
+     *  Two optional feedback fields — courseFeedback surfaces on
+     *  course-detail, trainerFeedback on trainer pages. */
+    submit: async (payload: {
+        studentId: string;
+        courseId: string;
+        trainerId?: string;
+        enrollmentId?: string;
+        courseRating: number;
+        trainerRating: number;
+        courseFeedback?: string;
+        trainerFeedback?: string;
+    }) => {
+        const response = await api.post('/reviews', payload);
+        return response.data;
+    },
+
+    /** Visible reviews for a course — drops admin-hidden rows. Each
+     *  row carries studentName + studentPhoto for direct rendering. */
+    forCourse: async (courseId: string) => {
+        const response = await api.get(`/reviews/course/${courseId}`);
+        return response.data as any[];
+    },
+
+    /** Visible reviews for a trainer — same shape as forCourse. */
+    forTrainer: async (trainerId: string) => {
+        const response = await api.get(`/reviews/trainer/${trainerId}`);
+        return response.data as any[];
+    },
 };
 
 // ══════════════════════════════════════════════
@@ -482,6 +736,50 @@ export const trainerService = {
     /** Get a single trainer's public profile */
     getTrainerById: async (trainerId: string) => {
         const response = await api.get(`/trainers/${trainerId}`);
+        return response.data;
+    },
+
+    /** Toggle the trainer's self-controlled availability and/or
+     *  concurrent-groups cap. Partial update — pass only the fields
+     *  you want to change. Backend gate effects:
+     *    isActive=false → admin can't form new groups for them,
+     *                     ML stops recommending their courses.
+     *    maxConcurrentGroups → ML drops the trainer's courses once
+     *                          their active group count hits the cap. */
+    updateAvailability: async (trainerId: string, data: { isActive?: boolean; maxConcurrentGroups?: number }) => {
+        const response = await api.put('/trainers/me/availability', data, { params: { trainerId } });
+        return response.data;
+    },
+
+    /** Read the trainer's preferred display currency. Falls back to
+     *  TND when the backend has no value stored. */
+    getCurrency: async (trainerId: string): Promise<{ currency: string }> => {
+        const response = await api.get(`/trainers/${trainerId}/currency`);
+        return response.data;
+    },
+
+    /** Earnings breakdown for a given month. Backend returns the
+     *  currency alongside so the client doesn't have to look it up
+     *  separately. Days come sorted newest-first. */
+    getEarnings: async (
+        trainerId: string,
+        year: number,
+        month: number,
+    ): Promise<{
+        year: number;
+        month: number;
+        currency: string;
+        total: number;
+        days: { date: string; courseId: string; courseTitle: string; amount: number }[];
+    }> => {
+        const response = await api.get(`/trainers/${trainerId}/earnings`, { params: { year, month } });
+        return response.data;
+    },
+
+    /** Persist a new preferred currency for this trainer. Also
+     *  becomes the default when creating a new course. */
+    setCurrency: async (trainerId: string, currency: string): Promise<{ currency: string }> => {
+        const response = await api.put(`/trainers/${trainerId}/currency`, { currency });
         return response.data;
     },
 

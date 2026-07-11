@@ -6,10 +6,12 @@ import { authService, notificationService } from '../../services/api';
 import api from '../../services/api';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
 
 export default function ProfileScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [imageTs, setImageTs] = useState(Date.now());
@@ -44,10 +46,10 @@ export default function ProfileScreen() {
     };
 
     const handleLogout = async () => {
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t('auth.logout'), t('auth.logoutConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Logout', style: 'destructive',
+                text: t('auth.logout'), style: 'destructive',
                 onPress: async () => { await authService.logout(); router.replace('/' as any); },
             },
         ]);
@@ -77,7 +79,7 @@ export default function ProfileScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
-                    <Text style={styles.headerTitle}>Profile</Text>
+                    <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
                 </View>
 
                 {/* Avatar */}
@@ -106,13 +108,13 @@ export default function ProfileScreen() {
                 </View>
 
                 {/* Name + role */}
-                <Text style={styles.profileName}>{user?.name || 'Student'}</Text>
-                <Text style={styles.profileRole}>Learner</Text>
+                <Text style={styles.profileName}>{user?.name || t('home.studentFallback')}</Text>
+                <Text style={styles.profileRole}>{t('auth.student')}</Text>
 
                 {/* Bio card */}
                 {profile?.bio ? (
                     <View style={styles.sectionWrap}>
-                        <Text style={styles.sectionLabel}>Bio</Text>
+                        <Text style={styles.sectionLabel}>{t('profile.bio')}</Text>
                         <View style={styles.glassCard}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <Text style={styles.bioText}>{profile.bio}</Text>
@@ -122,21 +124,21 @@ export default function ProfileScreen() {
 
                 {/* Professional Overview */}
                 <View style={styles.sectionWrap}>
-                    <Text style={styles.sectionLabel}>Professional Overview</Text>
+                    <Text style={styles.sectionLabel}>{t('profile.professionalOverview')}</Text>
                     <View style={styles.glassCard}>
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.overviewGrid}>
                             {/* Professional Experience */}
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>PROFESSIONAL EXPERIENCE</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.professionalExperience')}</Text>
                                 <Text style={styles.overviewValue}>
-                                    {profile?.professionalExperience || 'Not provided yet'}
+                                    {profile?.professionalExperience || t('profile.notProvided')}
                                 </Text>
                             </View>
 
                             {/* Key Skills */}
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>KEY SKILLS</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.keySkills')}</Text>
                                 {skillsList.length > 0 ? (
                                     skillsList.map((skill: string, i: number) => (
                                         <Text key={i} style={styles.overviewBullet}>{'\u2022'} {skill}</Text>
@@ -148,15 +150,15 @@ export default function ProfileScreen() {
 
                             {/* Education Level */}
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>EDUCATION LEVEL</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.educationLevel')}</Text>
                                 <Text style={styles.overviewValue}>
-                                    {profile?.educationLevel || 'Not provided yet'}
+                                    {profile?.educationLevel || t('profile.notProvided')}
                                 </Text>
                             </View>
 
                             {/* Training Domains / Interests */}
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>TRAINING DOMAINS</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.trainingDomains')}</Text>
                                 {domains.length > 0 ? (
                                     domains.slice(0, 5).map((d: string, i: number) => (
                                         <Text key={i} style={styles.overviewBullet}>{'\u2022'} {d}</Text>
@@ -172,7 +174,7 @@ export default function ProfileScreen() {
                 {/* LinkedIn / Portfolio links */}
                 {(profile?.linkedinUrl || profile?.portfolioUrl) && (
                     <View style={styles.sectionWrap}>
-                        <Text style={styles.sectionLabel}>Links</Text>
+                        <Text style={styles.sectionLabel}>{t('profile.links')}</Text>
                         <View style={styles.glassCard}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <View style={styles.linksRow}>
@@ -201,6 +203,28 @@ export default function ProfileScreen() {
                     </View>
                 )}
 
+                {/* Saved posts — anything the student bookmarked from
+                    the daily AI feed lands here. Mirrors the same row
+                    style as Settings & Privacy below so the section
+                    reads as a list of profile-owned things. */}
+                <View style={styles.sectionWrap}>
+                    <TouchableOpacity
+                        style={styles.settingsRow}
+                        onPress={() => router.push('/saved-posts' as any)}
+                        activeOpacity={0.8}
+                    >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.settingsIconWrap}>
+                            <Ionicons name="bookmark-outline" size={22} color="#7cce06" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.settingsTitle}>{t('profile.savedPosts')}</Text>
+                            <Text style={styles.settingsSubtitle}>{t('profile.savedPostsSubtitle')}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Settings & Privacy entry */}
                 <View style={styles.sectionWrap}>
                     <TouchableOpacity
@@ -213,8 +237,8 @@ export default function ProfileScreen() {
                             <Ionicons name="settings-outline" size={22} color="#7cce06" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.settingsTitle}>Settings & Privacy</Text>
-                            <Text style={styles.settingsSubtitle}>Language, security, payments and more</Text>
+                            <Text style={styles.settingsTitle}>{t('profile.settingsPrivacy')}</Text>
+                            <Text style={styles.settingsSubtitle}>{t('settings.manageAccount')}</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
                     </TouchableOpacity>
@@ -222,7 +246,7 @@ export default function ProfileScreen() {
 
                 {/* Edit Resume button */}
                 <TouchableOpacity style={styles.editResumeBtn} onPress={() => router.push('/edit-profile' as any)} activeOpacity={0.8}>
-                    <Text style={styles.editResumeBtnText}>Edit Profile</Text>
+                    <Text style={styles.editResumeBtnText}>{t('profile.editProfile')}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </ScreenBackground>

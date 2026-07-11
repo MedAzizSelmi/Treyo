@@ -76,8 +76,10 @@ export const toggleUserStatus = (userId: string, userType: string) =>
   api.put(`/admin/users/${userId}/toggle-status`, null, { params: { userType } });
 export const approveTrainer = (trainerId: string) =>
   api.put(`/admin/users/trainers/${trainerId}/approve`);
-export const rejectTrainer = (trainerId: string) =>
-  api.put(`/admin/users/trainers/${trainerId}/reject`);
+/** Reject a trainer's onboarding application. Optional `note` is
+ *  emailed verbatim to the trainer so they know why. */
+export const rejectTrainer = (trainerId: string, note?: string) =>
+  api.put(`/admin/users/trainers/${trainerId}/reject`, note ? { note } : {});
 
 // ── Courses ──
 export const getAllCourses = () => api.get('/admin/courses');
@@ -92,38 +94,14 @@ export const updateCourseMinStudents = (courseId: string, minStudents: number) =
   api.put(`/admin/courses/${courseId}/min-students`, null, {
     params: { minStudents },
   });
+export const updateTrainerDailyRevenue = (courseId: string, amount: number | null) =>
+  api.put(`/admin/courses/${courseId}/trainer-daily-revenue`, { amount });
 
-// ── Course Templates (admin owns the master content) ──
-export interface CourseTemplatePayload {
-  title: string;
-  description: string;
-  domain: string;
-  specificTopic: string;
-  level: string;
-  durationHours?: number | null;
-  language?: string;
-  format?: string;
-  prerequisites?: string;
-  learningOutcomes?: string[];
-  price?: number;
-  minStudentsRequired?: number;
-  maxStudentsPerGroup?: number;
-  maxGroupsAllowed?: number;
-  hasCertificate?: boolean;
-}
-
-export const getAllTemplates = () => api.get('/admin/course-templates');
-export const getTemplate = (templateId: string) =>
-  api.get(`/admin/course-templates/${templateId}`);
-export const createTemplate = (payload: CourseTemplatePayload) =>
-  api.post('/admin/course-templates', payload);
-export const updateTemplate = (templateId: string, payload: Partial<CourseTemplatePayload>) =>
-  api.put(`/admin/course-templates/${templateId}`, payload);
-export const deleteTemplate = (templateId: string) =>
-  api.delete(`/admin/course-templates/${templateId}`);
-// Drafts removed — assigning a template to trainers publishes immediately.
-export const assignTemplateTrainers = (templateId: string, trainerIds: string[]) =>
-  api.post(`/admin/course-templates/${templateId}/assign`, { trainerIds });
+// ── Course Templates ──
+// Retired in v2: admin no longer creates courses or assigns them to
+// trainers. Trainers create their own courses under admin-managed
+// modules and submit them for review (see modules + pending-courses
+// pages). The backend template endpoints still exist but are dormant.
 
 // ── Course interest / group formation workflow ──
 export const getRequestedCourses = () => api.get('/admin/requests');
@@ -152,6 +130,47 @@ export const getUnreadCount = (userId: string) =>
 // the ML service isn't exposed to the public internet.
 export const getMlHealth = () => api.get('/admin/system/ml-health');
 export const getBackendHealth = () => api.get('/admin/system/backend-health');
+
+// ── Modules (v2 course category system) ──
+export const listAdminModules = () => api.get('/admin/modules');
+export const createModule = (payload: {
+  name: string;
+  description?: string;
+  icon?: string;
+  accentColor?: string;
+  sortOrder?: number;
+}) => api.post('/admin/modules', payload);
+export const updateModule = (moduleId: string, payload: any) =>
+  api.put(`/admin/modules/${moduleId}`, payload);
+export const archiveModule = (moduleId: string) =>
+  api.delete(`/admin/modules/${moduleId}`);
+
+// ── Trainer-submitted courses awaiting admin review ──
+export const listPendingTrainerCourses = () => api.get('/admin/courses/pending-trainer');
+export const approveTrainerCourse = (
+  courseId: string,
+  price: number,
+  currency: string,
+) => api.put(`/admin/courses/${courseId}/approve-trainer`, { price, currency });
+export const rejectTrainerCourse = (courseId: string, note?: string) =>
+  api.put(`/admin/courses/${courseId}/reject-trainer`, note ? { note } : {});
+
+// ── System settings (admin-tunable globals) ──
+// Currently just the revenue display currency. Read is public so
+// screens that display prices anywhere can pick up the code without
+// admin auth.
+export const getRevenueCurrency = () =>
+  api.get<{ currency: string }>('/settings/revenue-currency');
+export const setRevenueCurrency = (currency: string) =>
+  api.put<{ currency: string }>('/admin/settings/revenue-currency', { currency });
+
+// ── Reviews moderation ──
+// Reviews are submitted by students at the end of a course. The
+// underlying ratings always count toward the course / trainer
+// averages — hiding a row just removes it from public display.
+export const getAllReviews = () => api.get('/reviews/admin/all');
+export const setReviewVisibility = (reviewId: string, hidden: boolean) =>
+  api.put(`/reviews/admin/${reviewId}/visibility`, { hidden });
 
 // ── Messages (group chat) ──
 // Admins are full members of every group chat — they see them all and

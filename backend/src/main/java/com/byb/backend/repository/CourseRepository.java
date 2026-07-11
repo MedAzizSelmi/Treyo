@@ -52,4 +52,13 @@ public interface CourseRepository extends JpaRepository<Course, String> {
 
     @Query("SELECT c FROM Course c WHERE c.trainerId = :trainerId AND c.isActive = true")
     List<Course> findActiveByTrainerId(String trainerId);
+
+    // ── Module-based queries (new admin-managed category flow) ──
+
+    long countByModuleId(String moduleId);
+
+    List<Course> findByModuleId(String moduleId);
+
+    /** Trainer-submitted courses waiting for admin approval. */
+    List<Course> findByApprovalStatusOrderByCreatedAtDesc(String approvalStatus);
 }

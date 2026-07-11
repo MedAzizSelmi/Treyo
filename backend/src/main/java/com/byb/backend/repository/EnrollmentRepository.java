@@ -18,6 +18,11 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, String> 
 
     List<Enrollment> findByCourseId(String courseId);
 
+    /** Every enrollment belonging to a single group. Used by the
+     *  lifecycle service to cascade "completed" status from the group
+     *  down to each member's enrollment row. */
+    List<Enrollment> findByGroupId(String groupId);
+
     Optional<Enrollment> findByStudentIdAndCourseId(String studentId, String courseId);
 
     long countByEnrollmentStatus(String status);

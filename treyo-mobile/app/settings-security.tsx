@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService } from '../services/api';
@@ -11,6 +12,7 @@ const TWO_FA_KEY = 'two_fa_enabled';
 
 export default function SecuritySettingsScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,34 +36,34 @@ export default function SecuritySettingsScreen() {
         if (/[^A-Za-z0-9]/.test(newPassword)) score++;
         return score;
     })();
-    const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][passwordStrength];
+    const strengthLabel = ['', t('security.strengthWeak'), t('security.strengthFair'), t('security.strengthGood'), t('security.strengthStrong')][passwordStrength];
     const strengthColor = ['transparent', '#ff5454', '#ffa500', '#7cce06', '#7cce06'][passwordStrength];
 
     const handleSubmit = async () => {
         if (!currentPassword || !newPassword || !confirmPassword) {
-            return Alert.alert('Missing fields', 'Please fill in all three password fields.');
+            return Alert.alert(t('security.missingFields'), t('security.missingFieldsBody'));
         }
         if (newPassword.length < 8) {
-            return Alert.alert('Password too short', 'New password must be at least 8 characters.');
+            return Alert.alert(t('security.tooShort'), t('security.tooShortBody'));
         }
         if (newPassword !== confirmPassword) {
-            return Alert.alert('Passwords don\'t match', 'New password and confirmation must be identical.');
+            return Alert.alert(t('security.noMatch'), t('security.noMatchBody'));
         }
         if (newPassword === currentPassword) {
-            return Alert.alert('Choose a new password', 'Your new password must be different from the current one.');
+            return Alert.alert(t('security.chooseNew'), t('security.chooseNewBody'));
         }
 
         setSubmitting(true);
         try {
             await authService.changePassword(currentPassword, newPassword);
-            Alert.alert('Password updated', 'Your password has been changed successfully.');
+            Alert.alert(t('security.updated'), t('security.updatedBody'));
             setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
         } catch (err: any) {
             const msg = err?.response?.data?.error
                 || err?.response?.data?.message
                 || err?.message
-                || 'Could not change password. Please try again.';
-            Alert.alert('Failed to update password', msg);
+                || t('security.updateFailedBody');
+            Alert.alert(t('security.updateFailed'), msg);
         } finally {
             setSubmitting(false);
         }
@@ -73,12 +75,12 @@ export default function SecuritySettingsScreen() {
             // Persist the user's intent locally so the toggle "remembers" the choice
             // until the real flow lands.
             Alert.alert(
-                'Two-Factor Authentication',
-                'Full 2FA setup with authenticator apps (Google Authenticator, Authy) is rolling out soon. Your preference will be remembered for activation.',
+                t('security.twoFaPromptTitle'),
+                t('security.twoFaPromptBody'),
                 [
-                    { text: 'Cancel', style: 'cancel' },
+                    { text: t('common.cancel'), style: 'cancel' },
                     {
-                        text: 'Enable when available',
+                        text: t('security.enableWhenAvailable'),
                         onPress: async () => {
                             setTwoFaOn(true);
                             await AsyncStorage.setItem(TWO_FA_KEY, 'true');
@@ -100,18 +102,18 @@ export default function SecuritySettingsScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Privacy</Text>
-                        <Text style={styles.headerSubtitle}>Password and two-factor authentication</Text>
+                        <Text style={styles.headerTitle}>{t('security.title')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('security.subtitle')}</Text>
                     </View>
                 </View>
 
                 {/* ── Change password ── */}
-                <Text style={styles.sectionLabel}>CHANGE PASSWORD</Text>
+                <Text style={styles.sectionLabel}>{t('security.changePassword')}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
                     <PasswordField
-                        label="Current password"
+                        label={t('security.currentPassword')}
                         value={currentPassword}
                         onChangeText={setCurrentPassword}
                         show={showCurrent}
@@ -119,12 +121,12 @@ export default function SecuritySettingsScreen() {
                     />
                     <View style={styles.divider} />
                     <PasswordField
-                        label="New password"
+                        label={t('security.newPassword')}
                         value={newPassword}
                         onChangeText={setNewPassword}
                         show={showNew}
                         onToggleShow={() => setShowNew(s => !s)}
-                        helper="At least 8 characters. Mix uppercase, numbers, and symbols for the best protection."
+                        helper={t('security.passwordHelper')}
                     />
 
                     {newPassword.length > 0 && (
@@ -143,7 +145,7 @@ export default function SecuritySettingsScreen() {
 
                     <View style={styles.divider} />
                     <PasswordField
-                        label="Confirm new password"
+                        label={t('security.confirmPassword')}
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
                         show={showConfirm}
@@ -159,11 +161,11 @@ export default function SecuritySettingsScreen() {
                 >
                     {submitting
                         ? <ActivityIndicator size="small" color="#000" />
-                        : <Text style={styles.submitText}>Update Password</Text>}
+                        : <Text style={styles.submitText}>{t('security.updatePassword')}</Text>}
                 </TouchableOpacity>
 
                 {/* ── 2FA ── */}
-                <Text style={styles.sectionLabel}>TWO-FACTOR AUTHENTICATION</Text>
+                <Text style={styles.sectionLabel}>{t('security.twoFactor')}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.twoFaRow}>
@@ -171,11 +173,9 @@ export default function SecuritySettingsScreen() {
                             <Ionicons name="shield-checkmark-outline" size={22} color="#7cce06" />
                         </View>
                         <View style={styles.twoFaBody}>
-                            <Text style={styles.twoFaTitle}>Authenticator app</Text>
+                            <Text style={styles.twoFaTitle}>{t('security.authenticatorApp')}</Text>
                             <Text style={styles.twoFaSubtitle}>
-                                {twoFaOn
-                                    ? 'You\'ll be prompted for a code at next sign-in (when available)'
-                                    : 'Add an extra layer of security with TOTP codes'}
+                                {twoFaOn ? t('security.authenticatorOn') : t('security.authenticatorOff')}
                             </Text>
                         </View>
                         <Switch
@@ -189,25 +189,23 @@ export default function SecuritySettingsScreen() {
                 </View>
 
                 {/* ── Active sessions placeholder ── */}
-                <Text style={styles.sectionLabel}>ACTIVE SESSIONS</Text>
+                <Text style={styles.sectionLabel}>{t('security.activeSessions')}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.sessionRow}>
                         <View style={styles.sessionDot} />
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.sessionTitle}>This device</Text>
-                            <Text style={styles.sessionSubtitle}>Active now</Text>
+                            <Text style={styles.sessionTitle}>{t('security.thisDevice')}</Text>
+                            <Text style={styles.sessionSubtitle}>{t('security.activeNow')}</Text>
                         </View>
-                        <Text style={styles.sessionTag}>Current</Text>
+                        <Text style={styles.sessionTag}>{t('security.current')}</Text>
                     </View>
                 </View>
 
                 <View style={styles.tipWrap}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <Ionicons name="bulb-outline" size={16} color="#7cce06" />
-                    <Text style={styles.tipText}>
-                        Tip: never reuse passwords across services. Consider a password manager like 1Password, Bitwarden, or your browser's built-in vault.
-                    </Text>
+                    <Text style={styles.tipText}>{t('security.tip')}</Text>
                 </View>
             </ScrollView>
         </ScreenBackground>

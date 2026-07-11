@@ -38,6 +38,13 @@ public class MessageService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
     private final AdminRepository adminRepository;
+    // Push fan-out — fires only when a recipient actually has a device
+    // token registered. The send itself is @Async so it never blocks the
+    // POST returning. See PushNotificationService.
+    private final PushNotificationService pushNotificationService;
+    // Invoked inline so we never serve a "still active" conversation
+    // for a group whose sessions have all ended.
+    private final CourseLifecycleService courseLifecycleService;
 
     // ─── Group chat namespacing ─────────────────────────────────────
     // We reuse the messages table for both 1-to-1 DMs and group chats.
@@ -282,6 +289,17 @@ public class MessageService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found: " + groupId));
 
+        // Reject sends to groups that have already completed their
+        // run (all sessions ended → CourseLifecycleService flipped
+        // groupStatus to "completed"). Read access stays open — the
+        // chat history doesn't disappear, but no new messages can be
+        // added.
+        String status = group.getGroupStatus();
+        if (Boolean.FALSE.equals(group.getIsActive())
+                || (status != null && (status.equalsIgnoreCase("completed") || status.equalsIgnoreCase("cancelled")))) {
+            throw new IllegalStateException("This group has ended — chat is read-only");
+        }
+
         Set<String> members = resolveGroupMemberIds(group);
         if (!members.contains(senderId)) {
             throw new SecurityException("Sender is not a member of this group");
@@ -322,6 +340,23 @@ public class MessageService {
             } catch (Exception e) {
                 System.err.println("Failed WS push to " + memberId + ": " + e.getMessage());
             }
+        }
+
+        // OS-level push: drives the heads-up notification when the user
+        // doesn't have the app open. WS already covers the in-app case.
+        // Body is the message text or "Photo" for image-only messages so
+        // the notification is meaningful even without opening the app.
+        String pushBody = hasContent ? content : "📷 Photo";
+        String pushTitle = (group.getGroupName() != null && !group.getGroupName().isBlank())
+                ? group.getGroupName() + " · " + senderName
+                : senderName;
+        Map<String, Object> data = new HashMap<>();
+        data.put("type", "group_message");
+        data.put("groupId", groupId);
+        data.put("messageId", messageId);
+        for (String memberId : members) {
+            if (memberId.equals(senderId)) continue;
+            pushNotificationService.sendToUser(memberId, pushTitle, pushBody, data);
         }
         return response;
     }
@@ -430,6 +465,21 @@ public class MessageService {
         List<ConversationResponse> out = new ArrayList<>();
         for (String gid : groupIds) {
             groupRepository.findById(gid).ifPresent(g -> {
+                // Lifecycle check first — if every session has ended,
+                // mark the group completed RIGHT NOW so the user sees
+                // a consistent state instead of waiting for the cron.
+                courseLifecycleService.checkAndCompleteOne(g);
+
+                // Completed and cancelled groups drop out of the
+                // active conversation list — the chat is read-only at
+                // that point and surfacing it as "active" would be
+                // misleading. The history itself is still queryable
+                // by groupId if we ever want a "Past chats" tab.
+                String status = g.getGroupStatus();
+                if (Boolean.FALSE.equals(g.getIsActive())
+                        || (status != null && (status.equalsIgnoreCase("completed") || status.equalsIgnoreCase("cancelled")))) {
+                    return;
+                }
                 ConversationResponse conv = buildGroupConversation(g);
                 if (conv != null) out.add(conv);
             });
@@ -467,7 +517,20 @@ public class MessageService {
         List<Message> msgs = messageRepository.findGroupMessages(convId);
 
         Message last = msgs.isEmpty() ? null : msgs.get(msgs.size() - 1);
-        String lastText = last != null ? last.getContent() : "Group created — say hi!";
+        // Preview text for the conversation list. Image-only messages
+        // have an empty content string — without this branch the preview
+        // would be blank and the mobile list would wrongly show its
+        // "No messages yet" fallback even though the chat has messages.
+        String lastText;
+        if (last == null) {
+            lastText = "Group created — say hi!";
+        } else if (last.getContent() != null && !last.getContent().isBlank()) {
+            lastText = last.getContent();
+        } else if (last.getAttachmentUrl() != null && !last.getAttachmentUrl().isBlank()) {
+            lastText = "📷 Photo"; // 📷 Photo
+        } else {
+            lastText = "Group created — say hi!";
+        }
         LocalDateTime lastTime = last != null ? last.getCreatedAt() : group.getCreatedAt();
 
         // Group "title" = course title where possible, falling back to

@@ -37,7 +37,14 @@
           "image": "./assets/images/Treyo-white.png",
           "imageWidth": 200
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#7cce06"
+        }
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

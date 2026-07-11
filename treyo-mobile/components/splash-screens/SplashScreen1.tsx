@@ -49,38 +49,34 @@ export default function SplashScreen1({ onFinish }: SplashScreenProps) {
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#160e45', '#02000e']}
-                style={StyleSheet.absoluteFill}
-            />
-
-            {/* Top green glow */}
-            <LinearGradient
-                colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
-                style={styles.topGlow}
-            />
-
-            {/* Bottom green glow */}
-            <LinearGradient
-                colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
-                style={styles.bottomGlow}
-            />
-
-            {/* Left blue glow */}
-            <LinearGradient
-                colors={['rgba(19,5,107,1)', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.leftGlow}
-            />
-
-            {/* Right blue glow */}
-            <LinearGradient
-                colors={['transparent', 'rgba(19,5,107,1)']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.rightGlow}
-            />
+            {/* Background layers wrapped in `direction: 'ltr'` so the
+                side glows aren't auto-mirrored in Arabic. */}
+            <View style={[StyleSheet.absoluteFill, { direction: 'ltr' }]} pointerEvents="none">
+                <LinearGradient
+                    colors={['#160e45', '#02000e']}
+                    style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                    colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
+                    style={styles.topGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
+                    style={styles.bottomGlow}
+                />
+                <LinearGradient
+                    colors={['rgba(19,5,107,1)', 'transparent']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.leftGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(19,5,107,1)']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.rightGlow}
+                />
+            </View>
 
             <Animated.View
                 style={[

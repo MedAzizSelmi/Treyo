@@ -103,6 +103,35 @@ public class Trainer extends BaseEntity {
     @Column(name = "is_available")
     private Boolean isAvailable = true;
 
+    /**
+     * Admin's approval verdict on this trainer's onboarding submission.
+     * Distinct from {@code isVerified} (email confirmation) and
+     * {@code isActive} (trainer-controlled availability):
+     *   - PENDING  : default at signup. Trainer can't sign in; admin
+     *                hasn't reviewed their onboarding yet.
+     *   - APPROVED : admin reviewed and accepted. Trainer can sign in.
+     *   - REJECTED : admin declined. Trainer is told and can't sign in.
+     * Stored as a String so the admin dashboard + mobile can render
+     * the value without an enum-mapping layer in between.
+     */
+    @Column(name = "approval_status", length = 20, nullable = false)
+    private String approvalStatus = "PENDING";
+
+    /** Free-text reason an admin can attach to a rejection so the
+     *  notification email can include "what to improve". Optional. */
+    @Column(name = "approval_note", columnDefinition = "TEXT")
+    private String approvalNote;
+
+    /** Timestamp of the most recent approval / rejection decision. */
+    @Column(name = "approval_decided_at")
+    private LocalDateTime approvalDecidedAt;
+
+    /** Trainer-chosen display currency (ISO-4217). Used as the default
+     *  currency when the trainer creates a new course and as the label
+     *  when the app shows earnings or revenue on their side. */
+    @Column(name = "preferred_currency", length = 8)
+    private String preferredCurrency = "TND";
+
     // Transient field for role
     @Transient
     public Role getRole() {

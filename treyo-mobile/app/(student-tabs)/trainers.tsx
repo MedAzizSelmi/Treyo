@@ -4,12 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useCallback } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { trainerService } from '../../services/api';
 
 export default function TrainersScreen() {
     const router = useRouter();
     const { colors } = useTheme();
+    const { t } = useTranslation();
     const [trainers, setTrainers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -34,8 +36,8 @@ export default function TrainersScreen() {
     return (
         <ScreenBackground style={styles.container}>
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Trainers</Text>
-                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Find the perfect trainer for you</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('trainers.title')}</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{t('trainers.topRated')}</Text>
             </View>
 
             {loading ? (
@@ -97,7 +99,7 @@ export default function TrainersScreen() {
                     {trainers.length === 0 && (
                         <View style={styles.emptyState}>
                             <Ionicons name="people-outline" size={64} color={colors.textTertiary} />
-                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No trainers available</Text>
+                            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('trainers.noTrainers')}</Text>
                             <Text style={[styles.emptySubtext, { color: colors.textTertiary }]}>
                                 Check back soon for new trainers joining the platform
                             </Text>

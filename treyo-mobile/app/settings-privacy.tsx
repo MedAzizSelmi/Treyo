@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ScreenBackground } from '../components/ScreenBackground';
@@ -44,11 +45,13 @@ const Row = ({ icon, title, subtitle, onPress, danger, rightLabel }: RowProps) =
 
 export default function SettingsPrivacyScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [language, setLanguage] = useState('en');
     const [twoFaOn, setTwoFaOn] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
     const appVersion = Constants.expoConfig?.version || '1.0.0';
     const isStudent = userRole === 'STUDENT';
+    const isTrainer = userRole === 'TRAINER';
 
     useEffect(() => {
         (async () => {
@@ -98,38 +101,51 @@ export default function SettingsPrivacyScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Settings & Privacy</Text>
-                        <Text style={styles.headerSubtitle}>Manage your account and preferences</Text>
+                        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('settings.languageSubtitle')}</Text>
                     </View>
                 </View>
 
                 {/* ── Account ── */}
-                <Text style={styles.sectionLabel}>ACCOUNT</Text>
+                <Text style={styles.sectionLabel}>{t('settings.account').toUpperCase()}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <Row icon="lock-closed-outline" title="Privacy" subtitle="Password & two-factor authentication"
+                    <Row icon="lock-closed-outline" title={t('settings.privacy')} subtitle={t('settings.security')}
                          onPress={() => router.push('/settings-security' as any)} />
                 </View>
 
                 {/* ── Preferences ── */}
-                <Text style={styles.sectionLabel}>PREFERENCES</Text>
+                <Text style={styles.sectionLabel}>{t('settings.preferences').toUpperCase()}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <Row icon="language-outline" title="Language"
+                    <Row icon="language-outline" title={t('settings.language')}
                          rightLabel={LANGUAGE_LABELS[language] || 'English'}
                          onPress={() => router.push('/settings-language' as any)} />
                     <View style={styles.divider} />
-                    <Row icon="notifications-outline" title="Notifications" subtitle="Email & push preferences"
+                    <Row icon="notifications-outline" title={t('settings.notifications')}
                          onPress={() => router.push('/notification-settings' as any)} />
                 </View>
+
+                {/* ── Earnings (trainers only) ── */}
+                {isTrainer && (
+                    <>
+                        <Text style={styles.sectionLabel}>EARNINGS</Text>
+                        <View style={styles.card}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <Row icon="cash-outline" title="Revenue currency"
+                                 subtitle="Default currency for the courses you create"
+                                 onPress={() => router.push('/settings-currency' as any)} />
+                        </View>
+                    </>
+                )}
 
                 {/* ── Billing (students only) ── */}
                 {isStudent && (
                     <>
-                        <Text style={styles.sectionLabel}>BILLING</Text>
+                        <Text style={styles.sectionLabel}>{t('settings.billing').toUpperCase()}</Text>
                         <View style={styles.card}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <Row icon="card-outline" title="Payment History" subtitle="View past transactions"
+                            <Row icon="card-outline" title={t('settings.paymentHistory')} subtitle={t('settings.viewPastTransactions')}
                                  onPress={() => router.push('/settings-payments' as any)} />
                         </View>
                     </>
@@ -138,45 +154,45 @@ export default function SettingsPrivacyScreen() {
                 {/* ── Data & Storage (students only — only they have search history) ── */}
                 {isStudent && (
                     <>
-                        <Text style={styles.sectionLabel}>DATA & STORAGE</Text>
+                        <Text style={styles.sectionLabel}>{t('settings.dataStorage').toUpperCase()}</Text>
                         <View style={styles.card}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <Row icon="time-outline" title="Clear Search History" subtitle="Remove course-search history from this device"
+                            <Row icon="time-outline" title={t('settings.clearSearchHistory')} subtitle={t('settings.clearSearchBody')}
                                  onPress={handleClearSearchHistory} />
                         </View>
                     </>
                 )}
 
                 {/* ── Support & Legal ── */}
-                <Text style={styles.sectionLabel}>SUPPORT & LEGAL</Text>
+                <Text style={styles.sectionLabel}>{t('settings.supportLegal').toUpperCase()}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <Row icon="help-circle-outline" title="Help & Support"
+                    <Row icon="help-circle-outline" title={t('settings.helpSupport')}
                          onPress={() => router.push('/help-support' as any)} />
                     <View style={styles.divider} />
-                    <Row icon="document-text-outline" title="Terms of Service"
-                         onPress={() => Alert.alert('Terms of Service', 'Full terms will be hosted on our website. (Placeholder)')} />
+                    <Row icon="document-text-outline" title={t('settings.termsOfService')}
+                         onPress={() => Alert.alert(t('settings.termsOfService'), '')} />
                     <View style={styles.divider} />
-                    <Row icon="shield-checkmark-outline" title="Privacy Policy"
-                         onPress={() => Alert.alert('Privacy Policy', 'Full privacy policy will be hosted on our website. (Placeholder)')} />
+                    <Row icon="shield-checkmark-outline" title={t('settings.privacyPolicy')}
+                         onPress={() => Alert.alert(t('settings.privacyPolicy'), '')} />
                 </View>
 
                 {/* ── About ── */}
-                <Text style={styles.sectionLabel}>ABOUT</Text>
+                <Text style={styles.sectionLabel}>{t('settings.about').toUpperCase()}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <Row icon="information-circle-outline" title="App Version" rightLabel={`v${appVersion}`} />
+                    <Row icon="information-circle-outline" title={t('settings.appVersion')} rightLabel={`v${appVersion}`} />
                 </View>
 
                 {/* ── Danger zone ── */}
                 <View style={[styles.card, { marginTop: 16 }]}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <Row icon="trash-outline" title="Delete account"
-                         subtitle="Permanently remove your account and data"
+                    <Row icon="trash-outline" title={t('settings.deleteAccount')}
+                         subtitle={t('settings.deleteAccountBody')}
                          onPress={handleDeleteAccount} danger />
                 </View>
 
-                <Text style={styles.footer}>Made with care · Treyo</Text>
+                <Text style={styles.footer}>{t('settings.madeWithCare')}</Text>
             </ScrollView>
         </ScreenBackground>
     );

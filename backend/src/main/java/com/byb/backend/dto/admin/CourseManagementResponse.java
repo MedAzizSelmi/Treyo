@@ -30,6 +30,8 @@ public class CourseManagementResponse {
     private Integer durationHours;
     private String format;
     private BigDecimal price;
+    private String currency;
+    private BigDecimal trainerDailyRevenue;
 
     private Boolean isPublished;
     private Boolean isActive;

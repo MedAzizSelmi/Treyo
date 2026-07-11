@@ -28,7 +28,14 @@ import {
   Copy,
   CheckCheck,
   X,
+  FileText,
+  Mail,
+  Phone,
+  MapPin,
+  Globe,
+  Eye,
 } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 type Tab = 'students' | 'trainers' | 'pending';
 
@@ -45,6 +52,10 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [promoteResult, setPromoteResult] = useState<PromoteResult | null>(null);
+  // Trainer being reviewed in the pending-approval detail panel.
+  // Null = panel closed. Populated when the admin clicks "Review".
+  const [reviewTrainer, setReviewTrainer] = useState<any | null>(null);
+  const [rejectNote, setRejectNote] = useState('');
   const [dialog, setDialog] = useState<{
     open: boolean;
     title: string;
@@ -283,30 +294,23 @@ export default function UsersPage() {
       render: (r: any) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setDialog({
-              open: true,
-              title: 'Approve Trainer',
-              message: `Approve ${r.name} as a verified trainer?`,
-              variant: 'success',
-              confirmLabel: 'Approve',
-              action: () => approveTrainer(r.trainerId),
-            })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/10 text-success hover:bg-success/20 transition"
+            onClick={() => { setRejectNote(''); setReviewTrainer(r); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20 transition"
           >
-            <ShieldCheck className="w-3.5 h-3.5" /> Approve
+            <Eye className="w-3.5 h-3.5" /> Review
           </button>
           <button
             onClick={() => setDialog({
               open: true,
-              title: 'Reject Trainer',
-              message: `Reject ${r.name}'s trainer application? This will deactivate their account.`,
-              variant: 'danger',
-              confirmLabel: 'Reject',
-              action: () => rejectTrainer(r.trainerId),
+              title: 'Approve Trainer',
+              message: `Approve ${r.name} as a verified trainer? They'll be emailed a confirmation.`,
+              variant: 'success',
+              confirmLabel: 'Approve',
+              action: () => approveTrainer(r.userId),
             })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-danger/10 text-danger hover:bg-danger/20 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/10 text-success hover:bg-success/20 transition"
           >
-            <ShieldX className="w-3.5 h-3.5" /> Reject
+            <ShieldCheck className="w-3.5 h-3.5" /> Approve
           </button>
         </div>
       ),
@@ -407,6 +411,243 @@ export default function UsersPage() {
         onConfirm={handleAction}
         onCancel={() => setDialog((d) => ({ ...d, open: false }))}
       />
+
+      {/* Trainer review modal — opened by "Review" on a pending row.
+          Shows the trainer's full onboarding submission so the admin
+          can decide before approve/reject. */}
+      {reviewTrainer && (
+        <TrainerReviewModal
+          trainer={reviewTrainer}
+          note={rejectNote}
+          onNoteChange={setRejectNote}
+          onClose={() => setReviewTrainer(null)}
+          onApprove={async () => {
+            await approveTrainer(reviewTrainer.userId);
+            setReviewTrainer(null);
+            loadData();
+          }}
+          onReject={async () => {
+            await rejectTrainer(reviewTrainer.userId, rejectNote.trim() || undefined);
+            setReviewTrainer(null);
+            loadData();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Detail panel for one pending trainer. Top section shows identity +
+ * onboarding info (bio, education, experience, location, links). CV
+ * link opens the uploaded resume in a new tab. Bottom is approve /
+ * reject with an optional rejection note that gets emailed to the
+ * trainer verbatim.
+ */
+function TrainerReviewModal({
+  trainer, note, onNoteChange, onClose, onApprove, onReject,
+}: {
+  trainer: any;
+  note: string;
+  onNoteChange: (v: string) => void;
+  onClose: () => void;
+  onApprove: () => void | Promise<void>;
+  onReject: () => void | Promise<void>;
+}) {
+  const cvUrl = trainer.cvUrl
+    ? (String(trainer.cvUrl).startsWith('http') ? trainer.cvUrl : `${API_BASE_URL}${trainer.cvUrl}`)
+    : null;
+  const photoUrl = trainer.profilePictureUrl
+    ? (String(trainer.profilePictureUrl).startsWith('http') ? trainer.profilePictureUrl : `${API_BASE_URL}${trainer.profilePictureUrl}`)
+    : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-card border border-border p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
+        >
+          <X className="w-4 h-4 text-muted" />
+        </button>
+
+        {/* Identity */}
+        <div className="flex items-start gap-4 mb-6">
+          {photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photoUrl} alt={trainer.name} className="w-16 h-16 rounded-full object-cover" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-accent-dim flex items-center justify-center text-accent font-bold text-xl">
+              {(trainer.name || 'T').trim().charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-white">{trainer.name}</h2>
+            <p className="text-sm text-muted flex items-center gap-1.5 mt-0.5">
+              <Mail className="w-3.5 h-3.5" /> {trainer.email}
+            </p>
+            {trainer.experienceYears != null && (
+              <p className="text-xs text-muted mt-1">
+                {trainer.experienceYears} {trainer.experienceYears === 1 ? 'year' : 'years'} of experience
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Specializations + skills */}
+        {(trainer.specializations?.length || trainer.skills?.length) ? (
+          <Section title="Specializations & skills">
+            {trainer.specializations?.length ? (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {trainer.specializations.map((s: string, i: number) => (
+                  <span key={`spec-${i}`} className="text-xs bg-accent-dim text-accent px-2 py-1 rounded-md">{s}</span>
+                ))}
+              </div>
+            ) : null}
+            {trainer.skills?.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {trainer.skills.map((s: string, i: number) => (
+                  <span key={`skill-${i}`} className="text-xs bg-card-hover text-foreground/80 px-2 py-1 rounded-md">{s}</span>
+                ))}
+              </div>
+            ) : null}
+          </Section>
+        ) : null}
+
+        {/* Bio + education + experience text */}
+        {trainer.bio && (
+          <Section title="Bio">
+            <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{trainer.bio}</p>
+          </Section>
+        )}
+        {trainer.education && (
+          <Section title="Education">
+            <p className="text-sm text-foreground/85 whitespace-pre-wrap">{trainer.education}</p>
+          </Section>
+        )}
+        {trainer.professionalExperience && (
+          <Section title="Professional experience">
+            <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{trainer.professionalExperience}</p>
+          </Section>
+        )}
+
+        {/* Contact + location */}
+        <Section title="Contact">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            {trainer.phone && (
+              <InfoRow icon={Phone} label="Phone" value={trainer.phone} />
+            )}
+            {(trainer.address || trainer.city || trainer.state) && (
+              <InfoRow
+                icon={MapPin}
+                label="Location"
+                value={[trainer.address, trainer.city, trainer.state, trainer.postalCode]
+                  .filter(Boolean).join(', ') || '—'}
+              />
+            )}
+          </div>
+        </Section>
+
+        {/* Links */}
+        {(trainer.linkedinUrl || trainer.portfolioUrl || trainer.githubUrl) ? (
+          <Section title="Links">
+            <div className="flex flex-wrap gap-2">
+              {trainer.linkedinUrl && (
+                <LinkChip icon={Globe} label="LinkedIn" href={trainer.linkedinUrl} />
+              )}
+              {trainer.portfolioUrl && (
+                <LinkChip icon={Globe} label="Portfolio" href={trainer.portfolioUrl} />
+              )}
+              {trainer.githubUrl && (
+                <LinkChip icon={Globe} label="GitHub" href={trainer.githubUrl} />
+              )}
+            </div>
+          </Section>
+        ) : null}
+
+        {/* CV */}
+        <Section title="CV / resume">
+          {cvUrl ? (
+            <a
+              href={cvUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-black text-sm font-semibold hover:bg-accent/90"
+            >
+              <FileText className="w-4 h-4" /> Open CV
+            </a>
+          ) : (
+            <p className="text-sm text-muted italic">No CV attached.</p>
+          )}
+        </Section>
+
+        {/* Rejection note */}
+        <Section title="Rejection note (optional)">
+          <textarea
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="If you reject this trainer, this note gets emailed to them verbatim — explain what to improve before re-applying."
+            className="w-full min-h-[80px] rounded-lg bg-card-hover border border-border p-3 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
+          />
+        </Section>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border">
+          <button
+            onClick={onReject}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-danger/10 text-danger hover:bg-danger/20 transition"
+          >
+            <ShieldX className="w-4 h-4" /> Reject
+          </button>
+          <button
+            onClick={onApprove}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-success text-black hover:bg-success/90 transition"
+          >
+            <ShieldCheck className="w-4 h-4" /> Approve
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-5">
+      <h3 className="text-xs uppercase tracking-wider text-muted font-semibold mb-2">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <Icon className="w-3.5 h-3.5 text-muted mt-0.5 flex-shrink-0" />
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-muted font-semibold">{label}</p>
+        <p className="text-foreground">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function LinkChip({ icon: Icon, label, href }: { icon: any; label: string; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-card-hover hover:bg-border text-xs font-medium text-foreground"
+    >
+      <Icon className="w-3.5 h-3.5" /> {label}
+    </a>
   );
 }

@@ -52,4 +52,14 @@ public class CreateCourseRequest {
     private Integer maxGroupsAllowed = 1;
 
     private Boolean hasCertificate = false;
+
+    /** v2: the module this course belongs to. Required at create time
+     *  in {@link com.byb.backend.service.CourseService#createTrainerCourse}. */
+    private String moduleId;
+
+    /** v2: URL of the uploaded course material (PDF / PPT / ZIP). */
+    private String materialUrl;
+
+    /** v2: original filename of the material for a friendlier download link. */
+    private String materialName;
 }

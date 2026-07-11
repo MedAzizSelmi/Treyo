@@ -49,6 +49,10 @@ public class AdminGroupFormationService {
     private final TrainerRepository trainerRepository;
     private final NotificationService notificationService;
     private final MessageService messageService;
+    // Invoked before listing so finished groups flip to "completed"
+    // BEFORE the isActive filter runs, dropping them from the
+    // admin's view immediately.
+    private final CourseLifecycleService courseLifecycleService;
 
     /** Count of unique non-enrolled students requesting this course. */
     public int countActiveRequests(String courseId) {
@@ -174,6 +178,11 @@ public class AdminGroupFormationService {
      * All groups with enriched info: course, trainer, members. Used by "Enrolled" tab.
      */
     public List<Map<String, Object>> getAllGroupsWithMembers() {
+        // Inline lifecycle pass — finished groups flip to "completed"
+        // (and isActive = false) before the filter below runs them
+        // out of the admin's "active groups" view.
+        groupRepository.findAll().forEach(courseLifecycleService::checkAndCompleteOne);
+
         return groupRepository.findAll().stream()
                 .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
                 .map(g -> {
@@ -313,6 +322,39 @@ public class AdminGroupFormationService {
     public Map<String, Object> formGroup(String courseId) {
         Course course = courseRepository.findByCourseId(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
+
+        // Trainer-availability gate.
+        //
+        // Two reasons we'd reject a group-formation request:
+        //   1. The trainer has flipped themselves to inactive from
+        //      their profile screen. They explicitly said "don't
+        //      assign me anything" — honour it.
+        //   2. The trainer is already at their maxConcurrentGroups
+        //      cap (default 3). Lifecycle service drops the count
+        //      when a group completes (isActive flips false), so the
+        //      slot opens up automatically.
+        //
+        // Same checks are mirrored on the ML recommendation side, so
+        // the admin shouldn't even SEE this course as needing a group
+        // when the trainer is unavailable — this is the belt-and-
+        // -suspenders guard.
+        Trainer trainer = trainerRepository.findByTrainerId(course.getTrainerId())
+                .orElseThrow(() -> new RuntimeException("Trainer not found for this course"));
+        if (!Boolean.TRUE.equals(trainer.getIsActive())) {
+            throw new RuntimeException("Trainer is currently inactive — they've paused new assignments. Reassign the course or wait until they reactivate.");
+        }
+        int cap = trainer.getMaxConcurrentGroups() == null ? 3 : trainer.getMaxConcurrentGroups();
+        long activeGroupsForTrainer = groupRepository.findByTrainerId(trainer.getTrainerId()).stream()
+                .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
+                .filter(g -> {
+                    String s = g.getGroupStatus();
+                    return s == null || (!s.equalsIgnoreCase("completed") && !s.equalsIgnoreCase("cancelled"));
+                })
+                .count();
+        if (activeGroupsForTrainer >= cap) {
+            throw new RuntimeException("Trainer is at capacity (" + activeGroupsForTrainer + "/" + cap +
+                    " active groups). Wait until one of their groups completes before forming another.");
+        }
 
         List<Enrollment> pending = enrollmentRepository.findByCourseId(courseId).stream()
                 .filter(e -> "confirmed".equalsIgnoreCase(e.getEnrollmentStatus()) && e.getGroupId() == null)

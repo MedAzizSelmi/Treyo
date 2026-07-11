@@ -1,14 +1,27 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from 'react-i18next';
+import * as Updates from 'expo-updates';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { setLanguage, getCurrentLanguage, LANGUAGE_KEY, Language } from '../i18n';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const LANGUAGE_KEY = 'app_language';
+/**
+ * Language picker.
+ *
+ * Tapping a language:
+ *   1. Persists to AsyncStorage under LANGUAGE_KEY.
+ *   2. Calls i18next.changeLanguage(code) so every useTranslation()
+ *      consumer re-renders with the new strings immediately.
+ *   3. If we're toggling in/out of an RTL language (Arabic), prompts
+ *      to restart so the layout direction actually flips — RN can't
+ *      switch I18nManager.isRTL without a fresh bundle.
+ */
 
-const LANGUAGES = [
+const LANGUAGES: { code: Language; label: string; native: string; flag: string }[] = [
     { code: 'en', label: 'English', native: 'English', flag: '🇬🇧' },
     { code: 'fr', label: 'French', native: 'Français', flag: '🇫🇷' },
     { code: 'ar', label: 'Arabic', native: 'العربية', flag: '🇹🇳' },
@@ -17,15 +30,42 @@ const LANGUAGES = [
 
 export default function LanguageSettingsScreen() {
     const router = useRouter();
-    const [selected, setSelected] = useState('en');
+    const { t } = useTranslation();
+    const [selected, setSelected] = useState<Language>(getCurrentLanguage());
 
     useEffect(() => {
-        AsyncStorage.getItem(LANGUAGE_KEY).then(v => { if (v) setSelected(v); });
+        // Keep state in sync with whatever's persisted (e.g. user opened
+        // this screen, navigated away, came back — the system locale
+        // could also have changed in the background).
+        AsyncStorage.getItem(LANGUAGE_KEY).then(v => {
+            if (v) setSelected(v as Language);
+        });
     }, []);
 
-    const handleSelect = async (code: string) => {
+    const handleSelect = async (code: Language) => {
+        if (code === selected) return;
         setSelected(code);
-        await AsyncStorage.setItem(LANGUAGE_KEY, code);
+        const { requiresRestart } = await setLanguage(code);
+        if (requiresRestart) {
+            Alert.alert(
+                t('settings.restartRequired'),
+                t('settings.restartBody'),
+                [
+                    { text: t('common.later'), style: 'cancel' },
+                    {
+                        text: t('common.ok'),
+                        onPress: async () => {
+                            // Updates.reloadAsync forces a fresh JS bundle so
+                            // the new I18nManager.isRTL takes effect across
+                            // every mounted screen. Falls back to a no-op in
+                            // Expo Go on simulators — the user can just kill
+                            // and reopen the app in that case.
+                            try { await Updates.reloadAsync(); } catch (_) {}
+                        },
+                    },
+                ],
+            );
+        }
     };
 
     return (
@@ -36,8 +76,8 @@ export default function LanguageSettingsScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Language</Text>
-                        <Text style={styles.headerSubtitle}>Choose your preferred language</Text>
+                        <Text style={styles.headerTitle}>{t('settings.languageTitle')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('settings.languageSubtitle')}</Text>
                     </View>
                 </View>
 
@@ -70,9 +110,7 @@ export default function LanguageSettingsScreen() {
                 <View style={styles.noteWrap}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <Ionicons name="information-circle-outline" size={18} color="#7cce06" />
-                    <Text style={styles.noteText}>
-                        Your preference is saved on this device. Full UI translations are rolling out gradually — newly added screens will pick up the language automatically.
-                    </Text>
+                    <Text style={styles.noteText}>{t('settings.languageNote')}</Text>
                 </View>
             </ScrollView>
         </ScreenBackground>

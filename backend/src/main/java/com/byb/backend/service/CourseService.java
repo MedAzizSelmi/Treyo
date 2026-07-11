@@ -25,6 +25,7 @@ public class CourseService {
     private final TrainerRepository trainerRepository;
     private final InteractionRepository interactionRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final com.byb.backend.repository.ModuleRepository moduleRepository;
 
     @Transactional
     public CourseResponse createCourse(String trainerId, CreateCourseRequest request) {
@@ -81,6 +82,14 @@ public class CourseService {
     public List<CourseResponse> getAllPublishedCourses() {
         return courseRepository.findByIsPublishedTrueAndIsActiveTrue()
                 .stream()
+                // Approval gate — pending / rejected trainer-created
+                // courses stay hidden from students. Legacy rows have
+                // approvalStatus = APPROVED (default) so they aren't
+                // affected by the switchover.
+                .filter(c -> {
+                    String s = c.getApprovalStatus();
+                    return s == null || "APPROVED".equalsIgnoreCase(s);
+                })
                 .map(course -> {
                     Trainer trainer = trainerRepository.findByTrainerId(course.getTrainerId())
                             .orElse(null);
@@ -88,6 +97,93 @@ public class CourseService {
                     return mapToCourseResponse(course, trainerName);
                 })
                 .collect(Collectors.toList());
+    }
+
+    // ── New v2 course lifecycle (module + approval) ──────────────────
+
+    /**
+     * Trainer submits a new course for admin review.
+     * Starts as isPublished=true (so the course-listing filter picks
+     * it up on approval) + isActive=true + approvalStatus=PENDING.
+     * The APPROVED filter on read endpoints keeps students from
+     * seeing it until the admin decides.
+     */
+    @Transactional
+    public CourseResponse createTrainerCourse(String trainerId, CreateCourseRequest request) {
+        Trainer trainer = trainerRepository.findByTrainerId(trainerId)
+                .orElseThrow(() -> new IllegalArgumentException("Trainer not found"));
+        if (request.getModuleId() == null || request.getModuleId().isBlank()) {
+            throw new IllegalArgumentException("moduleId is required — pick a module for this course.");
+        }
+
+        Course course = new Course();
+        course.setCourseId("CRS_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        course.setTrainerId(trainerId);
+        applyRequest(course, request);
+        course.setIsActive(true);
+        course.setIsPublished(true);
+        course.setPublishedAt(LocalDateTime.now());
+        course.setApprovalStatus("PENDING");
+        course.setApprovalDecidedAt(null);
+        course.setApprovalNote(null);
+
+        course = courseRepository.save(course);
+        return mapToCourseResponse(course, trainer.getName());
+    }
+
+    /**
+     * Trainer edits their own course. Only allowed while the course
+     * is PENDING or REJECTED — an APPROVED course is locked so the
+     * admin's verdict can't be quietly changed under them. Editing a
+     * REJECTED course re-opens it as PENDING for the admin to review
+     * the changes.
+     */
+    @Transactional
+    public CourseResponse updateTrainerCourse(String courseId, String trainerId, CreateCourseRequest request) {
+        Course course = courseRepository.findByCourseId(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found"));
+        if (!course.getTrainerId().equals(trainerId)) {
+            throw new IllegalArgumentException("You can only edit your own courses.");
+        }
+        String s = course.getApprovalStatus();
+        if ("APPROVED".equalsIgnoreCase(s)) {
+            throw new IllegalArgumentException("This course has already been approved and can no longer be edited. Ask the admin if changes are needed.");
+        }
+
+        applyRequest(course, request);
+        // Any edit puts the course back in the queue.
+        course.setApprovalStatus("PENDING");
+        course.setApprovalNote(null);
+        course.setApprovalDecidedAt(null);
+        course = courseRepository.save(course);
+
+        Trainer trainer = trainerRepository.findByTrainerId(trainerId).orElse(null);
+        return mapToCourseResponse(course, trainer != null ? trainer.getName() : "Unknown");
+    }
+
+    /** Shared field-copying used by both create and edit. Also copies
+     *  the two new fields — moduleId and materialUrl — that the v2
+     *  flow relies on. */
+    private void applyRequest(Course course, CreateCourseRequest request) {
+        course.setTitle(request.getTitle());
+        course.setDescription(request.getDescription());
+        course.setDomain(request.getDomain());
+        course.setSpecificTopic(request.getSpecificTopic());
+        course.setLevel(request.getLevel());
+        course.setDurationHours(request.getDurationHours());
+        course.setLanguage(request.getLanguage());
+        course.setFormat(request.getFormat());
+        course.setPrerequisites(request.getPrerequisites());
+        course.setLearningOutcomes(request.getLearningOutcomes());
+        course.setPrice(request.getPrice());
+        course.setMinStudentsRequired(request.getMinStudentsRequired());
+        course.setMaxStudentsPerGroup(request.getMaxStudentsPerGroup());
+        course.setMaxGroupsAllowed(request.getMaxGroupsAllowed());
+        course.setHasCertificate(request.getHasCertificate());
+        // v2 fields
+        if (request.getModuleId() != null) course.setModuleId(request.getModuleId());
+        if (request.getMaterialUrl() != null) course.setMaterialUrl(request.getMaterialUrl());
+        if (request.getMaterialName() != null) course.setMaterialName(request.getMaterialName());
     }
 
     public List<CourseResponse> getCoursesByTrainer(String trainerId) {
@@ -166,6 +262,12 @@ public class CourseService {
         return mapToCourseResponse(course, trainerName);
     }
 
+    /** Public shim so other services (e.g. AdminService.getPendingCourses)
+     *  can reuse this mapper without duplicating the field list. */
+    public CourseResponse toResponse(Course course, String trainerName) {
+        return mapToCourseResponse(course, trainerName);
+    }
+
     private CourseResponse mapToCourseResponse(Course course, String trainerName) {
         // Count interested students AND actual enrollments (dynamic — stays in sync with DB)
         long interestedCount = interactionRepository.countInterestedStudents(course.getCourseId());
@@ -203,6 +305,17 @@ public class CourseService {
                 .createdAt(course.getCreatedAt())
                 .interestedStudentsCount((int) interestedCount)
                 .canFormGroup(canFormGroup)
+                // v2 fields
+                .moduleId(course.getModuleId())
+                .moduleName(course.getModuleId() == null ? null :
+                        moduleRepository.findById(course.getModuleId())
+                                .map(com.byb.backend.model.CourseModule::getName)
+                                .orElse(null))
+                .materialUrl(course.getMaterialUrl())
+                .materialName(course.getMaterialName())
+                .approvalStatus(course.getApprovalStatus() == null ? "APPROVED" : course.getApprovalStatus())
+                .approvalNote(course.getApprovalNote())
+                .approvalDecidedAt(course.getApprovalDecidedAt())
                 .build();
     }
 }

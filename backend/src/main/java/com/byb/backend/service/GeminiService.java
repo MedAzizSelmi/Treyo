@@ -157,6 +157,28 @@ public class GeminiService {
                 .path("text").asText();
     }
 
+    // ── Public: one-shot text generation ──────────────────────────────────────
+    /**
+     * Single-turn text generation, no chat history. Used by the daily
+     * Feed cron to produce posts in bulk. Caller supplies the full
+     * prompt and gets the raw model text back — JSON parsing is the
+     * caller's job.
+     */
+    public String generateText(String prompt, int maxTokens, double temperature) throws Exception {
+        ObjectNode body = objectMapper.createObjectNode();
+        ArrayNode contents = objectMapper.createArrayNode();
+        contents.add(textTurn("user", prompt));
+        body.set("contents", contents);
+
+        ObjectNode genConfig = objectMapper.createObjectNode();
+        genConfig.put("maxOutputTokens", maxTokens);
+        genConfig.put("temperature", temperature);
+        body.set("generationConfig", genConfig);
+
+        String response = callGemini(body.toString());
+        return extractText(response);
+    }
+
     // ── Public: chat ──────────────────────────────────────────────────────────
     public ChatResponse chat(ChatRequest request) {
         try {

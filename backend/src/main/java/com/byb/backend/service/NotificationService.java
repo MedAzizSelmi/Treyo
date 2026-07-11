@@ -3,12 +3,14 @@ package com.byb.backend.service;
 import com.byb.backend.dto.notification.NotificationResponse;
 import com.byb.backend.model.Notification;
 import com.byb.backend.repository.NotificationRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -17,6 +19,37 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    // Pushed asynchronously alongside the in-DB notification so the user
+    // gets a heads-up banner even if the app isn't open. The DB row is
+    // still the source of truth — push is a side channel.
+    private final PushNotificationService pushNotificationService;
+    // Used to serialise i18n params into Notification.actionData so the
+    // mobile client can re-render the title/message in the user's
+    // language. See the notification translation flow in
+    // treyo-mobile/app/(student-tabs)/notifications.tsx.
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /** Serialise the i18n param map to a JSON string for actionData.
+     *  Returns null on any error so we don't fail the notification
+     *  insert just because translations can't be reconstructed. */
+    private String paramsJson(Map<String, Object> params) {
+        try {
+            return objectMapper.writeValueAsString(params);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Small helper so every notification path also fires an OS-level
+     *  push without duplicating the boilerplate Map.of for `data`. */
+    private void firePush(String userId, String type, String title, String message,
+                          String entityType, String entityId) {
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("type", type);
+        if (entityType != null) data.put("entityType", entityType);
+        if (entityId != null) data.put("entityId", entityId);
+        pushNotificationService.sendToUser(userId, title, message, data);
+    }
 
     @Transactional
     public void sendGroupFormingNotification(String studentId, String courseId,
@@ -36,8 +69,16 @@ public class NotificationService {
         notification.setRelatedEntityId(courseId);
         notification.setActionUrl("/courses/" + courseId + "/confirm");
         notification.setPriority("high");
+        notification.setActionData(paramsJson(Map.of(
+                "course", courseTitle,
+                "current", currentCount,
+                "min", minRequired
+        )));
 
         notificationRepository.save(notification);
+        firePush(notification.getUserId(), notification.getNotificationType(),
+                notification.getTitle(), notification.getMessage(),
+                notification.getRelatedEntityType(), notification.getRelatedEntityId());
     }
 
     @Transactional
@@ -57,8 +98,15 @@ public class NotificationService {
         notification.setRelatedEntityType("course");
         notification.setRelatedEntityId(courseId);
         notification.setPriority("high");
+        notification.setActionData(paramsJson(Map.of(
+                "course", courseTitle,
+                "count", interestedCount
+        )));
 
         notificationRepository.save(notification);
+        firePush(notification.getUserId(), notification.getNotificationType(),
+                notification.getTitle(), notification.getMessage(),
+                notification.getRelatedEntityType(), notification.getRelatedEntityId());
     }
 
     @Transactional
@@ -79,8 +127,12 @@ public class NotificationService {
         notification.setRelatedEntityId(courseId);
         notification.setActionUrl("/courses/" + courseId + "/one-to-one");
         notification.setPriority("normal");
+        notification.setActionData(paramsJson(Map.of("course", courseTitle)));
 
         notificationRepository.save(notification);
+        firePush(notification.getUserId(), notification.getNotificationType(),
+                notification.getTitle(), notification.getMessage(),
+                notification.getRelatedEntityType(), notification.getRelatedEntityId());
     }
 
     @Transactional
@@ -100,8 +152,12 @@ public class NotificationService {
         notification.setRelatedEntityId(groupId);
         notification.setActionUrl("/groups/" + groupId);
         notification.setPriority("high");
+        notification.setActionData(paramsJson(Map.of("course", courseTitle)));
 
         notificationRepository.save(notification);
+        firePush(notification.getUserId(), notification.getNotificationType(),
+                notification.getTitle(), notification.getMessage(),
+                notification.getRelatedEntityType(), notification.getRelatedEntityId());
     }
 
     @Transactional
@@ -116,8 +172,12 @@ public class NotificationService {
         notification.setMessage(messagePreview);
         notification.setActionUrl("/messages");
         notification.setPriority("normal");
+        notification.setActionData(paramsJson(Map.of("sender", senderName)));
 
         notificationRepository.save(notification);
+        firePush(notification.getUserId(), notification.getNotificationType(),
+                notification.getTitle(), notification.getMessage(),
+                notification.getRelatedEntityType(), notification.getRelatedEntityId());
     }
 
     public List<NotificationResponse> getUserNotifications(String userId) {

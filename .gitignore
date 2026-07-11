@@ -25,6 +25,19 @@ backend/src/main/resources/application.properties
 # ── Claude Code local settings ──
 .claude/settings.local.json
 
+# ── IDE / editor project files ──
+# JetBrains (IntelliJ, WebStorm, PyCharm) per-user project config —
+# machine-specific, should never be shared. Was tracked in early
+# commits; untracked repo-wide from here on.
+.idea/
+*.iml
+*.iws
+.vscode/
+
+# ── Python bytecode / caches (repo-wide safety net) ──
+__pycache__/
+*.py[cod]
+
 # ── OS junk ──
 .DS_Store
 Thumbs.db

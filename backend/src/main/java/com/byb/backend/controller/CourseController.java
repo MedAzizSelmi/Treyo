@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -23,45 +24,52 @@ public class CourseController {
     private final CourseService courseService;
 
     // ─────────────────────────────────────────────────────────────────
-    // NOTE: Trainers can NO LONGER create or edit course content.
-    // The admin owns all course content via CourseTemplate; offerings are
-    // auto-created when admin assigns a template to a trainer's roster.
-    // The create/update endpoints below are kept disabled (410 Gone) so
-    // any stale mobile clients fail fast with a clear message instead of
-    // silently mutating data.
+    // NEW FLOW (v2 — replaces admin-owned CourseTemplate):
+    //   1. Admin creates modules (categories).
+    //   2. Trainer POSTs to /api/courses with a moduleId + fields +
+    //      a materialUrl pointing at their uploaded PDF/PPT. The row
+    //      starts as approvalStatus = PENDING and is invisible to
+    //      students.
+    //   3. Admin reviews via /api/admin/courses/pending, calls
+    //      /approve or /reject. Approved courses go live; rejected
+    //      courses stay hidden and the trainer sees the reason.
+    //   4. Emails fire on both verdicts.
     // ─────────────────────────────────────────────────────────────────
 
     @PostMapping
-    @Operation(summary = "DEPRECATED — admin now creates courses via /admin/course-templates")
+    @Operation(summary = "Trainer submits a new course for admin review")
     public ResponseEntity<?> createCourse(
-            @RequestParam(required = false) String trainerId,
-            @RequestBody(required = false) CreateCourseRequest request) {
-        return ResponseEntity.status(410).body(java.util.Map.of(
-                "error", "Trainers can no longer create courses. Contact the admin to publish a new course."
-        ));
+            @RequestParam String trainerId,
+            @Valid @RequestBody CreateCourseRequest request) {
+        try {
+            CourseResponse course = courseService.createTrainerCourse(trainerId, request);
+            return ResponseEntity.ok(course);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PutMapping("/{courseId}")
-    @Operation(summary = "DEPRECATED — course content is now managed by admin via CourseTemplate")
+    @Operation(summary = "Trainer edits their pending course (only while PENDING or REJECTED)")
     public ResponseEntity<?> updateCourse(
             @PathVariable String courseId,
-            @RequestParam(required = false) String trainerId,
-            @RequestBody(required = false) CreateCourseRequest request) {
-        return ResponseEntity.status(410).body(java.util.Map.of(
-                "error", "Course content is admin-managed. Ask the admin to edit the template."
-        ));
+            @RequestParam String trainerId,
+            @Valid @RequestBody CreateCourseRequest request) {
+        try {
+            CourseResponse course = courseService.updateTrainerCourse(courseId, trainerId, request);
+            return ResponseEntity.ok(course);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PostMapping("/{courseId}/publish")
-    @Operation(summary = "DEPRECATED — drafts removed; every offering is created live")
+    @Operation(summary = "DEPRECATED — courses are published by admin approval")
     public ResponseEntity<?> publishCourse(
             @PathVariable String courseId,
             @RequestParam(required = false) String trainerId) {
-        // Drafts no longer exist — assigning a template to a trainer now
-        // immediately publishes the offering. This endpoint is kept for any
-        // stale mobile client that still calls it, but it's a no-op.
         return ResponseEntity.status(410).body(java.util.Map.of(
-                "error", "Drafts have been removed. Courses are published the moment the admin assigns them."
+                "error", "Publishing is handled by admin approval — submit the course via POST /api/courses."
         ));
     }
 

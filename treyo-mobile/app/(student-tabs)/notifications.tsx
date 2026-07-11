@@ -1,18 +1,23 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService, notificationService, enrollmentService, interactionService, paymentService } from '../../services/api';
 
 export default function NotificationsScreen() {
+    const { t } = useTranslation();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [userId, setUserId] = useState<string>('');
+    // When set, a modal renders the full title + message of this
+    // notification so the user can read past the 2-line preview.
+    const [openNotif, setOpenNotif] = useState<any | null>(null);
 
     useFocusEffect(useCallback(() => { loadNotifications(); }, []));
 
@@ -178,10 +183,125 @@ export default function NotificationsScreen() {
         if (!dateStr) return '';
         const diff = Date.now() - new Date(dateStr).getTime();
         const mins = Math.floor(diff / 60000);
-        if (mins < 60) return `${mins}m ago`;
-        const hours = Math.floor(mins / 3600000 * 60);
-        if (hours < 24) return `${hours}h ago`;
-        return `${Math.floor(hours / 24)}d ago`;
+        if (mins < 1) return t('common.now');
+        if (mins < 60) return t('common.minAgo', { count: mins });
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return t('common.hourAgo', { count: hours });
+        return t('common.dayAgo', { count: Math.floor(hours / 24) });
+    };
+
+    /** Translate the notification's title + message based on its type.
+     *
+     *  Two sources of params:
+     *    1. `actionData` JSON on the row (set by NotificationService for
+     *       every new notification — clean, structured).
+     *    2. Regex extraction from the stored English title/message — used
+     *       as a backfill for notifications created BEFORE we added the
+     *       actionData field, so they still translate cleanly instead of
+     *       showing literal "{{course}}" placeholders.
+     *
+     *  Falls back to the original English title/message if both routes
+     *  fail (unknown type, malformed JSON, regex miss). No notification
+     *  disappears just because translation fails. */
+    const translateNotification = (notif: any) => {
+        let params: any = {};
+        try {
+            if (notif.actionData) {
+                params = typeof notif.actionData === 'string'
+                    ? JSON.parse(notif.actionData)
+                    : notif.actionData;
+            }
+        } catch (_) {}
+
+        // Regex backfill — only runs if actionData didn't already give
+        // us what we need. The patterns match the English strings the
+        // backend has historically written, so this keeps old rows
+        // working without a migration.
+        const title = String(notif.title || '');
+        const message = String(notif.message || '');
+        const fillFromText = () => {
+            switch (notif.notificationType) {
+                case 'GROUP_FORMING': {
+                    // Two backend variants share the same type code.
+                    // Trainer message: "N students are interested in '<course>'"
+                    const trainerMsg = message.match(/^(\d+) students? are interested in '([^']+)'/);
+                    if (trainerMsg) {
+                        if (params.count == null) params.count = Number(trainerMsg[1]);
+                        if (!params.course) params.course = trainerMsg[2];
+                        return;
+                    }
+                    // Student message: "We have X/Y students interested in '<course>'"
+                    const studentMsg = message.match(/We have (\d+)\/(\d+) students? interested in '([^']+)'/);
+                    if (studentMsg) {
+                        if (params.current == null) params.current = Number(studentMsg[1]);
+                        if (params.min == null) params.min = Number(studentMsg[2]);
+                        if (!params.course) params.course = studentMsg[3];
+                        return;
+                    }
+                    // Title: "Group Forming for <course>"
+                    const titleMatch = title.match(/Group Forming for (.+)$/);
+                    if (titleMatch && !params.course) params.course = titleMatch[1];
+                    break;
+                }
+                case 'GROUP_READY': {
+                    const m = message.match(/Your group for '([^']+)'/);
+                    if (m && !params.course) params.course = m[1];
+                    break;
+                }
+                case 'ONE_TO_ONE_OFFER': {
+                    const m = message.match(/one-to-one sessions for '([^']+)'/);
+                    if (m && !params.course) params.course = m[1];
+                    break;
+                }
+                case 'NEW_MESSAGE': {
+                    const m = title.match(/New Message from (.+)$/);
+                    if (m && !params.sender) params.sender = m[1];
+                    break;
+                }
+            }
+        };
+        fillFromText();
+
+        const typeMap: Record<string, { titleKey: string; messageKey: string }> = {
+            GROUP_FORMING: {
+                titleKey: 'notifications.groupFormingTitle',
+                messageKey: params?.count != null
+                    ? 'notifications.groupFormingTrainerMessage'
+                    : 'notifications.groupFormingMessage',
+            },
+            GROUP_READY: {
+                titleKey: 'notifications.groupReadyTitle',
+                messageKey: 'notifications.groupReadyMessage',
+            },
+            ONE_TO_ONE_OFFER: {
+                titleKey: 'notifications.oneToOneTitle',
+                messageKey: 'notifications.oneToOneMessage',
+            },
+            NEW_MESSAGE: {
+                titleKey: 'notifications.newMessageTitle',
+                messageKey: '',
+            },
+        };
+
+        const entry = typeMap[notif.notificationType];
+        if (!entry) return { title: notif.title, message: notif.message };
+
+        // If we still don't have the required params after both lookups,
+        // give up on translation for this row and show the original
+        // English text — better than literal "{{course}}" placeholders.
+        const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'ONE_TO_ONE_OFFER'].includes(notif.notificationType);
+        if (needsCourse && !params.course) {
+            return { title: notif.title, message: notif.message };
+        }
+        if (notif.notificationType === 'NEW_MESSAGE' && !params.sender) {
+            return { title: notif.title, message: notif.message };
+        }
+
+        const translatedTitle = entry.titleKey ? t(entry.titleKey, params) : notif.title;
+        // For NEW_MESSAGE the message is the actual preview text — keep
+        // the original since it's user content, not a template.
+        const translatedMessage = entry.messageKey ? t(entry.messageKey, params) : notif.message;
+        return { title: translatedTitle, message: translatedMessage };
     };
 
     const isActionable = (type: string) =>
@@ -212,14 +332,14 @@ export default function NotificationsScreen() {
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.headerTitle}>Notifications</Text>
+                        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
                         {unreadCount > 0 && (
-                            <Text style={styles.headerSubtitle}>{unreadCount} unread</Text>
+                            <Text style={styles.headerSubtitle}>{t('notifications.unread', { count: unreadCount })}</Text>
                         )}
                     </View>
                     {unreadCount > 0 && (
                         <TouchableOpacity onPress={handleMarkAllRead} style={styles.markAllBtn} activeOpacity={0.7}>
-                            <Text style={styles.markAllText}>Mark all read</Text>
+                            <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -229,19 +349,32 @@ export default function NotificationsScreen() {
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="notifications-off-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>You're all caught up!</Text>
-                        <Text style={styles.emptySubtitle}>No notifications right now. Pull down to refresh.</Text>
+                        <Text style={styles.emptyTitle}>{t('notifications.allCaughtUp')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('notifications.noNotificationsBody')}</Text>
                     </View>
                 ) : (
                     notifications.map((notif: any) => {
                         const color = getIconColor(notif.notificationType);
                         const actionable = isActionable(notif.notificationType) && !notif.isRead;
+                        const localized = translateNotification(notif);
                         return (
                             <TouchableOpacity
                                 key={notif.notificationId}
                                 style={[styles.card, !notif.isRead && styles.cardUnread]}
-                                activeOpacity={notif.isRead ? 1 : 0.85}
-                                onPress={() => !notif.isRead && !actionable && handleMarkRead(notif.notificationId)}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                    // Tapping the card always opens the
+                                    // detail modal, and silently marks the
+                                    // notification as read if it isn't
+                                    // already. Actionable ones keep their
+                                    // Confirm / Can't Attend buttons inside
+                                    // the modal so the user can decide
+                                    // after reading the full message.
+                                    setOpenNotif(notif);
+                                    if (!notif.isRead && !actionable) {
+                                        handleMarkRead(notif.notificationId);
+                                    }
+                                }}
                             >
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
@@ -253,15 +386,15 @@ export default function NotificationsScreen() {
 
                                 <View style={styles.body}>
                                     <View style={styles.titleRow}>
-                                        <Text style={styles.title} numberOfLines={1}>{notif.title}</Text>
+                                        <Text style={styles.title} numberOfLines={1}>{localized.title}</Text>
                                         {notif.priority === 'urgent' && (
                                             <View style={styles.urgentBadge}>
-                                                <Text style={styles.urgentText}>Urgent</Text>
+                                                <Text style={styles.urgentText}>{t('notifications.urgent')}</Text>
                                             </View>
                                         )}
                                         {!notif.isRead && <View style={styles.unreadDot} />}
                                     </View>
-                                    <Text style={styles.message} numberOfLines={2}>{notif.message}</Text>
+                                    <Text style={styles.message} numberOfLines={2}>{localized.message}</Text>
                                     <Text style={styles.time}>{formatTime(notif.createdAt)}</Text>
 
                                     {actionable && (() => {
@@ -284,7 +417,7 @@ export default function NotificationsScreen() {
                                                     {isProcessing ? (
                                                         <ActivityIndicator size="small" color="#000" />
                                                     ) : (
-                                                        <Text style={styles.confirmText}>Confirm</Text>
+                                                        <Text style={styles.confirmText}>{t('notifications.confirm')}</Text>
                                                     )}
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
@@ -293,14 +426,14 @@ export default function NotificationsScreen() {
                                                     disabled={isProcessing}
                                                     activeOpacity={0.85}
                                                 >
-                                                    <Text style={styles.declineText}>Can't Attend</Text>
+                                                    <Text style={styles.declineText}>{t('notifications.cantAttend')}</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         );
                                     })()}
 
                                     {notif.isRead && (
-                                        <Text style={styles.readLabel}>✓ Read</Text>
+                                        <Text style={styles.readLabel}>{t('notifications.read')}</Text>
                                     )}
                                 </View>
                             </TouchableOpacity>
@@ -308,9 +441,137 @@ export default function NotificationsScreen() {
                     })
                 )}
             </ScrollView>
+
+            {/* ── Notification detail modal ──
+                Tapping a card opens this with the full title + message
+                + time, so long messages don't get cut off at 2 lines.
+                Actionable notifications (GROUP_FORMING etc.) keep their
+                Confirm / Can't Attend buttons inside the modal. */}
+            <Modal
+                visible={!!openNotif}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setOpenNotif(null)}
+            >
+                <TouchableOpacity
+                    style={modalStyles.backdrop}
+                    activeOpacity={1}
+                    onPress={() => setOpenNotif(null)}
+                >
+                    <TouchableOpacity activeOpacity={1} onPress={() => {}} style={modalStyles.cardWrap}>
+                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                        {openNotif && (() => {
+                            const localized = translateNotification(openNotif);
+                            const color = getIconColor(openNotif.notificationType);
+                            const actionable = isActionable(openNotif.notificationType) && !openNotif.isRead;
+                            const isGroupForming = openNotif.notificationType === 'GROUP_FORMING';
+                            const isProcessing = processingId === openNotif.notificationId;
+                            return (
+                                <>
+                                    <View style={modalStyles.headerRow}>
+                                        <View style={[modalStyles.iconWrap, { backgroundColor: color + '18' }]}>
+                                            <Ionicons name={getIcon(openNotif.notificationType) as any} size={24} color={color} />
+                                        </View>
+                                        <TouchableOpacity onPress={() => setOpenNotif(null)} style={modalStyles.closeBtn}>
+                                            <Ionicons name="close" size={20} color="#ffffff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={modalStyles.title}>{localized.title}</Text>
+                                    <Text style={modalStyles.time}>{formatTime(openNotif.createdAt)}</Text>
+                                    <ScrollView style={modalStyles.messageScroll} showsVerticalScrollIndicator={false}>
+                                        <Text style={modalStyles.message}>{localized.message}</Text>
+                                    </ScrollView>
+                                    {actionable && (
+                                        <View style={modalStyles.actions}>
+                                            <TouchableOpacity
+                                                style={[modalStyles.confirmBtn, isProcessing && { opacity: 0.6 }]}
+                                                onPress={() => {
+                                                    const n = openNotif;
+                                                    setOpenNotif(null);
+                                                    if (isGroupForming) handleConfirmGroupForming(n);
+                                                    else handleMarkRead(n.notificationId);
+                                                }}
+                                                disabled={isProcessing}
+                                                activeOpacity={0.85}
+                                            >
+                                                {isProcessing
+                                                    ? <ActivityIndicator size="small" color="#000" />
+                                                    : <Text style={modalStyles.confirmText}>{t('notifications.confirm')}</Text>}
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={[modalStyles.declineBtn, isProcessing && { opacity: 0.6 }]}
+                                                onPress={() => {
+                                                    const n = openNotif;
+                                                    setOpenNotif(null);
+                                                    if (isGroupForming) handleDeclineGroupForming(n);
+                                                    else handleMarkRead(n.notificationId);
+                                                }}
+                                                disabled={isProcessing}
+                                                activeOpacity={0.85}
+                                            >
+                                                <Text style={modalStyles.declineText}>{t('notifications.cantAttend')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </ScreenBackground>
     );
 }
+
+const modalStyles = StyleSheet.create({
+    backdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    cardWrap: {
+        width: '100%',
+        maxWidth: 420,
+        borderRadius: 22,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        padding: 20,
+        maxHeight: '80%',
+    },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+    iconWrap: {
+        width: 48, height: 48, borderRadius: 24,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    closeBtn: {
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    title: { fontSize: 17, fontWeight: '700', color: '#ffffff', marginBottom: 6 },
+    time: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 14 },
+    messageScroll: { maxHeight: 260 },
+    message: { fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.85)' },
+    actions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+    confirmBtn: {
+        flex: 1, backgroundColor: '#7cce06', borderRadius: 14,
+        paddingVertical: 14, alignItems: 'center',
+    },
+    confirmText: { fontSize: 14, fontWeight: '700', color: '#000' },
+    declineBtn: {
+        flex: 1, borderRadius: 14, borderWidth: 1, borderColor: '#ff5454',
+        paddingVertical: 14, alignItems: 'center',
+    },
+    declineText: { fontSize: 14, fontWeight: '700', color: '#ff5454' },
+});
 
 const styles = StyleSheet.create({
     scroll: { flex: 1 },

@@ -6,6 +6,7 @@ import {
   getAllCourses,
   deleteCourse,
   updateCourseMinStudents,
+  updateTrainerDailyRevenue,
 } from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
 import DataTable from '@/components/DataTable';
@@ -19,7 +20,7 @@ import {
   Layers,
   Pencil,
   X,
-  Mail,
+  Coins,
 } from 'lucide-react';
 
 // Drafts/pending courses were removed — every offering is created live the
@@ -46,6 +47,14 @@ export default function CoursesPage() {
     error: string;
   }>({ open: false, course: null, value: '5', saving: false, error: '' });
 
+  const [dailyRevenueModal, setDailyRevenueModal] = useState<{
+    open: boolean;
+    course: any | null;
+    value: string;
+    saving: boolean;
+    error: string;
+  }>({ open: false, course: null, value: '', saving: false, error: '' });
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -68,6 +77,27 @@ export default function CoursesPage() {
       console.error(err);
     }
     setDialog((d) => ({ ...d, open: false }));
+  };
+
+  const handleSaveDailyRevenue = async () => {
+    const raw = dailyRevenueModal.value.trim();
+    const n = raw === '' ? null : Number(raw);
+    if (n !== null && (!Number.isFinite(n) || n < 0)) {
+      setDailyRevenueModal((m) => ({ ...m, error: 'Enter a non-negative number, or leave empty to clear.' }));
+      return;
+    }
+    setDailyRevenueModal((m) => ({ ...m, saving: true, error: '' }));
+    try {
+      await updateTrainerDailyRevenue(dailyRevenueModal.course.courseId, n);
+      await loadData();
+      setDailyRevenueModal({ open: false, course: null, value: '', saving: false, error: '' });
+    } catch (err: any) {
+      setDailyRevenueModal((m) => ({
+        ...m,
+        saving: false,
+        error: err?.response?.data?.error || 'Failed to update',
+      }));
+    }
   };
 
   const handleSaveMinStudents = async () => {
@@ -128,27 +158,6 @@ export default function CoursesPage() {
       ),
     },
     {
-      key: 'requestedCount',
-      label: 'Requested',
-      sortable: true,
-      render: (r: any) => {
-        const requested = r.requestedCount || 0;
-        const min = r.minStudentsRequired || 5;
-        const reached = requested >= min;
-        return (
-          <div className="flex items-center gap-1.5">
-            <Mail className={`w-3.5 h-3.5 ${reached ? 'text-success' : 'text-warning'}`} />
-            <span className={`font-medium ${reached ? 'text-success' : 'text-foreground'}`}>
-              {requested}
-            </span>
-            {reached && requested > 0 && (
-              <span className="text-[10px] text-success">✓ min met</span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
       key: 'totalEnrolled',
       label: 'Enrolled',
       sortable: true,
@@ -197,6 +206,36 @@ export default function CoursesPage() {
       ),
     },
     {
+      key: 'trainerDailyRevenue',
+      label: 'Trainer revenue/day',
+      sortable: true,
+      render: (r: any) => {
+        const val = r.trainerDailyRevenue;
+        const hasValue = val != null && val !== '';
+        return (
+          <button
+            onClick={() =>
+              setDailyRevenueModal({
+                open: true,
+                course: r,
+                value: hasValue ? String(val) : '',
+                saving: false,
+                error: '',
+              })
+            }
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-card-hover transition group"
+            title="Click to set the trainer's daily earnings"
+          >
+            <Coins className={`w-3.5 h-3.5 ${hasValue ? 'text-accent' : 'text-muted'} group-hover:text-accent transition`} />
+            <span className={`font-medium ${hasValue ? 'text-foreground' : 'text-muted italic'}`}>
+              {hasValue ? `${val} ${r.currency || 'TND'}` : 'Not set'}
+            </span>
+            <Pencil className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition" />
+          </button>
+        );
+      },
+    },
+    {
       key: 'isActive',
       label: 'Status',
       render: (r: any) => (
@@ -242,18 +281,12 @@ export default function CoursesPage() {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <SummaryCard
           icon={BookOpen}
           color="success"
           value={courses.filter((c) => c.isActive).length}
           label="Live"
-        />
-        <SummaryCard
-          icon={Mail}
-          color="info"
-          value={courses.reduce((s: number, c: any) => s + (c.requestedCount || 0), 0)}
-          label="Total Requests"
         />
         <SummaryCard
           icon={Users}
@@ -274,6 +307,91 @@ export default function CoursesPage() {
         onConfirm={handleAction}
         onCancel={() => setDialog((d) => ({ ...d, open: false }))}
       />
+
+      {/* Edit Trainer Daily Revenue Modal */}
+      {dailyRevenueModal.open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() =>
+            !dailyRevenueModal.saving &&
+            setDailyRevenueModal({ open: false, course: null, value: '', saving: false, error: '' })
+          }
+        >
+          <div
+            className="bg-card border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/12 flex items-center justify-center">
+                  <Coins className="w-5 h-5 text-accent" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Trainer revenue per day</h3>
+                  <p className="text-xs text-muted truncate max-w-[280px]">
+                    {dailyRevenueModal.course?.title}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() =>
+                  !dailyRevenueModal.saving &&
+                  setDailyRevenueModal({ open: false, course: null, value: '', saving: false, error: '' })
+                }
+                className="p-1 rounded-lg hover:bg-card-hover text-muted hover:text-foreground transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted mb-4">
+              Amount the trainer earns for each day they teach this course.
+              Feeds their monthly earnings breakdown in the mobile app. Leave empty to clear.
+            </p>
+
+            <div className="flex items-stretch gap-2">
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={dailyRevenueModal.value}
+                onChange={(e) =>
+                  setDailyRevenueModal((m) => ({ ...m, value: e.target.value, error: '' }))
+                }
+                className="flex-1 px-4 py-3 rounded-xl bg-card-hover border border-border focus:border-accent outline-none text-white text-lg font-semibold"
+                placeholder="e.g. 150"
+                disabled={dailyRevenueModal.saving}
+              />
+              <div className="flex items-center px-4 rounded-xl bg-card-hover border border-border text-muted text-sm font-semibold">
+                {dailyRevenueModal.course?.currency || 'TND'}
+              </div>
+            </div>
+
+            {dailyRevenueModal.error && (
+              <p className="text-xs text-danger mt-2">{dailyRevenueModal.error}</p>
+            )}
+
+            <div className="flex items-center gap-2 mt-6">
+              <button
+                onClick={() =>
+                  setDailyRevenueModal({ open: false, course: null, value: '', saving: false, error: '' })
+                }
+                disabled={dailyRevenueModal.saving}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border text-muted hover:text-foreground hover:bg-card-hover transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveDailyRevenue}
+                disabled={dailyRevenueModal.saving}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-accent text-black hover:bg-accent/90 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {dailyRevenueModal.saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Min Students Modal */}
       {minStudentsModal.open && (

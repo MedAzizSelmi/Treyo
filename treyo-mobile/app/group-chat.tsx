@@ -1,6 +1,7 @@
 import {
     View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput,
     ActivityIndicator, Platform, Alert, Image, Keyboard, KeyboardEvent,
+    Modal, Dimensions, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -9,7 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
-import { authService, messageService, fetchUpload, API_BASE_URL } from '../services/api';
+import { useTranslation } from 'react-i18next';
+import { authService, messageService, groupService, fetchUpload, API_BASE_URL } from '../services/api';
 
 // How often we re-fetch the message list while the chat is open. 4s matches
 // the admin dashboard's cadence — frequent enough that a reply lands within
@@ -34,6 +36,7 @@ const POLL_INTERVAL_MS = 4000;
  */
 export default function GroupChatScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const { groupId, groupName } = useLocalSearchParams<{ groupId: string; groupName?: string }>();
     const [userId, setUserId] = useState<string | null>(null);
     const [messages, setMessages] = useState<any[]>([]);
@@ -45,6 +48,14 @@ export default function GroupChatScreen() {
     // composer's send button shows a spinner during this so the user
     // knows their tap registered and isn't trying to send twice.
     const [uploadingImage, setUploadingImage] = useState(false);
+    // Lightbox: when set, a fullscreen modal renders this image URI over
+    // the chat. Null hides the modal. We store the URI rather than the
+    // message so we don't keep a stale reference once messages refresh.
+    const [lightboxUri, setLightboxUri] = useState<string | null>(null);
+    // If the group has finished its run, the composer hides and a
+    // banner appears explaining the chat is read-only. Driven by the
+    // CourseLifecycleService.computeProgress endpoint.
+    const [groupEnded, setGroupEnded] = useState(false);
 
     // Keyboard handling differs sharply by platform:
     //
@@ -152,6 +163,17 @@ export default function GroupChatScreen() {
 
     // First load shows the spinner + scrolls to the bottom of history.
     useEffect(() => { load(); }, [load]);
+
+    // Check whether the group has wrapped up. If so, the composer is
+    // hidden and a "group ended" banner replaces it. We check once on
+    // mount — group completion doesn't flip back, so polling isn't
+    // necessary.
+    useEffect(() => {
+        if (!groupId) return;
+        groupService.getProgress(String(groupId))
+            .then(p => setGroupEnded(!!p?.isCompleted))
+            .catch(() => {});
+    }, [groupId]);
 
     // Background poll for live updates. Without this, the user has to
     // leave-and-return to see new messages — what the user reported.
@@ -489,7 +511,11 @@ export default function GroupChatScreen() {
                                                             </Text>
                                                         </TouchableOpacity>
                                                     )}
-                                                    <View style={styles.imageOnlyImageWrap}>
+                                                    <TouchableOpacity
+                                                        style={styles.imageOnlyImageWrap}
+                                                        activeOpacity={0.9}
+                                                        onPress={() => imgUri && setLightboxUri(imgUri)}
+                                                    >
                                                         <Image
                                                             source={{ uri: imgUri! }}
                                                             style={styles.imageOnlyImage}
@@ -511,7 +537,7 @@ export default function GroupChatScreen() {
                                                                 />
                                                             )}
                                                         </View>
-                                                    </View>
+                                                    </TouchableOpacity>
                                                 </View>
                                             );
                                         }
@@ -528,11 +554,16 @@ export default function GroupChatScreen() {
                                                     </TouchableOpacity>
                                                 )}
                                                 {hasImage && imgUri && (
-                                                    <Image
-                                                        source={{ uri: imgUri }}
-                                                        style={styles.attachmentImage}
-                                                        resizeMode="cover"
-                                                    />
+                                                    <TouchableOpacity
+                                                        activeOpacity={0.9}
+                                                        onPress={() => setLightboxUri(imgUri)}
+                                                    >
+                                                        <Image
+                                                            source={{ uri: imgUri }}
+                                                            style={styles.attachmentImage}
+                                                            resizeMode="cover"
+                                                        />
+                                                    </TouchableOpacity>
                                                 )}
                                                 {!!msg.content && (
                                                     <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
@@ -565,8 +596,17 @@ export default function GroupChatScreen() {
                     </ScrollView>
                 )}
 
+                {/* ── Group-ended banner ── */}
+                {groupEnded && !error && (
+                    <View style={styles.endedBanner}>
+                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                        <Ionicons name="lock-closed-outline" size={16} color="rgba(255,255,255,0.7)" />
+                        <Text style={styles.endedBannerText}>{t('course.groupEnded')}</Text>
+                    </View>
+                )}
+
                 {/* ── Composer ── */}
-                {!error && (
+                {!error && !groupEnded && (
                     <View style={styles.composer}>
                         <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
 
@@ -590,7 +630,7 @@ export default function GroupChatScreen() {
 
                         <TextInput
                             style={styles.input}
-                            placeholder="Type a message…"
+                            placeholder={t('chat.placeholder')}
                             placeholderTextColor="rgba(255,255,255,0.35)"
                             value={draft}
                             onChangeText={setDraft}
@@ -613,6 +653,42 @@ export default function GroupChatScreen() {
                     </View>
                 )}
             </View>
+
+            {/* ── Image lightbox ──
+                Fullscreen modal that pops up when any chat image is tapped.
+                Uses `resizeMode="contain"` so the entire photo fits without
+                cropping, and a backdrop tap dismisses it. We hide the OS
+                status bar while open so the image fills the screen edge-to-
+                edge. */}
+            <Modal
+                visible={!!lightboxUri}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setLightboxUri(null)}
+                statusBarTranslucent
+            >
+                <StatusBar hidden />
+                <TouchableOpacity
+                    style={styles.lightboxBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setLightboxUri(null)}
+                >
+                    {lightboxUri && (
+                        <Image
+                            source={{ uri: lightboxUri }}
+                            style={styles.lightboxImage}
+                            resizeMode="contain"
+                        />
+                    )}
+                    <TouchableOpacity
+                        style={styles.lightboxClose}
+                        onPress={() => setLightboxUri(null)}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="close" size={26} color="#ffffff" />
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </ScreenBackground>
     );
 }
@@ -791,4 +867,34 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
     sendBtnDisabled: { opacity: 0.5 },
+
+    // Group-ended banner — replaces the composer when the lifecycle
+    // job has flipped this group to "completed".
+    endedBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        marginHorizontal: 14, marginBottom: 16,
+        paddingHorizontal: 14, paddingVertical: 12,
+        borderRadius: 14, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+    },
+    endedBannerText: { fontSize: 13, color: 'rgba(255,255,255,0.75)', flex: 1 },
+
+    // ── Lightbox ──
+    lightboxBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.97)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    lightboxImage: {
+        width: Dimensions.get('window').width,
+        height: Dimensions.get('window').height,
+    },
+    lightboxClose: {
+        position: 'absolute',
+        top: 48, right: 18,
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center', justifyContent: 'center',
+    },
 });

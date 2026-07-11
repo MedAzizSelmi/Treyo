@@ -3,9 +3,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenBackground } from '../components/ScreenBackground';
-import { courseService } from '../services/api';
+import { authService, courseService, searchLogService } from '../services/api';
 
 const HISTORY_KEY = 'student_search_history';
 const HISTORY_LIMIT = 10;
@@ -13,11 +14,15 @@ const HISTORY_LIMIT = 10;
 const LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
 export default function CourseSearchScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const [query, setQuery] = useState('');
     const [allCourses, setAllCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<string[]>([]);
+    // Student ID — used to attribute search logs to the right user so
+    // the recommendation engine can weight them per-student.
+    const [studentId, setStudentId] = useState<string | null>(null);
     const [filterOpen, setFilterOpen] = useState(false);
     const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
     const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
@@ -25,6 +30,9 @@ export default function CourseSearchScreen() {
     useEffect(() => {
         loadCourses();
         loadHistory();
+        authService.getCurrentUser()
+            .then(u => setStudentId(u?.userId ?? null))
+            .catch(() => {});
     }, []);
 
     const loadCourses = async () => {
@@ -50,13 +58,37 @@ export default function CourseSearchScreen() {
         try { await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (_) {}
     };
 
-    /** Push a term to the front, dedupe, cap to HISTORY_LIMIT. Called on submit. */
-    const recordSearch = (term: string) => {
+    /** Push a term to the front, dedupe, cap to HISTORY_LIMIT.
+     *  Called on submit, on result tap, AND from the debounced typing
+     *  effect below — so a user who just types and looks at results
+     *  without explicitly hitting Search still gets their query
+     *  remembered. */
+    const recordSearch = (term: string, clickedCourseId?: string) => {
         const trimmed = term.trim();
         if (!trimmed) return;
         const next = [trimmed, ...history.filter(h => h.toLowerCase() !== trimmed.toLowerCase())].slice(0, HISTORY_LIMIT);
         saveHistory(next);
+        // Send to backend so the ML recommendation engine sees it on
+        // its next refresh. Silent fail — UX doesn't care if logging
+        // missed a beat.
+        if (studentId) {
+            searchLogService.log({ studentId, query: trimmed, clickedCourseId });
+        }
     };
+
+    // Debounced auto-save: when the user pauses typing for 1.2s with
+    // a non-trivial query (≥ 3 chars), record it. Avoids the bug
+    // where someone types "node", studies the results, and leaves —
+    // only ever seeing "N" (the leftover from a previous single-char
+    // search) in their history. The 3-char floor stops us flooding
+    // history with single-letter typos.
+    useEffect(() => {
+        const trimmed = query.trim();
+        if (trimmed.length < 3) return;
+        const t = setTimeout(() => recordSearch(trimmed), 1200);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query]);
 
     const removeHistoryItem = (term: string) => {
         saveHistory(history.filter(h => h !== term));
@@ -97,7 +129,7 @@ export default function CourseSearchScreen() {
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Search Courses</Text>
+                    <Text style={styles.headerTitle}>{t('search.title')}</Text>
                 </View>
 
                 {/* ── Search bar + filter ── */}
@@ -107,7 +139,7 @@ export default function CourseSearchScreen() {
                         <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.5)" />
                         <TextInput
                             style={styles.searchInput}
-                            placeholder="Search by title, trainer, topic..."
+                            placeholder={t('search.placeholder')}
                             placeholderTextColor="rgba(255,255,255,0.35)"
                             value={query}
                             onChangeText={setQuery}
@@ -157,10 +189,10 @@ export default function CourseSearchScreen() {
                 ) : showHistory ? (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recent Searches</Text>
+                            <Text style={styles.sectionTitle}>{t('search.recentSearches')}</Text>
                             {history.length > 0 && (
                                 <TouchableOpacity onPress={clearHistory}>
-                                    <Text style={styles.clearAll}>Clear all</Text>
+                                    <Text style={styles.clearAll}>{t('search.clearAll')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -169,8 +201,8 @@ export default function CourseSearchScreen() {
                                 <View style={styles.emptyIconWrap}>
                                     <Ionicons name="time-outline" size={36} color="rgba(124,206,6,0.4)" />
                                 </View>
-                                <Text style={styles.emptyTitle}>No recent searches</Text>
-                                <Text style={styles.emptySubtitle}>Your search history will appear here.</Text>
+                                <Text style={styles.emptyTitle}>{t('search.noResults')}</Text>
+                                <Text style={styles.emptySubtitle}>{t('search.tryDifferent')}</Text>
                             </View>
                         ) : (
                             history.map((term, i) => (
@@ -199,8 +231,8 @@ export default function CourseSearchScreen() {
                                 <View style={styles.emptyIconWrap}>
                                     <Ionicons name="search-outline" size={36} color="rgba(124,206,6,0.4)" />
                                 </View>
-                                <Text style={styles.emptyTitle}>No courses found</Text>
-                                <Text style={styles.emptySubtitle}>Try different keywords or remove filters.</Text>
+                                <Text style={styles.emptyTitle}>{t('search.noResults')}</Text>
+                                <Text style={styles.emptySubtitle}>{t('search.tryDifferent')}</Text>
                             </View>
                         ) : (
                             results.map((c: any) => (
@@ -209,7 +241,10 @@ export default function CourseSearchScreen() {
                                     style={styles.resultCard}
                                     activeOpacity={0.85}
                                     onPress={() => {
-                                        recordSearch(query);
+                                        // Pass the clicked course so the ML
+                                        // engine learns "query X → user wanted
+                                        // course Y" associations.
+                                        recordSearch(query, c.courseId || c.id);
                                         router.push({ pathname: '/course-detail' as any, params: { courseId: c.courseId || c.id } });
                                     }}
                                 >

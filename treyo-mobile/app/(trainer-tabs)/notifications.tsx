@@ -1,15 +1,20 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService, notificationService } from '../../services/api';
 
 export default function TrainerNotificationsScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    // Tapping a card opens this modal with the full title + message
+    // so long descriptions aren't truncated.
+    const [openNotif, setOpenNotif] = useState<any | null>(null);
 
     useFocusEffect(
         useCallback(() => {
@@ -74,11 +79,86 @@ export default function TrainerNotificationsScreen() {
         const now = new Date();
         const diff = now.getTime() - date.getTime();
         const mins = Math.floor(diff / 60000);
-        if (mins < 60) return `${mins}m ago`;
+        if (mins < 1) return t('common.now');
+        if (mins < 60) return t('common.minAgo', { count: mins });
         const hours = Math.floor(mins / 60);
-        if (hours < 24) return `${hours}h ago`;
-        const days = Math.floor(hours / 24);
-        return `${days}d ago`;
+        if (hours < 24) return t('common.hourAgo', { count: hours });
+        return t('common.dayAgo', { count: Math.floor(hours / 24) });
+    };
+
+    /** See student notifications screen for full explanation. Same
+     *  actionData + regex-backfill fallback strategy. */
+    const translateNotification = (notif: any) => {
+        let params: any = {};
+        try {
+            if (notif.actionData) {
+                params = typeof notif.actionData === 'string'
+                    ? JSON.parse(notif.actionData)
+                    : notif.actionData;
+            }
+        } catch (_) {}
+
+        const title = String(notif.title || '');
+        const message = String(notif.message || '');
+        switch (notif.notificationType) {
+            case 'GROUP_FORMING': {
+                const m = message.match(/^(\d+) students? are interested in '([^']+)'/);
+                if (m) {
+                    if (params.count == null) params.count = Number(m[1]);
+                    if (!params.course) params.course = m[2];
+                }
+                break;
+            }
+            case 'GROUP_READY': {
+                const m = message.match(/Your group for '([^']+)'/);
+                if (m && !params.course) params.course = m[1];
+                break;
+            }
+            case 'ONE_TO_ONE_OFFER': {
+                const m = message.match(/one-to-one sessions for '([^']+)'/);
+                if (m && !params.course) params.course = m[1];
+                break;
+            }
+            case 'NEW_MESSAGE': {
+                const m = title.match(/New Message from (.+)$/);
+                if (m && !params.sender) params.sender = m[1];
+                break;
+            }
+        }
+
+        const typeMap: Record<string, { titleKey: string; messageKey: string }> = {
+            GROUP_FORMING: {
+                titleKey: 'notifications.groupFormingTrainerTitle',
+                messageKey: 'notifications.groupFormingTrainerMessage',
+            },
+            GROUP_READY: {
+                titleKey: 'notifications.groupReadyTitle',
+                messageKey: 'notifications.groupReadyMessage',
+            },
+            ONE_TO_ONE_OFFER: {
+                titleKey: 'notifications.oneToOneTitle',
+                messageKey: 'notifications.oneToOneMessage',
+            },
+            NEW_MESSAGE: {
+                titleKey: 'notifications.newMessageTitle',
+                messageKey: '',
+            },
+        };
+        const entry = typeMap[notif.notificationType];
+        if (!entry) return { title: notif.title, message: notif.message };
+
+        const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'ONE_TO_ONE_OFFER'].includes(notif.notificationType);
+        if (needsCourse && !params.course) {
+            return { title: notif.title, message: notif.message };
+        }
+        if (notif.notificationType === 'NEW_MESSAGE' && !params.sender) {
+            return { title: notif.title, message: notif.message };
+        }
+
+        return {
+            title: entry.titleKey ? t(entry.titleKey, params) : notif.title,
+            message: entry.messageKey ? t(entry.messageKey, params) : notif.message,
+        };
     };
 
     return (
@@ -94,7 +174,7 @@ export default function TrainerNotificationsScreen() {
                         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                             <Ionicons name="arrow-back" size={22} color="#ffffff" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Notifications</Text>
+                        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
                     </View>
                 </View>
 
@@ -102,12 +182,17 @@ export default function TrainerNotificationsScreen() {
                     <View style={{ paddingTop: 60, alignItems: 'center' }}>
                         <ActivityIndicator size="large" color="#7cce06" />
                     </View>
-                ) : notifications.length > 0 ? notifications.map((notif: any) => (
+                ) : notifications.length > 0 ? notifications.map((notif: any) => {
+                    const localized = translateNotification(notif);
+                    return (
                     <TouchableOpacity
                         key={notif.notificationId}
                         style={[styles.notifCard, !notif.isRead && styles.notifCardUnread]}
                         activeOpacity={0.85}
-                        onPress={() => !notif.isRead && handleMarkRead(notif.notificationId)}
+                        onPress={() => {
+                            setOpenNotif(notif);
+                            if (!notif.isRead) handleMarkRead(notif.notificationId);
+                        }}
                     >
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={[styles.notifIconWrap, { backgroundColor: getIconColor(notif.notificationType) + '20' }]}>
@@ -118,25 +203,105 @@ export default function TrainerNotificationsScreen() {
                             />
                         </View>
                         <View style={styles.notifContent}>
-                            <Text style={styles.notifTitle}>{notif.title}</Text>
-                            <Text style={styles.notifDesc}>{notif.message}</Text>
+                            <Text style={styles.notifTitle}>{localized.title}</Text>
+                            <Text style={styles.notifDesc}>{localized.message}</Text>
                             <Text style={styles.notifTime}>{formatTime(notif.createdAt)}</Text>
                         </View>
                         {!notif.isRead && <View style={styles.unreadDot} />}
                     </TouchableOpacity>
-                )) : (
+                    );
+                }) : (
                     <View style={styles.emptyState}>
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="notifications-off-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>No notifications</Text>
-                        <Text style={styles.emptySubtitle}>You're all caught up!</Text>
+                        <Text style={styles.emptyTitle}>{t('notifications.noNotifications')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('notifications.allCaughtUp')}</Text>
                     </View>
                 )}
             </ScrollView>
+
+            {/* Detail modal — opens on tap so the full message is visible
+                instead of being truncated to two lines on the card. */}
+            <Modal
+                visible={!!openNotif}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setOpenNotif(null)}
+            >
+                <TouchableOpacity
+                    style={modalStyles.backdrop}
+                    activeOpacity={1}
+                    onPress={() => setOpenNotif(null)}
+                >
+                    <TouchableOpacity activeOpacity={1} onPress={() => {}} style={modalStyles.cardWrap}>
+                        <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+                        {openNotif && (() => {
+                            const localized = translateNotification(openNotif);
+                            const color = getIconColor(openNotif.notificationType);
+                            return (
+                                <>
+                                    <View style={modalStyles.headerRow}>
+                                        <View style={[modalStyles.iconWrap, { backgroundColor: color + '18' }]}>
+                                            <Ionicons name={getIconName(openNotif.notificationType) as any} size={24} color={color} />
+                                        </View>
+                                        <TouchableOpacity onPress={() => setOpenNotif(null)} style={modalStyles.closeBtn}>
+                                            <Ionicons name="close" size={20} color="#ffffff" />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={modalStyles.title}>{localized.title}</Text>
+                                    <Text style={modalStyles.time}>{formatTime(openNotif.createdAt)}</Text>
+                                    <ScrollView style={modalStyles.messageScroll} showsVerticalScrollIndicator={false}>
+                                        <Text style={modalStyles.message}>{localized.message}</Text>
+                                    </ScrollView>
+                                </>
+                            );
+                        })()}
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </ScreenBackground>
     );
 }
+
+const modalStyles = StyleSheet.create({
+    backdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 20,
+    },
+    cardWrap: {
+        width: '100%',
+        maxWidth: 420,
+        borderRadius: 22,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        padding: 20,
+        maxHeight: '80%',
+    },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+    iconWrap: {
+        width: 48, height: 48, borderRadius: 24,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    closeBtn: {
+        width: 32, height: 32, borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    title: { fontSize: 17, fontWeight: '700', color: '#ffffff', marginBottom: 6 },
+    time: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 14 },
+    messageScroll: { maxHeight: 280 },
+    message: { fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.85)' },
+});
 
 const styles = StyleSheet.create({
     scroll: { flex: 1 },

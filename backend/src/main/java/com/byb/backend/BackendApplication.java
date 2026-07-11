@@ -3,6 +3,8 @@ package com.byb.backend;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * @EnableJpaAuditing activates the AuditingEntityListener registered on
@@ -14,6 +16,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  */
 @SpringBootApplication
 @EnableJpaAuditing
+@EnableAsync // PushNotificationService.sendToUser is @Async — let the chat
+              // POST return as soon as the message is saved, without
+              // waiting on Expo's push API round-trip.
+@EnableScheduling // FeedGenerationService.dailyJob runs at 06:00 server time
+                  // to generate that day's AI feed posts via Gemini.
 public class BackendApplication {
 
     public static void main(String[] args) {

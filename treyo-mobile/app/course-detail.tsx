@@ -7,14 +7,17 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { ReviewsList } from '../components/ReviewsList';
 import {
     courseService, trainerService, enrollmentService,
-    interactionService, authService, API_BASE_URL,
+    interactionService, authService, groupService, API_BASE_URL,
 } from '../services/api';
 
 export default function CourseDetailScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const { courseId } = useLocalSearchParams<{ courseId: string }>();
 
     const [course, setCourse] = useState<any>(null);
@@ -23,6 +26,16 @@ export default function CourseDetailScreen() {
     const [actionLoading, setActionLoading] = useState(false);
     const [interested, setInterested] = useState(false);
     const [enrolled, setEnrolled] = useState(false);
+    // Scheduled sessions for this specific course (filtered from the
+    // student's full session list). Only shown once `enrolled` is true.
+    const [courseSessions, setCourseSessions] = useState<any[]>([]);
+    // Progress for the group this student is in for this course.
+    // Populated only when `enrolled` is true; null otherwise. Drives
+    // the progress bar in the Your sessions section.
+    const [progress, setProgress] = useState<{
+        sessionsCompleted: number; totalSessions: number; percentage: number;
+        groupStatus: string; isCompleted: boolean;
+    } | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [expanded, setExpanded] = useState(false);
     // Favourite-toggle state. `saved` drives the heart icon (filled/outlined);
@@ -52,6 +65,26 @@ export default function CourseDetailScreen() {
                     const status = await interactionService.getStatus(user.userId, courseId);
                     setInterested(!!status.interested);
                     setEnrolled(!!status.enrolled);
+                    // If the student is enrolled, fetch their sessions and
+                    // keep only the ones for this course. Failures are silent
+                    // — schedule section just stays empty.
+                    if (status.enrolled) {
+                        groupService.getStudentSessions(user.userId)
+                            .then((all: any[]) => {
+                                const mine = (all || []).filter(s => s.courseId === courseId);
+                                setCourseSessions(mine);
+                                // Pull progress for the first matched
+                                // group — all sessions for the same
+                                // enrollment share a single groupId.
+                                const gid = mine[0]?.groupId;
+                                if (gid) {
+                                    groupService.getProgress(gid)
+                                        .then(setProgress)
+                                        .catch(() => {});
+                                }
+                            })
+                            .catch(() => {});
+                    }
                 } catch (_) {}
                 // Saved-state lookup runs in parallel with the rest — heart
                 // icon paints correctly on first render rather than starting
@@ -82,8 +115,8 @@ export default function CourseDetailScreen() {
         try {
             await interactionService.expressInterest(userId, courseId);
             Alert.alert(
-                'Request Sent!',
-                "You'll be notified when the group is ready to start.",
+                t('course.requestSent'),
+                t('course.requestSentBody'),
             );
         } catch (e: any) {
             // Roll back the optimistic flip if the call actually failed
@@ -165,9 +198,9 @@ export default function CourseDetailScreen() {
                         <Ionicons name="arrow-back" size={20} color="#ffffff" />
                     </TouchableOpacity>
                     <Ionicons name="alert-circle-outline" size={56} color="rgba(255,255,255,0.3)" />
-                    <Text style={styles.errorText}>Course not found</Text>
+                    <Text style={styles.errorText}>{t('course.courseNotFound')}</Text>
                     <TouchableOpacity onPress={() => router.back()}>
-                        <Text style={styles.errorLink}>Go back</Text>
+                        <Text style={styles.errorLink}>{t('course.goBack')}</Text>
                     </TouchableOpacity>
                 </View>
             </ScreenBackground>
@@ -250,7 +283,7 @@ export default function CourseDetailScreen() {
                         {course.hasCertificate && (
                             <View style={styles.certBadge}>
                                 <Ionicons name="ribbon-outline" size={11} color="#FFD700" />
-                                <Text style={styles.certText}>Certificate</Text>
+                                <Text style={styles.certText}>{t('course.certificate')}</Text>
                             </View>
                         )}
                     </View>
@@ -264,11 +297,11 @@ export default function CourseDetailScreen() {
                 {/* ── Stats row ── */}
                 <View style={styles.statsRow}>
                     {rating !== null && (
-                        <StatItem icon="star" iconColor="#FFD700" value={rating.toFixed(1)} label="Rating" />
+                        <StatItem icon="star" iconColor="#FFD700" value={rating.toFixed(1)} label={t('course.rating')} />
                     )}
-                    <StatItem icon="people-outline" iconColor="#7cce06" value={String(course.totalEnrolled || 0)} label="Enrolled" />
+                    <StatItem icon="people-outline" iconColor="#7cce06" value={String(course.totalEnrolled || 0)} label={t('course.totalEnrolled')} />
                     {course.durationHours && (
-                        <StatItem icon="time-outline" iconColor="#7cce06" value={`${course.durationHours}h`} label="Duration" />
+                        <StatItem icon="time-outline" iconColor="#7cce06" value={`${course.durationHours}h`} label={t('course.duration')} />
                     )}
                     <StatItem
                         icon="cash-outline"
@@ -285,10 +318,10 @@ export default function CourseDetailScreen() {
                         <View style={styles.groupHeader}>
                             <View style={styles.groupTitleRow}>
                                 <Ionicons name="people" size={15} color="#7cce06" />
-                                <Text style={styles.groupTitle}>Group Forming</Text>
+                                <Text style={styles.groupTitle}>{t('course.groupForming')}</Text>
                             </View>
                             <View style={styles.spotsLeftBadge}>
-                                <Text style={styles.spotsLeftText}>{spotsLeft} spots left</Text>
+                                <Text style={styles.spotsLeftText}>{t('course.spotsLeft', { count: spotsLeft })}</Text>
                             </View>
                         </View>
                         <View style={styles.progressRow}>
@@ -305,7 +338,7 @@ export default function CourseDetailScreen() {
 
                 {/* ── Description ── */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>About this course</Text>
+                    <Text style={styles.sectionTitle}>{t('course.aboutTitle')}</Text>
                     <Text style={styles.descText} numberOfLines={expanded ? undefined : 4}>
                         {course.description}
                     </Text>
@@ -315,7 +348,7 @@ export default function CourseDetailScreen() {
                             style={styles.expandBtn}
                             activeOpacity={0.7}
                         >
-                            <Text style={styles.expandText}>{expanded ? 'Show less' : 'Read more'}</Text>
+                            <Text style={styles.expandText}>{expanded ? t('course.showLess') : t('course.readMore')}</Text>
                             <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="#7cce06" />
                         </TouchableOpacity>
                     )}
@@ -324,7 +357,7 @@ export default function CourseDetailScreen() {
                 {/* ── Learning outcomes ── */}
                 {outcomes.length > 0 && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>What you'll learn</Text>
+                        <Text style={styles.sectionTitle}>{t('course.whatYoullLearn')}</Text>
                         {outcomes.map((item, i) => (
                             <View key={i} style={styles.outcomeRow}>
                                 <View style={styles.outcomeDot} />
@@ -337,7 +370,7 @@ export default function CourseDetailScreen() {
                 {/* ── Prerequisites ── */}
                 {course.prerequisites ? (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Prerequisites</Text>
+                        <Text style={styles.sectionTitle}>{t('course.prerequisites')}</Text>
                         <View style={styles.prereqBox}>
                             <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                             <Ionicons name="information-circle-outline" size={16} color="#7cce06" />
@@ -348,27 +381,81 @@ export default function CourseDetailScreen() {
 
                 {/* ── Course details ── */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Course details</Text>
+                    <Text style={styles.sectionTitle}>{t('course.details')}</Text>
                     <View style={styles.detailsGrid}>
                         {course.format && (
-                            <DetailChip icon="layers-outline" label="Format" value={course.format} />
+                            <DetailChip icon="layers-outline" label={t('course.format')} value={course.format} />
                         )}
                         {course.language && (
-                            <DetailChip icon="language-outline" label="Language" value={course.language} />
+                            <DetailChip icon="language-outline" label={t('course.language')} value={course.language} />
                         )}
                         {course.maxStudentsPerGroup && (
-                            <DetailChip icon="people-outline" label="Group size" value={`Max ${course.maxStudentsPerGroup}`} />
+                            <DetailChip icon="people-outline" label={t('course.groupSize')} value={t('course.maxStudents', { count: course.maxStudentsPerGroup })} />
                         )}
                         {course.hasCertificate && (
-                            <DetailChip icon="ribbon-outline" label="Certificate" value="Included" />
+                            <DetailChip icon="ribbon-outline" label={t('course.certificate')} value={t('course.certificateIncluded')} />
                         )}
                     </View>
                 </View>
 
+                {/* ── Your sessions (enrolled students only) ── */}
+                {enrolled && courseSessions.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>{t('course.yourSessions')}</Text>
+
+                        {/* Progress bar — driven by the backend's
+                            CourseLifecycleService. Updates as past
+                            sessions roll over to "ended". When 100%
+                            the home screen will surface the review
+                            prompt the next time the student opens
+                            the app. */}
+                        {progress && progress.totalSessions > 0 && (
+                            <View style={styles.progressWrap}>
+                                <View style={styles.progressHeader}>
+                                    <Text style={styles.progressLabelText}>
+                                        {t('course.progress', {
+                                            done: progress.sessionsCompleted,
+                                            total: progress.totalSessions,
+                                        })}
+                                    </Text>
+                                    <Text style={styles.progressPct}>{progress.percentage}%</Text>
+                                </View>
+                                <View style={styles.progressTrackBig}>
+                                    <View style={[styles.progressFillBig, {
+                                        width: `${progress.percentage}%` as any,
+                                        backgroundColor: progress.isCompleted ? '#FFD700' : '#7cce06',
+                                    }]} />
+                                </View>
+                                {progress.isCompleted && (
+                                    <Text style={styles.progressDoneText}>
+                                        {t('course.courseCompleted')}
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+
+                        {courseSessions.slice(0, 6).map((s, i) => (
+                            <SessionRow key={`${s.groupId}-${s.date}-${s.time}-${i}`} session={s} />
+                        ))}
+                        {courseSessions.length > 6 && (
+                            <TouchableOpacity
+                                onPress={() => router.push('/my-schedule')}
+                                style={styles.expandBtn}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.expandText}>
+                                    See all {courseSessions.length} sessions
+                                </Text>
+                                <Ionicons name="chevron-forward" size={14} color="#7cce06" />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
                 {/* ── Instructor ── */}
                 {trainer && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Your instructor</Text>
+                        <Text style={styles.sectionTitle}>{t('course.instructor')}</Text>
                         <View style={styles.trainerCard}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
@@ -383,10 +470,10 @@ export default function CourseDetailScreen() {
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.trainerName}>{trainer.name}</Text>
                                     {trainer.experienceYears ? (
-                                        <Text style={styles.trainerMeta}>{trainer.experienceYears} yrs experience</Text>
+                                        <Text style={styles.trainerMeta}>{t('course.yearsExperience', { count: trainer.experienceYears })}</Text>
                                     ) : null}
                                     {trainer.coursesCount ? (
-                                        <Text style={styles.trainerMeta}>{trainer.coursesCount} courses</Text>
+                                        <Text style={styles.trainerMeta}>{t('course.coursesCount', { count: trainer.coursesCount })}</Text>
                                     ) : null}
                                 </View>
                                 {trainer.averageRating ? (
@@ -439,6 +526,15 @@ export default function CourseDetailScreen() {
                     </View>
                 )}
 
+                {/* ── What students said ──
+                    Public reviews list, hidden ones already filtered
+                    by the backend. Empty state still renders so the
+                    section header anchors something visible. */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('reviews.studentsSaid')}</Text>
+                    <ReviewsList mode="course" id={String(courseId)} />
+                </View>
+
                 <View style={{ height: 110 }} />
             </ScrollView>
 
@@ -451,20 +547,20 @@ export default function CourseDetailScreen() {
                             {price === 0 ? 'Free' : `${price} ${course.currency || 'TND'}`}
                         </Text>
                         {price > 0 && (
-                            <Text style={styles.enrollPriceLabel}>one-time payment</Text>
+                            <Text style={styles.enrollPriceLabel}>{t('course.oneTimePayment')}</Text>
                         )}
                     </View>
 
                     {enrolled ? (
                         <View style={[styles.enrollBtn, styles.enrolledBtn]}>
                             <Ionicons name="checkmark-circle" size={17} color="#000" />
-                            <Text style={styles.enrollBtnText}>Enrolled</Text>
+                            <Text style={styles.enrollBtnText}>{t('course.enrolled')}</Text>
                         </View>
                     ) : interested ? (
                         <View style={styles.actionGroup}>
                             <View style={[styles.requestedBtn]}>
                                 <Ionicons name="checkmark-circle" size={15} color="#7cce06" />
-                                <Text style={styles.requestedBtnText}>Requested</Text>
+                                <Text style={styles.requestedBtnText}>{t('course.requested')}</Text>
                             </View>
                             <TouchableOpacity
                                 style={styles.cancelRequestBtn}
@@ -491,7 +587,7 @@ export default function CourseDetailScreen() {
                             ) : (
                                 <>
                                     <Ionicons name="add-circle-outline" size={17} color="#000" />
-                                    <Text style={styles.enrollBtnText}>Request to Join</Text>
+                                    <Text style={styles.enrollBtnText}>{t('course.requestToJoin')}</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -508,6 +604,50 @@ function StatItem({ icon, iconColor, value, label }: { icon: any; iconColor: str
             <Ionicons name={icon} size={17} color={iconColor} />
             <Text style={styles.statValue}>{value}</Text>
             {label ? <Text style={styles.statLabel}>{label}</Text> : null}
+        </View>
+    );
+}
+
+/** One row in the "Your sessions" list. Renders date, time, duration,
+ *  and a mode pill (online vs. on-site) so the student knows where each
+ *  session takes place at a glance. */
+function SessionRow({ session }: { session: any }) {
+    // Use the current i18n language for date formatting so "Fri, Jun 12"
+    // renders as "الجمعة، 12 يونيو" in Arabic, "ven. 12 juin" in French, etc.
+    const { t, i18n } = useTranslation();
+    const dt = session?.date && session?.time
+        ? new Date(`${session.date}T${session.time.length === 5 ? session.time + ':00' : session.time}`)
+        : null;
+    const dateLabel = dt
+        ? dt.toLocaleDateString(i18n.language || undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+        : session?.date || '';
+    const timeLabel = session?.time ? String(session.time).slice(0, 5) : '';
+    const hours = session?.hours ? `${session.hours}${t('common.hours')}` : null;
+    const isOnline = !!session?.isOnline;
+
+    return (
+        <View style={styles.sessionRow}>
+            <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={styles.sessionDateBox}>
+                <Ionicons name="calendar-outline" size={16} color="#7cce06" />
+            </View>
+            <View style={{ flex: 1 }}>
+                <Text style={styles.sessionDate}>{dateLabel}</Text>
+                <View style={styles.sessionMetaRow}>
+                    <Text style={styles.sessionMeta}>{timeLabel}</Text>
+                    {hours && <Text style={styles.sessionMetaDim}>· {hours}</Text>}
+                </View>
+            </View>
+            <View style={[styles.sessionModePill, isOnline ? styles.sessionModeOnline : styles.sessionModeOnsite]}>
+                <Ionicons
+                    name={isOnline ? 'videocam-outline' : 'location-outline'}
+                    size={11}
+                    color={isOnline ? '#7cce06' : '#FFD700'}
+                />
+                <Text style={[styles.sessionModeText, { color: isOnline ? '#7cce06' : '#FFD700' }]}>
+                    {isOnline ? t('common.online') : t('common.onSite')}
+                </Text>
+            </View>
         </View>
     );
 }
@@ -669,6 +809,50 @@ const styles = StyleSheet.create({
     },
     detailLabel: { fontSize: 10, color: '#aaaaaa', fontWeight: '600', marginBottom: 2, textTransform: 'uppercase' },
     detailValue: { fontSize: 13, color: '#ffffff', fontWeight: '500' },
+
+    // Progress bar above the session list
+    progressWrap: { marginBottom: 14 },
+    progressHeader: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 8,
+    },
+    progressLabelText: { fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: '600' },
+    progressPct: { fontSize: 13, color: '#7cce06', fontWeight: '700' },
+    progressTrackBig: {
+        height: 8, borderRadius: 4,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+    },
+    progressFillBig: { height: 8, borderRadius: 4 },
+    progressDoneText: {
+        fontSize: 12, color: '#FFD700', fontWeight: '700',
+        marginTop: 8, textAlign: 'center', letterSpacing: 0.3,
+    },
+
+    // Your sessions list
+    sessionRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        borderRadius: 14, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+        padding: 12, marginBottom: 8,
+    },
+    sessionDateBox: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    sessionDate: { fontSize: 14, color: '#ffffff', fontWeight: '600' },
+    sessionMetaRow: { flexDirection: 'row', gap: 6, marginTop: 2, alignItems: 'center' },
+    sessionMeta: { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
+    sessionMetaDim: { fontSize: 12, color: 'rgba(255,255,255,0.45)' },
+    sessionModePill: {
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999,
+        borderWidth: 1,
+    },
+    sessionModeOnline: { backgroundColor: 'rgba(124,206,6,0.10)', borderColor: 'rgba(124,206,6,0.30)' },
+    sessionModeOnsite: { backgroundColor: 'rgba(255,215,0,0.10)', borderColor: 'rgba(255,215,0,0.30)' },
+    sessionModeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
 
     // Trainer card
     trainerCard: {

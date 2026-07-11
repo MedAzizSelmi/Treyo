@@ -2,12 +2,14 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch } from 're
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { ScreenBackground } from '../components/ScreenBackground';
 
 export default function NotificationSettingsScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { t } = useTranslation();
     const [pushEnabled, setPushEnabled] = useState(true);
     const [emailEnabled, setEmailEnabled] = useState(true);
     const [courseUpdates, setCourseUpdates] = useState(true);
@@ -21,60 +23,60 @@ export default function NotificationSettingsScreen() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>{t('notificationSettings.title')}</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Notification Channels</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('notificationSettings.title')}</Text>
 
                 <SettingItem
                     icon="notifications"
-                    title="Push Notifications"
-                    description="Receive notifications on your device"
+                    title={t('notificationSettings.push')}
+                    description=""
                     value={pushEnabled}
                     onValueChange={setPushEnabled}
                     colors={colors}
                 />
                 <SettingItem
                     icon="mail"
-                    title="Email Notifications"
-                    description="Receive notifications via email"
+                    title={t('notificationSettings.email')}
+                    description=""
                     value={emailEnabled}
                     onValueChange={setEmailEnabled}
                     colors={colors}
                 />
 
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Notification Types</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('notificationSettings.courseAnnouncements')}</Text>
 
                 <SettingItem
                     icon="book"
-                    title="Course Updates"
-                    description="New content, announcements, and materials"
+                    title={t('notificationSettings.courseAnnouncements')}
+                    description=""
                     value={courseUpdates}
                     onValueChange={setCourseUpdates}
                     colors={colors}
                 />
                 <SettingItem
                     icon="chatbubbles"
-                    title="New Messages"
-                    description="Messages from trainers and students"
+                    title={t('notificationSettings.newMessages')}
+                    description=""
                     value={newMessages}
                     onValueChange={setNewMessages}
                     colors={colors}
                 />
                 <SettingItem
                     icon="calendar"
-                    title="Session Reminders"
-                    description="Upcoming classes and sessions"
+                    title={t('notificationSettings.groupUpdates')}
+                    description=""
                     value={sessionReminders}
                     onValueChange={setSessionReminders}
                     colors={colors}
                 />
                 <SettingItem
                     icon="pricetag"
-                    title="Promotions & Offers"
-                    description="Special deals and discounts"
+                    title={t('notificationSettings.marketing')}
+                    description=""
                     value={promotions}
                     onValueChange={setPromotions}
                     colors={colors}

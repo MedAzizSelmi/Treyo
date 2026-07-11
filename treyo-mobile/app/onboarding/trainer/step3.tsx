@@ -82,15 +82,13 @@ export default function TrainerOnboardingStep3() {
                 bio,
             });
 
-            // Onboarding done — trainer's courses are now assigned by the admin,
-            // so there's no longer a step 4 for course creation.
-            router.replace({
-                pathname: '/success' as any,
-                params: {
-                    message: 'Profile setup complete! 🎉',
-                    nextRoute: '/(trainer-tabs)/home',
-                },
-            });
+            // Onboarding done — but a trainer isn't approved until an
+            // admin reviews their submission. Bounce them to the
+            // pending screen instead of straight into the tabs, and
+            // log them out on the way so the JWT can't be used to
+            // bypass the approval gate at login.
+            await authService.logout();
+            router.replace('/trainer-pending' as any);
         } catch (error) {
             console.error('Error:', error);
             Alert.alert('Error', 'Failed to save.');

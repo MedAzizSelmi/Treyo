@@ -4,6 +4,7 @@ import com.byb.backend.dto.admin.CourseManagementResponse;
 import com.byb.backend.dto.admin.DashboardStatsResponse;
 import com.byb.backend.dto.admin.SendNotificationRequest;
 import com.byb.backend.dto.admin.UserManagementResponse;
+import com.byb.backend.dto.course.CourseResponse;
 import com.byb.backend.service.AdminGroupFormationService;
 import com.byb.backend.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -102,18 +103,72 @@ public class AdminController {
     }
 
     /**
-     * Reject trainer
+     * Reject trainer. Optional body {@code { "note": "..." }} is
+     * included verbatim in the rejection email so the trainer
+     * knows what to fix before re-applying.
      */
     @PutMapping("/users/trainers/{trainerId}/reject")
     @Operation(summary = "Reject trainer profile")
-    public ResponseEntity<Map<String, String>> rejectTrainer(@PathVariable String trainerId) {
-        adminService.rejectTrainer(trainerId);
+    public ResponseEntity<Map<String, String>> rejectTrainer(
+            @PathVariable String trainerId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String note = null;
+        if (body != null && body.get("note") != null) {
+            note = String.valueOf(body.get("note")).trim();
+            if (note.isEmpty()) note = null;
+        }
+        adminService.rejectTrainer(trainerId, note);
         return ResponseEntity.ok(Map.of("message", "Trainer rejected"));
     }
 
     // ============================================
     // COURSE MANAGEMENT
     // ============================================
+
+    /** Trainer-submitted courses waiting for admin approval. Includes
+     *  the material URL so the admin can open the trainer's uploaded
+     *  PDF/PPT directly from the review card. */
+    @GetMapping("/courses/pending-trainer")
+    @Operation(summary = "Courses submitted by trainers, waiting for admin review")
+    public ResponseEntity<List<CourseResponse>> getPendingTrainerCourses() {
+        return ResponseEntity.ok(adminService.getPendingTrainerCourses());
+    }
+
+    @PutMapping("/courses/{courseId}/approve-trainer")
+    @Operation(summary = "Approve a trainer-submitted course and set its price")
+    public ResponseEntity<Map<String, String>> approveTrainerCourse(
+            @PathVariable String courseId,
+            @RequestBody Map<String, Object> body) {
+        Object rawPrice = body == null ? null : body.get("price");
+        Object rawCurrency = body == null ? null : body.get("currency");
+        java.math.BigDecimal price;
+        try {
+            price = new java.math.BigDecimal(String.valueOf(rawPrice));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Price is required."));
+        }
+        String currency = rawCurrency == null ? null : String.valueOf(rawCurrency);
+        try {
+            adminService.approveTrainerCourse(courseId, price, currency);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+        return ResponseEntity.ok(Map.of("message", "Course approved"));
+    }
+
+    @PutMapping("/courses/{courseId}/reject-trainer")
+    @Operation(summary = "Reject a trainer-submitted course, optionally with a note")
+    public ResponseEntity<Map<String, String>> rejectTrainerCourse(
+            @PathVariable String courseId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String note = null;
+        if (body != null && body.get("note") != null) {
+            note = String.valueOf(body.get("note")).trim();
+            if (note.isEmpty()) note = null;
+        }
+        adminService.rejectTrainerCourse(courseId, note);
+        return ResponseEntity.ok(Map.of("message", "Course rejected"));
+    }
 
     /**
      * Get all courses
@@ -176,6 +231,33 @@ public class AdminController {
     ) {
         adminService.updateCourseMinStudents(courseId, minStudents);
         return ResponseEntity.ok(Map.of("message", "Minimum students updated to " + minStudents));
+    }
+
+    /**
+     * Set the daily amount the trainer earns while running this
+     * course. Independent of the student-facing price — this is the
+     * trainer's cut per day of training. Null clears the value.
+     */
+    @PutMapping("/courses/{courseId}/trainer-daily-revenue")
+    @Operation(summary = "Set the trainer's daily earnings for a course")
+    public ResponseEntity<Map<String, String>> updateTrainerDailyRevenue(
+            @PathVariable String courseId,
+            @RequestBody Map<String, Object> body
+    ) {
+        Object raw = body == null ? null : body.get("amount");
+        java.math.BigDecimal amount = null;
+        if (raw != null && !String.valueOf(raw).isBlank()) {
+            try {
+                amount = new java.math.BigDecimal(String.valueOf(raw));
+                if (amount.signum() < 0) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Amount must be non-negative."));
+                }
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid amount."));
+            }
+        }
+        adminService.updateTrainerDailyRevenue(courseId, amount);
+        return ResponseEntity.ok(Map.of("message", "Trainer daily revenue updated"));
     }
 
     // ============================================

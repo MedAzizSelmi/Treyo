@@ -4,6 +4,7 @@ import { BlurView } from 'expo-blur';
 import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 import { authService, interactionService } from '../services/api';
 
 /**
@@ -17,6 +18,7 @@ import { authService, interactionService } from '../services/api';
  * no need to drill into detail just to remove something you no longer want.
  */
 export default function FavoritesScreen() {
+    const { t } = useTranslation();
     const router = useRouter();
     const [courses, setCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -89,13 +91,13 @@ export default function FavoritesScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Favourites</Text>
+                        <Text style={styles.headerTitle}>{t('favorites.title')}</Text>
                         <Text style={styles.headerSubtitle}>
                             {loading
-                                ? 'Loading…'
+                                ? t('common.loading')
                                 : courses.length === 0
-                                    ? 'Save courses you want to revisit'
-                                    : `${courses.length} saved course${courses.length === 1 ? '' : 's'}`}
+                                    ? t('favorites.emptyBody')
+                                    : `${courses.length}`}
                         </Text>
                     </View>
                 </View>
@@ -109,10 +111,8 @@ export default function FavoritesScreen() {
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="heart-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>No favourites yet</Text>
-                        <Text style={styles.emptySubtitle}>
-                            Tap the heart icon on a course to save it here for later.
-                        </Text>
+                        <Text style={styles.emptyTitle}>{t('favorites.empty')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('favorites.emptyBody')}</Text>
                     </View>
                 ) : (
                     courses.map((course: any) => {

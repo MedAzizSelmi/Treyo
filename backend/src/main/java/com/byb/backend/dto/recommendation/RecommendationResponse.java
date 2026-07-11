@@ -29,7 +29,13 @@ public class RecommendationResponse {
         private String domain;
         private String specificTopic;
         private String level;
+        /** Average rating — DB-sourced so it reflects the latest review
+         *  submitted by any student, not the value cached in the ML
+         *  service's in-memory model. */
         private BigDecimal rating;
+        /** Alias that matches the field name the mobile cards already
+         *  read (`course.averageRating`). Same value as `rating`. */
+        private BigDecimal averageRating;
         private Double score;
         private String reason;
 
@@ -38,5 +44,8 @@ public class RecommendationResponse {
         private String trainerName;
         private BigDecimal price;
         private Integer durationHours;
+        /** Live enrolled-students count read off Course.totalEnrolled.
+         *  Driven by the enrollment flow, not the ML cache. */
+        private Integer totalEnrolled;
     }
 }

@@ -274,17 +274,45 @@ class RecommendationEngine:
             )
             print(f"   ✓ Loaded {len(students)} students")
 
+            # Trainer-aware course filter:
+            #   1. Course's trainer must be active (the trainer can pause
+            #      themselves on their profile → is_active = FALSE)
+            #   2. Trainer must have room for another group — defined as
+            #      `active_group_count < trainers.max_concurrent_groups`.
+            #      If they're already running their cap of groups, every
+            #      course they teach drops out of recommendations until
+            #      one of those groups completes (groupStatus flips to
+            #      "completed" + isActive=false via CourseLifecycleService).
+            # Reads `groups.is_active` because a "completed" group has
+            # isActive=false, so it doesn't count against the cap.
             courses = pd.read_sql("""
+                WITH active_group_counts AS (
+                    SELECT trainer_id, COUNT(*) AS active_groups
+                    FROM groups
+                    WHERE is_active = TRUE
+                      AND (group_status IS NULL
+                           OR LOWER(group_status) NOT IN ('completed','cancelled'))
+                    GROUP BY trainer_id
+                )
                 SELECT
-                    course_id, trainer_id, title, description, domain, specific_topic, level,
-                    duration_hours, language, format, price, has_certificate,
-                    average_rating as rating, total_ratings as num_ratings,
-                    total_enrolled as num_enrolled, total_completed as num_completed,
-                    created_at as created_date, is_active
-                FROM courses
-                WHERE is_active = TRUE AND is_published = TRUE
+                    c.course_id, c.trainer_id, c.title, c.description, c.domain,
+                    c.specific_topic, c.level, c.duration_hours, c.language, c.format,
+                    c.price, c.has_certificate,
+                    c.average_rating as rating, c.total_ratings as num_ratings,
+                    c.total_enrolled as num_enrolled, c.total_completed as num_completed,
+                    c.created_at as created_date, c.is_active
+                FROM courses c
+                JOIN trainers t ON t.trainer_id = c.trainer_id
+                LEFT JOIN active_group_counts agc ON agc.trainer_id = c.trainer_id
+                WHERE c.is_active = TRUE
+                  AND c.is_published = TRUE
+                  -- v2: hide courses awaiting or refused by admin
+                  -- review. Legacy rows default to APPROVED.
+                  AND (c.approval_status IS NULL OR c.approval_status = 'APPROVED')
+                  AND t.is_active = TRUE
+                  AND COALESCE(agc.active_groups, 0) < COALESCE(t.max_concurrent_groups, 3)
             """, conn)
-            print(f"   ✓ Loaded {len(courses)} courses")
+            print(f"   ✓ Loaded {len(courses)} courses (after trainer-status + capacity filter)")
 
             interactions = pd.read_sql("""
                 SELECT

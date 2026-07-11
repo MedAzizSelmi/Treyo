@@ -2,6 +2,7 @@ import { View, Image, StyleSheet, Dimensions, Text, TouchableOpacity, Animated }
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useRef } from 'react';
 import PagerView from 'react-native-pager-view';
+import { useTranslation } from 'react-i18next';
 
 // Use 'screen' (full physical screen) not 'window' (safe area). On Android
 // 'window' excludes the system nav bar, which shrinks the gradient view
@@ -12,33 +13,38 @@ type OnboardingCarouselProps = {
     onFinish: () => void;
 };
 
-const slides = [
-    {
-        image: require('../../assets/images/splash2.png'),
-        title: 'Perfect Learning Match\nPowered by AI',
-        description: 'Treyo connects learners and trainers through AI-powered tools for fast and personalized learning.',
-        highlightWords: ['learners', 'trainers'],
-    },
-    {
-        image: require('../../assets/images/splash3.png'),
-        title: 'Trainers at the heart of smart learning.',
-        description: 'Create and automate your courses, track your progress, and easily reach the right learners.',
-        highlightWords: ['Trainers'],
-        titleHighlight: 'Trainers',
-    },
-    {
-        image: require('../../assets/images/splash4.png'),
-        title: 'Empowering learners to go further.',
-        description: "Get a personalized e-learning journey. treyo's AI matches you with ideal experts, and tailors content as you level up.",
-        highlightWords: ['learners', "treyo's"],
-        titleHighlight: 'learners',
-    },
-];
-
 export default function OnboardingCarousel({ onFinish }: OnboardingCarouselProps) {
+    const { t } = useTranslation();
     const [currentPage, setCurrentPage] = useState(0);
     const pagerRef = useRef<PagerView>(null);
     const scrollX = useRef(new Animated.Value(0)).current;
+
+    // Translated slides — rebuilt each render so they react to language changes.
+    // highlightWords stays English because the green styling matches specific
+    // keywords; in non-English languages we skip highlighting entirely rather
+    // than guessing at the equivalent. The visual rhythm still works.
+    const slides = [
+        {
+            image: require('../../assets/images/splash2.png'),
+            title: t('onboarding.slide1Title'),
+            description: t('onboarding.slide1Desc'),
+            highlightWords: ['learners', 'trainers'],
+        },
+        {
+            image: require('../../assets/images/splash3.png'),
+            title: t('onboarding.slide2Title'),
+            description: t('onboarding.slide2Desc'),
+            highlightWords: ['Trainers'],
+            titleHighlight: 'Trainers',
+        },
+        {
+            image: require('../../assets/images/splash4.png'),
+            title: t('onboarding.slide3Title'),
+            description: t('onboarding.slide3Desc'),
+            highlightWords: ['learners', "treyo's"],
+            titleHighlight: 'learners',
+        },
+    ];
 
     const renderHighlightedText = (text: string, highlightWords: string[]) => {
         const parts = text.split(new RegExp(`(${highlightWords.join('|')})`, 'gi'));
@@ -80,28 +86,31 @@ export default function OnboardingCarousel({ onFinish }: OnboardingCarouselProps
 
     return (
         <View style={styles.container}>
-            {/* Background */}
-            <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
-            <LinearGradient
-                colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
-                style={styles.topGlow}
-            />
-            <LinearGradient
-                colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
-                style={styles.bottomGlow}
-            />
-            <LinearGradient
-                colors={['rgba(19,5,107,1)', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.leftGlow}
-            />
-            <LinearGradient
-                colors={['transparent', 'rgba(19,5,107,1)']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.rightGlow}
-            />
+            {/* Background — wrapped in `direction: 'ltr'` so the side
+                glows aren't auto-mirrored in Arabic. */}
+            <View style={[StyleSheet.absoluteFill, { direction: 'ltr' }]} pointerEvents="none">
+                <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
+                <LinearGradient
+                    colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']}
+                    style={styles.topGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']}
+                    style={styles.bottomGlow}
+                />
+                <LinearGradient
+                    colors={['rgba(19,5,107,1)', 'transparent']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.leftGlow}
+                />
+                <LinearGradient
+                    colors={['transparent', 'rgba(19,5,107,1)']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={styles.rightGlow}
+                />
+            </View>
 
             {/* Pager */}
             <PagerView
@@ -166,12 +175,12 @@ export default function OnboardingCarousel({ onFinish }: OnboardingCarouselProps
                         activeOpacity={0.8}
                     >
                         <LinearGradient colors={['#7cce06', '#6bb805']} style={styles.buttonGradient}>
-                            <Text style={styles.buttonText}>Get Started</Text>
+                            <Text style={styles.buttonText}>{t('auth.getStarted')}</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 ) : (
                     <TouchableOpacity style={styles.skipButton} onPress={onFinish}>
-                        <Text style={styles.skipText}>Skip</Text>
+                        <Text style={styles.skipText}>{t('common.skip')}</Text>
                     </TouchableOpacity>
                 )}
             </View>

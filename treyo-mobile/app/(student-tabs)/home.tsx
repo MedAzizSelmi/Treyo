@@ -1,13 +1,14 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, RefreshControl, ActivityIndicator, Dimensions, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
-import { courseService, authService, enrollmentService, notificationService, trainerService } from '../../services/api';
+import { courseService, authService, enrollmentService, notificationService, trainerService, groupService, reviewService } from '../../services/api';
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ScreenBackground } from '../../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 
 // A course shows up in "Groups Forming Now" only once it has reached this
 // fraction of its minimum-students requirement. So a course with min=100
@@ -25,11 +26,16 @@ const CARD_HALF = (width - 40 - CARD_GAP) / 2;
 export default function StudentHomeScreen() {
     const { colors } = useTheme();
     const router = useRouter();
+    const { t, i18n } = useTranslation();
     const [user, setUser] = useState<any>(null);
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+    // Flat list of all upcoming sessions across the student's enrolled
+    // groups — powers the "Upcoming Sessions" strip at the top. Empty
+    // until at least one trainer has scheduled the group.
+    const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
     const [trainers, setTrainers] = useState<any[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -105,11 +111,18 @@ export default function StudentHomeScreen() {
                     .catch(() => setRecommendations([]))
             );
 
-            // Enrolled courses (acts as "upcoming sessions")
+            // Enrolled courses (used for the "Your courses" section)
             promises.push(
                 enrollmentService.getStudentEnrollments(currentUser.userId)
                     .then(e => setEnrolledCourses(e || []))
                     .catch(() => setEnrolledCourses([]))
+            );
+
+            // Scheduled sessions across all the student's groups
+            promises.push(
+                groupService.getStudentSessions(currentUser.userId)
+                    .then(s => setUpcomingSessions(s || []))
+                    .catch(() => setUpcomingSessions([]))
             );
 
             // Top trainers
@@ -127,12 +140,57 @@ export default function StudentHomeScreen() {
             );
 
             await Promise.all(promises);
+
+            // ── Review prompt for newly-completed courses ──
+            // If any enrolled course has finished (status === 'completed'
+            // or completedAt set) AND we haven't already collected a
+            // review, surface a one-shot alert offering to leave one.
+            // We only ask about the first match — no need to stack
+            // dialogs on a fresh login. The /reviews/check call is cheap
+            // and dedupes against double-prompts.
+            try {
+                await maybePromptReview(currentUser?.userId);
+            } catch (_) {}
         } catch (error) {
             console.error('Error loading data:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
+    };
+
+    const maybePromptReview = async (uid?: string | null) => {
+        if (!uid) return;
+        try {
+            const enrollments = await enrollmentService.getStudentEnrollments(uid);
+            const completed = (enrollments || []).filter((e: any) =>
+                (e.enrollmentStatus || '').toLowerCase() === 'completed'
+                || !!e.completedAt
+            );
+            for (const e of completed) {
+                if (!e.courseId) continue;
+                try {
+                    const status = await reviewService.check(uid, e.courseId);
+                    if (!status?.reviewed) {
+                        Alert.alert(
+                            t('review.ratePromptTitle'),
+                            t('review.ratePromptBody', { title: e.courseTitle || t('home.course') }),
+                            [
+                                { text: t('common.later'), style: 'cancel' },
+                                {
+                                    text: t('common.rateNow'),
+                                    onPress: () => router.push({
+                                        pathname: '/course-review' as any,
+                                        params: { courseId: e.courseId },
+                                    }),
+                                },
+                            ],
+                        );
+                        return; // only ask once per home load
+                    }
+                } catch (_) {}
+            }
+        } catch (_) {}
     };
 
     if (loading) {
@@ -176,8 +234,10 @@ export default function StudentHomeScreen() {
                     </View>
                 </View>
 
-                <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Student'}</Text>
-                <Text style={styles.subtitle}>Ready to start learning?</Text>
+                <Text style={styles.greeting}>
+                    {t('home.greeting', { name: user?.name?.split(' ')[0] || t('home.studentFallback') })}
+                </Text>
+                <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
 
                 {/* ── QUICK ACTIONS ── */}
                 <View style={styles.quickRow}>
@@ -187,7 +247,7 @@ export default function StudentHomeScreen() {
                             <View style={styles.quickIconWrap}><Ionicons name="search-outline" size={22} color="rgba(255,255,255,0.7)" /></View>
                             <Ionicons name="arrow-up-outline" size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: '45deg' }] }} />
                         </View>
-                        <Text style={styles.quickLabel}>Trainings</Text>
+                        <Text style={styles.quickLabel}>{t('home.quickTrainings')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={[styles.quickCard, { width: CARD_HALF, height: CARD_HALF * 0.85 }]} onPress={() => router.push('/(student-tabs)/chatbot' as any)} activeOpacity={0.8}>
@@ -196,25 +256,95 @@ export default function StudentHomeScreen() {
                             <View style={styles.quickIconWrap}><Ionicons name="chatbubble-ellipses-outline" size={22} color="rgba(255,255,255,0.7)" /></View>
                             <Ionicons name="arrow-up-outline" size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: '45deg' }] }} />
                         </View>
-                        <Text style={styles.quickLabel}>AI Chat</Text>
+                        <Text style={styles.quickLabel}>{t('home.quickAiChat')}</Text>
                     </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={[styles.quickCard, { width: '100%', height: CARD_HALF * 0.7 }]} onPress={() => {}} activeOpacity={0.8}>
+                <TouchableOpacity style={[styles.quickCard, { width: '100%', height: CARD_HALF * 0.7 }]} onPress={() => router.push('/feed' as any)} activeOpacity={0.8}>
                     <BlurView intensity={25} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.quickTop}>
                         <View style={styles.quickIconWrap}><Ionicons name="list-outline" size={22} color="rgba(255,255,255,0.7)" /></View>
                         <Ionicons name="arrow-up-outline" size={18} color="rgba(255,255,255,0.4)" style={{ transform: [{ rotate: '45deg' }] }} />
                     </View>
-                    <Text style={styles.quickLabel}>Feed</Text>
+                    <Text style={styles.quickLabel}>{t('home.quickFeed')}</Text>
                 </TouchableOpacity>
+
+                {/* ── UPCOMING SESSIONS ──
+                    Flat list of every scheduled future session across all
+                    the student's groups, sorted soonest-first. Shows the
+                    next 3 inline + a See All into /my-schedule. Hidden
+                    entirely if no trainer has scheduled anything yet so
+                    we don't render an empty header. */}
+                {upcomingSessions.length > 0 && (
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>{t('home.upcomingSessions')}</Text>
+                            <TouchableOpacity onPress={() => router.push('/my-schedule' as any)}>
+                                <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {upcomingSessions.slice(0, 3).map((s: any, i: number) => {
+                            const dt = s?.date && s?.time
+                                ? new Date(`${s.date}T${String(s.time).length === 5 ? s.time + ':00' : s.time}`)
+                                : null;
+                            const dateLabel = dt
+                                ? dt.toLocaleDateString(i18n.language || undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                                : s?.date || '';
+                            const timeLabel = s?.time ? String(s.time).slice(0, 5) : '';
+                            return (
+                                <TouchableOpacity
+                                    key={`${s.groupId}-${s.date}-${s.time}-${i}`}
+                                    style={styles.sessionCard}
+                                    activeOpacity={0.85}
+                                    onPress={() => s.courseId && router.push({ pathname: '/course-detail' as any, params: { courseId: s.courseId } })}
+                                >
+                                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                                    <View style={[styles.sessionAccent, { backgroundColor: '#7cce06' }]} />
+                                    <View style={styles.sessionBody}>
+                                        <View style={styles.sessionTop}>
+                                            <Text style={styles.sessionTitle} numberOfLines={1}>
+                                                {s.courseTitle || s.groupName || 'Session'}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.sessionTrainer}>{dateLabel} · {timeLabel}</Text>
+                                        <View style={styles.sessionMeta}>
+                                            <View style={styles.metaChip}>
+                                                <Ionicons
+                                                    name={s.isOnline ? 'videocam-outline' : 'location-outline'}
+                                                    size={13}
+                                                    color="#aaaaaa"
+                                                />
+                                                <Text style={styles.metaText}>{s.isOnline ? t('common.online') : t('common.onSite')}</Text>
+                                            </View>
+                                            {s.hours ? (
+                                                <View style={styles.metaChip}>
+                                                    <Ionicons name="time-outline" size={13} color="#aaaaaa" />
+                                                    <Text style={styles.metaText}>{s.hours}h</Text>
+                                                </View>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                    <View style={styles.sessionRight}>
+                                        <View style={styles.sessionTypeBadge}>
+                                            <Ionicons name="calendar-outline" size={12} color="#7cce06" />
+                                            <Text style={styles.sessionTypeText}>Session</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.2)" style={{ marginTop: 8 }} />
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                )}
 
                 {/* ── MY ENROLLMENTS ── */}
                 {enrolledCourses.length > 0 && (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>My Enrollments</Text>
-                            <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+                            <Text style={styles.sectionTitle}>{t('home.myEnrollments')}</Text>
+                            <TouchableOpacity onPress={() => router.push('/my-schedule' as any)}>
+                                <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
+                            </TouchableOpacity>
                         </View>
                         {enrolledCourses.slice(0, 4).map((enrollment: any, i: number) => (
                             <TouchableOpacity
@@ -273,8 +403,8 @@ export default function StudentHomeScreen() {
                 {formingGroups.length > 0 && (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Groups Forming Now</Text>
-                            <TouchableOpacity onPress={() => router.push('/groups-forming' as any)}><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+                            <Text style={styles.sectionTitle}>{t('home.groupsForming')}</Text>
+                            <TouchableOpacity onPress={() => router.push('/groups-forming' as any)}><Text style={styles.seeAll}>{t('common.seeAll')}</Text></TouchableOpacity>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                             {formingGroups.map((course: any, i: number) => {
@@ -322,8 +452,8 @@ export default function StudentHomeScreen() {
                 {recommendations.length > 0 && (
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recommended For You</Text>
-                            <TouchableOpacity onPress={() => router.push('/recommended-courses' as any)}><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+                            <Text style={styles.sectionTitle}>{t('home.recommended')}</Text>
+                            <TouchableOpacity onPress={() => router.push('/recommended-courses' as any)}><Text style={styles.seeAll}>{t('common.seeAll')}</Text></TouchableOpacity>
                         </View>
                         {recommendations.slice(0, 4).map((course: any) => (
                             <TouchableOpacity
@@ -368,12 +498,20 @@ export default function StudentHomeScreen() {
                 {trainers.length > 0 && (
                     <View style={[styles.section, { marginBottom: 40 }]}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Top Trainers</Text>
-                            <TouchableOpacity onPress={() => router.push('/(student-tabs)/trainers' as any)}><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
+                            <Text style={styles.sectionTitle}>{t('home.topTrainers')}</Text>
+                            <TouchableOpacity onPress={() => router.push('/(student-tabs)/trainers' as any)}><Text style={styles.seeAll}>{t('common.seeAll')}</Text></TouchableOpacity>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
                             {trainers.slice(0, 8).map((trainer: any, i: number) => (
-                                <TouchableOpacity key={trainer.trainerId || i} style={styles.trainerCard} activeOpacity={0.85}>
+                                <TouchableOpacity
+                                    key={trainer.trainerId || i}
+                                    style={styles.trainerCard}
+                                    activeOpacity={0.85}
+                                    onPress={() => trainer.trainerId && router.push({
+                                        pathname: '/trainer-profile' as any,
+                                        params: { trainerId: trainer.trainerId },
+                                    })}
+                                >
                                     <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
                                     <View style={styles.trainerAvatar}>
                                         {trainer.profilePictureUrl ? (

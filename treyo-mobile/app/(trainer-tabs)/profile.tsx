@@ -1,16 +1,26 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Image, Linking, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { authService, notificationService } from '../../services/api';
+import { authService, notificationService, courseService, trainerService } from '../../services/api';
 import api from '../../services/api';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
+import { ReviewsList } from '../../components/ReviewsList';
 
 export default function TrainerProfileScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
+    // Local mirrors of the availability fields so the stepper / switch
+    // respond instantly. Synced from `profile` on every load and
+    // pushed up to the backend on each interaction.
+    const [maxGroups, setMaxGroups] = useState<number>(3);
+    const [savingAvailability, setSavingAvailability] = useState(false);
     const [user, setUser] = useState<any>(null);
+    // useState import gets these here — `useState` already imported above.
     const [profile, setProfile] = useState<any>(null);
+    const [courses, setCourses] = useState<any[]>([]);
     const [imageTs, setImageTs] = useState(Date.now());
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
@@ -27,8 +37,23 @@ export default function TrainerProfileScreen() {
             const res = await api.get('/trainers/me');
             setProfile(res.data);
             setImageTs(Date.now());
+            // Sync local availability mirrors with server state.
+            if (res.data?.maxConcurrentGroups) {
+                setMaxGroups(Number(res.data.maxConcurrentGroups));
+            }
 
             if (currentUser?.userId) {
+                // Pull this trainer's courses so we can derive student
+                // count + course count. The trainer DTO doesn't carry
+                // those aggregates (totalStudentsTaught isn't auto-
+                // updated on enrollment, totalCourses doesn't exist at
+                // all), so we compute them from the source of truth.
+                try {
+                    const c = await courseService.getTrainerCourses(currentUser.userId);
+                    setCourses(Array.isArray(c) ? c : []);
+                } catch (_) {
+                    setCourses([]);
+                }
                 try {
                     const count = await notificationService.getUnreadCount(currentUser.userId);
                     setUnreadNotifCount(typeof count === 'number' ? count : 0);
@@ -39,11 +64,88 @@ export default function TrainerProfileScreen() {
         }
     };
 
+    // ── Derived values ────────────────────────────────────────────────
+    // Computed from real data instead of the broken DTO fields the
+    // screen used to read.
+    const studentsCount = useMemo(
+        () => courses.reduce(
+            (sum, c: any) => sum + (c.totalEnrolled ?? c.interestedStudentsCount ?? 0),
+            0,
+        ),
+        [courses],
+    );
+    const coursesCount = courses.length;
+
+    // specializations is a String[] on the DTO. Pretty-print it; "—" if empty.
+    const specializationText = useMemo(() => {
+        const s = profile?.specializations;
+        if (!s) return null;
+        if (Array.isArray(s)) return s.filter(Boolean).join(' · ') || null;
+        return String(s) || null;
+    }, [profile?.specializations]);
+
+    // Experience: prefer the free-text professionalExperience the trainer
+    // wrote, fall back to "N years" derived from experienceYears.
+    const experienceText = useMemo(() => {
+        const exp = profile?.professionalExperience;
+        if (exp && String(exp).trim()) return String(exp).trim();
+        const years = profile?.experienceYears;
+        if (years && Number(years) > 0) return `${years} ${Number(years) === 1 ? 'year' : 'years'}`;
+        return null;
+    }, [profile?.professionalExperience, profile?.experienceYears]);
+
+    // Location: stitched together from city + state (no single "location"
+    // field exists on the DTO). Skips empty pieces gracefully.
+    const locationText = useMemo(() => {
+        const parts = [profile?.city, profile?.state].filter(
+            (x: any) => x && String(x).trim());
+        return parts.length > 0 ? parts.join(', ') : null;
+    }, [profile?.city, profile?.state]);
+
+    /** Flip the trainer's active flag. Optimistic update — patches the
+     *  profile state immediately, rolls back on error. Pushes to
+     *  /trainers/me/availability. */
+    const handleToggleActive = async (next: boolean) => {
+        if (!user?.userId || savingAvailability) return;
+        const prevActive = !!profile?.active;
+        setProfile((p: any) => ({ ...(p || {}), active: next }));
+        setSavingAvailability(true);
+        try {
+            await trainerService.updateAvailability(user.userId, { isActive: next });
+        } catch (_) {
+            // Roll back
+            setProfile((p: any) => ({ ...(p || {}), active: prevActive }));
+            Alert.alert(t('common.error'), t('common.retry'));
+        } finally {
+            setSavingAvailability(false);
+        }
+    };
+
+    /** Bump the cap by +1 / -1. Clamped to [1, 20] client-side; the
+     *  backend repeats the clamp. Each tap fires a PUT — no debounce.
+     *  Trainers won't be flipping this fast. */
+    const handleChangeMaxGroups = async (delta: number) => {
+        if (!user?.userId || savingAvailability) return;
+        const next = Math.max(1, Math.min(20, maxGroups + delta));
+        if (next === maxGroups) return;
+        const prev = maxGroups;
+        setMaxGroups(next);
+        setSavingAvailability(true);
+        try {
+            await trainerService.updateAvailability(user.userId, { maxConcurrentGroups: next });
+        } catch (_) {
+            setMaxGroups(prev);
+            Alert.alert(t('common.error'), t('common.retry'));
+        } finally {
+            setSavingAvailability(false);
+        }
+    };
+
     const handleLogout = async () => {
-        Alert.alert('Logout', 'Are you sure you want to logout?', [
-            { text: 'Cancel', style: 'cancel' },
+        Alert.alert(t('auth.logout'), t('auth.logoutConfirm'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
-                text: 'Logout', style: 'destructive',
+                text: t('auth.logout'), style: 'destructive',
                 onPress: async () => { await authService.logout(); router.replace('/' as any); },
             },
         ]);
@@ -70,7 +172,7 @@ export default function TrainerProfileScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
-                    <Text style={styles.headerTitle}>Profile</Text>
+                    <Text style={styles.headerTitle}>{t('tabs.profile')}</Text>
                 </View>
 
                 {/* ── Avatar ── */}
@@ -93,50 +195,58 @@ export default function TrainerProfileScreen() {
                 </View>
 
                 {/* ── Name + Role ── */}
-                <Text style={styles.profileName}>{user?.name || 'Trainer'}</Text>
-                <Text style={styles.profileRole}>Trainer</Text>
+                <Text style={styles.profileName}>{user?.name || t('auth.trainer')}</Text>
+                <Text style={styles.profileRole}>{t('auth.trainer')}</Text>
 
-                {/* ── Stats ── */}
+                {/* ── Stats ──
+                    Derived from the trainer's own courses (computed above).
+                    Cuts out the broken `totalStudents`/`totalCourses`
+                    fields that don't exist on the trainer DTO. */}
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{profile?.totalStudents ?? 0}</Text>
-                        <Text style={styles.statLabel}>Students</Text>
+                        <Text style={styles.statValue}>{studentsCount}</Text>
+                        <Text style={styles.statLabel}>{t('profile.students')}</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{profile?.totalCourses ?? 0}</Text>
-                        <Text style={styles.statLabel}>Courses</Text>
+                        <Text style={styles.statValue}>{coursesCount}</Text>
+                        <Text style={styles.statLabel}>{t('profile.courses')}</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
                         <Text style={styles.statValue}>
-                            {profile?.averageRating ? Number(profile.averageRating).toFixed(1) : '—'}
+                            {profile?.averageRating && Number(profile.averageRating) > 0
+                                ? Number(profile.averageRating).toFixed(1)
+                                : '—'}
                         </Text>
-                        <Text style={styles.statLabel}>Rating</Text>
+                        <Text style={styles.statLabel}>{t('profile.rating')}</Text>
                     </View>
                 </View>
 
-                {/* ── Professional Info ── */}
+                {/* ── Professional Info ──
+                    Reads the actual DTO fields now: `specializations` (array),
+                    `professionalExperience` / `experienceYears`, `education`,
+                    and a stitched `city, state` for location. */}
                 <View style={styles.sectionWrap}>
-                    <Text style={styles.sectionLabel}>Professional Overview</Text>
+                    <Text style={styles.sectionLabel}>{t('profile.professionalOverview')}</Text>
                     <View style={styles.glassCard}>
                         <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                         <View style={styles.overviewGrid}>
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>SPECIALIZATION</Text>
-                                <Text style={styles.overviewValue}>{profile?.specialization || 'Not provided yet'}</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.specializationCaps')}</Text>
+                                <Text style={styles.overviewValue}>{specializationText || t('profile.notProvided')}</Text>
                             </View>
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>EXPERIENCE</Text>
-                                <Text style={styles.overviewValue}>{profile?.experience || 'Not provided yet'}</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.experienceCaps')}</Text>
+                                <Text style={styles.overviewValue}>{experienceText || t('profile.notProvided')}</Text>
                             </View>
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>EDUCATION</Text>
-                                <Text style={styles.overviewValue}>{profile?.education || 'Not provided yet'}</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.education')}</Text>
+                                <Text style={styles.overviewValue}>{profile?.education || t('profile.notProvided')}</Text>
                             </View>
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>LOCATION</Text>
-                                <Text style={styles.overviewValue}>{profile?.location || 'Not provided yet'}</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.locationCaps')}</Text>
+                                <Text style={styles.overviewValue}>{locationText || t('profile.notProvided')}</Text>
                             </View>
                         </View>
                     </View>
@@ -145,7 +255,7 @@ export default function TrainerProfileScreen() {
                 {/* ── Bio ── */}
                 {(profile?.bio) ? (
                     <View style={styles.sectionWrap}>
-                        <Text style={styles.sectionLabel}>Bio</Text>
+                        <Text style={styles.sectionLabel}>{t('profile.bio')}</Text>
                         <View style={styles.glassCard}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <Text style={styles.bioText}>{profile.bio}</Text>
@@ -156,7 +266,7 @@ export default function TrainerProfileScreen() {
                 {/* ── LinkedIn / Portfolio links ── */}
                 {(profile?.linkedinUrl || profile?.portfolioUrl) && (
                     <View style={styles.sectionWrap}>
-                        <Text style={styles.sectionLabel}>Links</Text>
+                        <Text style={styles.sectionLabel}>{t('profile.links')}</Text>
                         <View style={styles.glassCard}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <View style={styles.linksRow}>
@@ -185,6 +295,85 @@ export default function TrainerProfileScreen() {
                     </View>
                 )}
 
+                {/* ── Student feedback ──
+                    Read-only list of every review the trainer's
+                    students have left across all their courses. Hint
+                    line explains it's only visible to them so they
+                    feel safe acting on harsh feedback. */}
+                {user?.userId && (
+                    <View style={styles.sectionWrap}>
+                        <Text style={styles.sectionLabel}>{t('reviews.myFeedback')}</Text>
+                        <Text style={styles.feedbackHint}>{t('reviews.myFeedbackHint')}</Text>
+                        <ReviewsList mode="trainer" id={user.userId} limit={5} />
+                    </View>
+                )}
+
+                {/* ── Availability + concurrent-groups cap ── */}
+                <View style={styles.sectionWrap}>
+                    <Text style={styles.sectionLabel}>{t('profile.availability')}</Text>
+                    <View style={styles.glassCard}>
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+
+                        {/* Active / Inactive switch */}
+                        <View style={styles.availRow}>
+                            <View style={styles.availIconWrap}>
+                                <Ionicons
+                                    name={profile?.active ? 'flash' : 'pause-circle-outline'}
+                                    size={20}
+                                    color={profile?.active ? '#7cce06' : '#ffa500'}
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.availTitle}>
+                                    {profile?.active ? t('profile.active') : t('profile.inactive')}
+                                </Text>
+                                <Text style={styles.availSubtitle}>
+                                    {profile?.active ? t('profile.activeBody') : t('profile.inactiveBody')}
+                                </Text>
+                            </View>
+                            <Switch
+                                value={!!profile?.active}
+                                onValueChange={handleToggleActive}
+                                trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(124,206,6,0.5)' }}
+                                thumbColor={profile?.active ? '#7cce06' : '#ffffff'}
+                                ios_backgroundColor="rgba(255,255,255,0.15)"
+                            />
+                        </View>
+
+                        <View style={styles.availDivider} />
+
+                        {/* Max concurrent groups stepper */}
+                        <View style={styles.availRow}>
+                            <View style={styles.availIconWrap}>
+                                <Ionicons name="people" size={20} color="#7cce06" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.availTitle}>{t('profile.maxGroups')}</Text>
+                                <Text style={styles.availSubtitle}>{t('profile.maxGroupsBody')}</Text>
+                            </View>
+                            <View style={styles.stepper}>
+                                <TouchableOpacity
+                                    onPress={() => handleChangeMaxGroups(-1)}
+                                    style={styles.stepperBtn}
+                                    activeOpacity={0.6}
+                                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                                >
+                                    <Ionicons name="remove" size={18} color="#7cce06" />
+                                </TouchableOpacity>
+                                <Text style={styles.stepperValue}>{maxGroups}</Text>
+                                <TouchableOpacity
+                                    onPress={() => handleChangeMaxGroups(1)}
+                                    style={styles.stepperBtn}
+                                    activeOpacity={0.6}
+                                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                                >
+                                    <Ionicons name="add" size={18} color="#7cce06" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
                 {/* ── Settings & Privacy ── */}
                 <View style={styles.settingsWrap}>
                     <TouchableOpacity
@@ -197,8 +386,8 @@ export default function TrainerProfileScreen() {
                             <Ionicons name="settings-outline" size={22} color="#7cce06" />
                         </View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.settingsTitle}>Settings & Privacy</Text>
-                            <Text style={styles.settingsSubtitle}>Language, security, notifications and more</Text>
+                            <Text style={styles.settingsTitle}>{t('profile.settingsPrivacy')}</Text>
+                            <Text style={styles.settingsSubtitle}>{t('settings.manageAccount')}</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
                     </TouchableOpacity>
@@ -206,7 +395,7 @@ export default function TrainerProfileScreen() {
 
                 {/* ── Edit Profile ── */}
                 <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/trainer-edit-profile' as any)} activeOpacity={0.8}>
-                    <Text style={styles.editBtnText}>Edit Profile</Text>
+                    <Text style={styles.editBtnText}>{t('profile.editProfile')}</Text>
                 </TouchableOpacity>
             </ScrollView>
         </ScreenBackground>
@@ -258,6 +447,7 @@ const styles = StyleSheet.create({
     // Sections
     sectionWrap: { paddingHorizontal: 20, marginBottom: 20 },
     sectionLabel: { fontSize: 15, fontWeight: '700', color: '#7cce06', marginBottom: 10 },
+    feedbackHint: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: -6, marginBottom: 12 },
 
     glassCard: {
         borderRadius: 18, overflow: 'hidden',
@@ -279,6 +469,32 @@ const styles = StyleSheet.create({
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     },
     linkBtnText: { fontSize: 13, color: '#ffffff', fontWeight: '500' },
+
+    // Availability card
+    availRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 14,
+        paddingVertical: 14, paddingHorizontal: 16,
+    },
+    availIconWrap: {
+        width: 36, height: 36, borderRadius: 12,
+        backgroundColor: 'rgba(124,206,6,0.10)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    availTitle: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    availSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 16 },
+    availDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginHorizontal: 16 },
+
+    stepper: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderRadius: 999, paddingHorizontal: 4, paddingVertical: 3,
+    },
+    stepperBtn: {
+        width: 28, height: 28, borderRadius: 14,
+        backgroundColor: 'rgba(124,206,6,0.12)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    stepperValue: { color: '#ffffff', fontSize: 14, fontWeight: '700', minWidth: 22, textAlign: 'center' },
 
     settingsWrap: { paddingHorizontal: 20, marginBottom: 16 },
     settingsRow: {

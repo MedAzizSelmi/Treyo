@@ -37,6 +37,10 @@ public class TrainerProfileResponse {
     private BigDecimal averageRating;
     private Integer totalStudentsTaught;
     private boolean isProfileComplete;
+    /** Trainer-controlled availability toggle. False = no new groups
+     *  will be formed for this trainer; ML stops recommending their
+     *  courses. */
+    private Boolean isActive;
 
     // Profile completion status
     private ProfileCompletionStatus profileCompletionStatus;

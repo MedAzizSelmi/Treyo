@@ -51,8 +51,31 @@ server.tomcat.max-swallow-size=-1
 # Use a long random string (>= 256 bits). Generate one with e.g.:
 #   openssl rand -base64 48
 jwt.secret=CHANGE_ME_TO_A_LONG_RANDOM_SECRET
-jwt.expiration=86400000
-jwt.refresh-expiration=604800000
+# 90 days — keeps mobile users signed in until they explicitly log out.
+jwt.expiration=7776000000
+# 365 days — reserved for /auth/refresh (not currently exposed).
+jwt.refresh-expiration=31536000000
+
+# ===================================================================
+# SMTP (transactional email — verification + password reset)
+# ===================================================================
+# Recommended: Mailgun's free tier. SendGrid, AWS SES, and Gmail SMTP
+# (with an app password) also work — just swap host + credentials.
+spring.mail.host=smtp.mailgun.org
+spring.mail.port=587
+spring.mail.username=postmaster@sandboxXXXXXX.mailgun.org
+spring.mail.password=CHANGE_ME
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
+spring.mail.properties.mail.smtp.starttls.required=true
+
+app.mail.from=no-reply@yourdomain.com
+app.mail.from-name=Treyo
+
+# Base URL the email links resolve against. Production = your marketing
+# site, which deep-links into the app. Dev = your local web bounce page
+# or the Expo dev server.
+app.url=https://treyo.app
 
 # ===================================================================
 # ML SERVICE CONFIGURATION (FastAPI)

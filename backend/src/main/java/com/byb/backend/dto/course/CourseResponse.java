@@ -46,4 +46,14 @@ public class CourseResponse {
     // Additional info
     private Integer interestedStudentsCount;
     private Boolean canFormGroup;
+
+    // v2: module category + uploaded material + admin approval verdict.
+    private String moduleId;
+    private String moduleName;
+    private String materialUrl;
+    private String materialName;
+    /** PENDING / APPROVED / REJECTED. Legacy rows report APPROVED. */
+    private String approvalStatus;
+    private String approvalNote;
+    private LocalDateTime approvalDecidedAt;
 }

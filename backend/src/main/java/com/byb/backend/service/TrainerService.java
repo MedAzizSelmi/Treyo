@@ -77,6 +77,39 @@ public class TrainerService {
         return mapToProfileResponse(trainer);
     }
 
+    /**
+     * Trainer's self-controlled availability + capacity. Partial
+     * update — only the fields present in the body get applied.
+     */
+    @Transactional
+    public TrainerProfileResponse updateAvailability(String trainerId, java.util.Map<String, Object> body) {
+        Trainer trainer = trainerRepository.findByTrainerId(trainerId)
+                .orElseThrow(() -> new RuntimeException("Trainer not found"));
+
+        if (body.containsKey("isActive")) {
+            Object v = body.get("isActive");
+            if (v instanceof Boolean b) {
+                trainer.setIsActive(b);
+            } else if (v != null) {
+                trainer.setIsActive(Boolean.parseBoolean(String.valueOf(v)));
+            }
+        }
+        if (body.containsKey("maxConcurrentGroups")) {
+            Object v = body.get("maxConcurrentGroups");
+            int parsed;
+            if (v instanceof Number n) parsed = n.intValue();
+            else { try { parsed = Integer.parseInt(String.valueOf(v).trim()); } catch (Exception e) { parsed = 3; } }
+            // Clamp to a sane range. 1..20 covers anyone running a
+            // legit training operation without letting someone set a
+            // ridiculous cap.
+            parsed = Math.max(1, Math.min(20, parsed));
+            trainer.setMaxConcurrentGroups(parsed);
+        }
+
+        trainer = trainerRepository.save(trainer);
+        return mapToProfileResponse(trainer);
+    }
+
     private TrainerProfileResponse mapToProfileResponse(Trainer trainer) {
         // Calculate profile completion status
         boolean page1 = trainer.getPhone() != null && trainer.getAddress() != null;
@@ -117,6 +150,7 @@ public class TrainerService {
                 .totalStudentsTaught(trainer.getTotalStudentsTaught())
                 .isProfileComplete(trainer.isProfileComplete())
                 .profileCompletionStatus(status)
+                .isActive(trainer.getIsActive())
                 .build();
     }
 }

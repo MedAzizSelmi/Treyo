@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { authService, courseService, notificationService, groupService } from '../../services/api';
+import { authService, courseService, notificationService, groupService, trainerService } from '../../services/api';
 import api from '../../services/api';
 import { ScreenBackground } from '../../components/ScreenBackground';
 
@@ -18,6 +18,7 @@ export default function TrainerHomeScreen() {
     const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
     const [stats, setStats] = useState({ students: 0, courses: 0, rating: 0, revenue: 0 });
+    const [currency, setCurrency] = useState<string>('TND');
 
     const loadData = async () => {
         try {
@@ -72,6 +73,26 @@ export default function TrainerHomeScreen() {
                     const count = await notificationService.getUnreadCount(currentUser.userId);
                     setUnreadNotifCount(typeof count === 'number' ? count : 0);
                 } catch (_) {}
+
+                try {
+                    const res = await trainerService.getCurrency(currentUser.userId);
+                    if (res.currency) setCurrency(res.currency);
+                } catch (_) {}
+
+                // Current-month earnings — resets each month naturally
+                // since we always query {now.year, now.month}. Backend
+                // returns a currency too, which overrides the trainer's
+                // preferred display currency when set.
+                try {
+                    const now = new Date();
+                    const earn = await trainerService.getEarnings(
+                        currentUser.userId,
+                        now.getFullYear(),
+                        now.getMonth() + 1,
+                    );
+                    setStats(s => ({ ...s, revenue: Number(earn.total) || 0 }));
+                    if (earn.currency) setCurrency(earn.currency);
+                } catch (_) {}
             }
         } catch (e) {
             console.log('Trainer home load error', e);
@@ -94,10 +115,16 @@ export default function TrainerHomeScreen() {
 
     const firstName = user?.name?.split(' ')[0] || 'Trainer';
 
+    /**
+     * Render revenue using the trainer's preferred currency (settings-
+     * currency screen). Trailing code — "0 EUR", "1.2k TND" — rather
+     * than a leading symbol since not every listed currency has a
+     * clean one-glyph prefix (MAD, DZD, AED all read better as codes).
+     */
     const formatRevenue = (v: number) => {
-        if (!v) return '$0';
-        if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`;
-        return `$${v}`;
+        if (!v) return `0 ${currency}`;
+        if (v >= 1000) return `${(v / 1000).toFixed(1)}k ${currency}`;
+        return `${v} ${currency}`;
     };
 
     // Courses returned by /api/courses/trainer/{id} carry isPublished /
@@ -150,7 +177,13 @@ export default function TrainerHomeScreen() {
                         {/* ── Stats Grid ── */}
                         <View style={styles.statsRow}>
                             <StatCard title="Students" value={String(stats.students)} icon="people" color="#7cce06" />
-                            <StatCard title="Revenue" value={formatRevenue(stats.revenue)} icon="cash-outline" color="#FFD700" />
+                            <StatCard
+                                title="Revenue"
+                                value={formatRevenue(stats.revenue)}
+                                icon="cash-outline"
+                                color="#FFD700"
+                                onPress={() => router.push('/trainer-earnings' as any)}
+                            />
                         </View>
                         <View style={styles.statsRow}>
                             <StatCard title="Courses" value={String(stats.courses || courses.length)} icon="book-outline" color="#FF6B6B" />
@@ -229,17 +262,25 @@ export default function TrainerHomeScreen() {
     );
 }
 
-function StatCard({ title, value, icon, color }: any) {
-    return (
-        <View style={styles.statCard}>
+function StatCard({ title, value, icon, color, onPress }: any) {
+    const inner = (
+        <>
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
                 <Ionicons name={icon} size={22} color={color} />
             </View>
             <Text style={styles.statValue}>{value}</Text>
             <Text style={styles.statTitle}>{title}</Text>
-        </View>
+        </>
     );
+    if (onPress) {
+        return (
+            <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.75}>
+                {inner}
+            </TouchableOpacity>
+        );
+    }
+    return <View style={styles.statCard}>{inner}</View>;
 }
 
 function formatSessionDate(iso: string | null | undefined): { day: string; time: string; relative: string } {
@@ -265,6 +306,7 @@ function formatSessionDate(iso: string | null | undefined): { day: string; time:
 }
 
 function SessionCard({ session }: { session: any }) {
+    const router = useRouter();
     const { day, time, relative } = formatSessionDate(session.startDate);
     const status = (session.groupStatus || '').toLowerCase();
     const statusColor = status === 'active' ? '#7cce06' : status === 'ready' ? '#FFA500' : '#888';
@@ -274,7 +316,16 @@ function SessionCard({ session }: { session: any }) {
         : (session.meetingLocation || 'Location TBA');
 
     return (
-        <TouchableOpacity style={styles.sessionCard} activeOpacity={0.85}>
+        <TouchableOpacity
+            style={styles.sessionCard}
+            activeOpacity={0.85}
+            // Tapping a session card opens the scheduling screen for this
+            // group — where the trainer lays out the actual class dates.
+            onPress={() => router.push({
+                pathname: '/schedule-sessions' as any,
+                params: { groupId: session.groupId },
+            })}
+        >
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
             {/* Date pill on the left */}

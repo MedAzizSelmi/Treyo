@@ -3,15 +3,19 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authService } from '../services/api';
+import { registerForPushNotifications } from '../services/push';
 
 // Use 'screen' (full physical screen) not 'window' (safe area). On Android
 // 'window' excludes the system nav bar, which shrinks the gradient view
 // and pulls the strong-green bottom of the glow into the visible area.
 const { width, height } = Dimensions.get('screen');
 
+
 export default function LoginScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -20,13 +24,20 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password');
+            Alert.alert(t('common.error'), t('auth.invalidCreds'));
             return;
         }
 
         setLoading(true);
         try {
             const response = await authService.login(email, password);
+
+            // Register this device's Expo push token under the new user
+            // so the OS can deliver notifications even when the app is
+            // closed. Fire-and-forget — push is best-effort.
+            if (response?.userId) {
+                registerForPushNotifications(response.userId, response.role).catch(() => {});
+            }
 
             if (!response.onboardingComplete) {
                 if (response.role === 'STUDENT') {
@@ -42,7 +53,27 @@ export default function LoginScreen() {
                 }
             }
         } catch (error: any) {
-            Alert.alert('Login Failed', error.response?.data?.message || 'Invalid credentials');
+            // Trainer-approval gate. The backend throws a RuntimeException
+            // with a marker message — surface it as a friendly screen
+            // rather than the generic "invalid credentials" alert. We
+            // grep both the top-level message and the nested response
+            // body since Spring sometimes wraps the exception text
+            // differently across error paths.
+            const raw = String(
+                error?.response?.data?.message
+                || error?.response?.data?.error
+                || error?.message
+                || '',
+            );
+            if (raw.includes('TRAINER_PENDING_APPROVAL')) {
+                router.replace('/trainer-pending' as any);
+                return;
+            }
+            if (raw.includes('TRAINER_REJECTED')) {
+                router.replace('/trainer-rejected' as any);
+                return;
+            }
+            Alert.alert(t('auth.loginFailed'), error.response?.data?.message || t('auth.invalidCreds'));
         } finally {
             setLoading(false);
         }
@@ -63,6 +94,11 @@ export default function LoginScreen() {
                     response = await authService.loginWithLinkedIn();
                     break;
             }
+            // Same push token registration as the email path.
+            if (response?.userId) {
+                registerForPushNotifications(response.userId, response.role).catch(() => {});
+            }
+
             // Assuming response has same structure as email/password login
             if (!response.onboardingComplete) {
                 if (response.role === 'STUDENT') {
@@ -86,12 +122,15 @@ export default function LoginScreen() {
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-            {/* Background */}
-            <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
-            <LinearGradient colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']} style={styles.topGlow} />
-            <LinearGradient colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']} style={styles.bottomGlow} />
-            <LinearGradient colors={['rgba(19,5,107,1)', 'transparent']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.leftGlow} />
-            <LinearGradient colors={['transparent', 'rgba(19,5,107,1)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.rightGlow} />
+            {/* Background — wrapped in `direction: 'ltr'` so the side
+                glows aren't auto-mirrored in Arabic. */}
+            <View style={[StyleSheet.absoluteFill, { direction: 'ltr' }]} pointerEvents="none">
+                <LinearGradient colors={['#160e45', '#02000e']} style={StyleSheet.absoluteFill} />
+                <LinearGradient colors={['rgba(124,206,6,0.6)', 'rgba(124,206,6,0.25)', 'transparent']} style={styles.topGlow} />
+                <LinearGradient colors={['transparent', 'rgba(124,206,6,0.25)', 'rgba(124,206,6,0.6)']} style={styles.bottomGlow} />
+                <LinearGradient colors={['rgba(19,5,107,1)', 'transparent']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.leftGlow} />
+                <LinearGradient colors={['transparent', 'rgba(19,5,107,1)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.rightGlow} />
+            </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -99,8 +138,8 @@ export default function LoginScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.header}>
-                    <Text style={styles.title}>Welcome Back</Text>
-                    <Text style={styles.subtitle}>Sign in to continue</Text>
+                    <Text style={styles.title}>{t('auth.loginTitle')}</Text>
+                    <Text style={styles.subtitle}>{t('auth.loginSubtitle')}</Text>
                 </View>
 
                 <View style={styles.form}>
@@ -108,7 +147,7 @@ export default function LoginScreen() {
                         <Ionicons name="mail-outline" size={20} color="#aaa" />
                         <TextInput
                             style={styles.input}
-                            placeholder="Email"
+                            placeholder={t('auth.email')}
                             placeholderTextColor="#777"
                             value={email}
                             onChangeText={setEmail}
@@ -120,7 +159,7 @@ export default function LoginScreen() {
                         <Ionicons name="lock-closed-outline" size={20} color="#aaa" />
                         <TextInput
                             style={styles.input}
-                            placeholder="Password"
+                            placeholder={t('auth.password')}
                             placeholderTextColor="#777"
                             secureTextEntry={!showPassword}
                             value={password}
@@ -132,6 +171,18 @@ export default function LoginScreen() {
                         </TouchableOpacity>
                     </View>
 
+                    {/* Forgot password — routes to the email-entry screen.
+                        Sits between the password input and the sign-in
+                        button where users naturally look after a failed
+                        login attempt. */}
+                    <TouchableOpacity
+                        onPress={() => router.push('/forgot-password' as any)}
+                        style={styles.forgotLink}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.forgotText}>{t('auth.forgot')}</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                         style={styles.loginButton}
                         onPress={handleLogin}
@@ -139,7 +190,7 @@ export default function LoginScreen() {
                     >
                         <LinearGradient colors={['#7cce06', '#6bb805']} style={styles.buttonGradient}>
                             <Text style={styles.loginButtonText}>
-                                {loading ? 'Signing In...' : 'Sign In'}
+                                {loading ? t('common.loading') : t('auth.signIn')}
                             </Text>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -148,7 +199,7 @@ export default function LoginScreen() {
                     <View style={styles.socialSection}>
                         <View style={styles.divider}>
                             <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>or continue with</Text>
+                            <Text style={styles.dividerText}>{t('auth.orContinueWith')}</Text>
                             <View style={styles.dividerLine} />
                         </View>
 
@@ -183,9 +234,9 @@ export default function LoginScreen() {
                     </View>
 
                     <View style={styles.signupContainer}>
-                        <Text style={styles.signupText}>Don't have an account? </Text>
+                        <Text style={styles.signupText}>{t('auth.noAccount')} </Text>
                         <TouchableOpacity onPress={() => router.push('/signup' as any)}>
-                            <Text style={styles.signupLink}>Sign Up</Text>
+                            <Text style={styles.signupLink}>{t('auth.signUp')}</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -227,6 +278,13 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         marginLeft: 10
     },
+
+    forgotLink: {
+        alignSelf: 'flex-end',
+        paddingVertical: 8, paddingHorizontal: 4,
+        marginTop: -4, marginBottom: 6,
+    },
+    forgotText: { color: '#7cce06', fontSize: 13, fontWeight: '600' },
 
     loginButton: {
         borderRadius: 20,
