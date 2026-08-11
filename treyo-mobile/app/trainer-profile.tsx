@@ -7,7 +7,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { ReviewsList } from '../components/ReviewsList';
-import { trainerService, courseService, API_BASE_URL } from '../services/api';
+import ReportTrainerModal from '../components/ReportTrainerModal';
+import { trainerService, courseService, authService, API_BASE_URL } from '../services/api';
 
 export default function TrainerProfileScreen() {
     const router = useRouter();
@@ -16,8 +17,20 @@ export default function TrainerProfileScreen() {
     const [trainer, setTrainer] = useState<any>(null);
     const [courses, setCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [reportOpen, setReportOpen] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+
+    // Reporting is a student-only action, and nobody reports themselves.
+    const canReport =
+        currentUser?.role === 'STUDENT' &&
+        !!currentUser?.userId &&
+        currentUser.userId !== trainerId;
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => {
+        authService.getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null));
+    }, []);
 
     const load = async () => {
         if (!trainerId) return;
@@ -75,11 +88,23 @@ export default function TrainerProfileScreen() {
     return (
         <ScreenBackground>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-                {/* Back button */}
+                {/* Back button + report action */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
+                    {/* Only students can report, and never themselves — a
+                        trainer viewing their own profile shouldn't see this. */}
+                    {canReport && (
+                        <TouchableOpacity
+                            onPress={() => setReportOpen(true)}
+                            style={styles.reportBtn}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="flag-outline" size={15} color="#ff8f8f" />
+                            <Text style={styles.reportBtnText}>{t('report.reportAction')}</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Hero card */}
@@ -230,6 +255,16 @@ export default function TrainerProfileScreen() {
 
                 <View style={{ height: 80 }} />
             </ScrollView>
+
+            {canReport && (
+                <ReportTrainerModal
+                    visible={reportOpen}
+                    onClose={() => setReportOpen(false)}
+                    studentId={currentUser.userId}
+                    trainerId={String(trainerId)}
+                    trainerName={trainer?.name}
+                />
+            )}
         </ScreenBackground>
     );
 }
@@ -237,7 +272,17 @@ export default function TrainerProfileScreen() {
 const styles = StyleSheet.create({
     scroll: { paddingBottom: 40 },
 
-    header: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingHorizontal: 20, paddingBottom: 12 },
+    header: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingTop: 56, paddingHorizontal: 20, paddingBottom: 12,
+    },
+    reportBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
+        borderWidth: 1, borderColor: 'rgba(255,84,84,0.3)',
+        backgroundColor: 'rgba(255,84,84,0.10)',
+    },
+    reportBtnText: { fontSize: 12.5, fontWeight: '700', color: '#ff8f8f' },
     backBtn: {
         width: 38, height: 38, borderRadius: 12,
         backgroundColor: 'rgba(255,255,255,0.08)',

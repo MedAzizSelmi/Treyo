@@ -19,6 +19,7 @@ import {
   Star,
   Clock,
   Settings,
+  Flag,
 } from 'lucide-react';
 import { logout } from '@/lib/api';
 import { useState } from 'react';
@@ -33,6 +34,7 @@ const NAV = [
   { label: 'Groups', href: '/dashboard/groups', icon: GitBranch },
   { label: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { label: 'Reviews', href: '/dashboard/reviews', icon: Star },
+  { label: 'Reports', href: '/dashboard/reports', icon: Flag },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
   { label: 'System Health', href: '/dashboard/system', icon: Activity },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },

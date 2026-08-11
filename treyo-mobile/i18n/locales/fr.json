@@ -526,5 +526,28 @@
     "network": {
         "offline": "Vous êtes hors ligne — Certaines fonctionnalités peuvent être indisponibles.",
         "backOnline": "De nouveau en ligne"
+    },
+    "report": {
+        "title": "Signaler le formateur",
+        "subtitle": "Expliquez aux administrateurs ce qui s’est passé. Votre signalement est traité confidentiellement.",
+        "reasonLabel": "Motif",
+        "detailsLabel": "Détails (facultatif)",
+        "detailsPlaceholder": "Décrivez ce qui s’est passé…",
+        "submit": "Envoyer le signalement",
+        "cancel": "Annuler",
+        "reportAction": "Signaler",
+        "success": "Signalement envoyé",
+        "successBody": "Merci. Notre équipe va l’examiner rapidement.",
+        "alreadyReported": "Vous avez déjà un signalement en attente concernant ce formateur.",
+        "pickReason": "Veuillez choisir un motif.",
+        "failed": "Impossible d’envoyer le signalement. Réessayez.",
+        "reasons": {
+            "INAPPROPRIATE_BEHAVIOUR": "Comportement inapproprié",
+            "MISLEADING_CONTENT": "Contenu trompeur",
+            "NO_SHOW": "Absence",
+            "HARASSMENT": "Harcèlement",
+            "SPAM": "Spam",
+            "OTHER": "Autre"
+        }
     }
 }

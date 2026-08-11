@@ -459,7 +459,19 @@ export default function CourseDetailScreen() {
                         <View style={styles.trainerCard}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
-                            <View style={styles.trainerTop}>
+                            {/* Identity row opens the trainer's full profile,
+                                matching the Trainers list. Only this row is
+                                tappable — the card also holds LinkedIn /
+                                portfolio buttons, and wrapping the whole card
+                                would nest touchables and swallow their taps. */}
+                            <TouchableOpacity
+                                style={styles.trainerTop}
+                                activeOpacity={0.75}
+                                onPress={() => router.push({
+                                    pathname: '/trainer-profile' as any,
+                                    params: { trainerId: trainer.trainerId || course?.trainerId },
+                                })}
+                            >
                                 {trainerPicUri ? (
                                     <Image source={{ uri: trainerPicUri }} style={styles.trainerAvatar} />
                                 ) : (
@@ -484,7 +496,9 @@ export default function CourseDetailScreen() {
                                         </Text>
                                     </View>
                                 ) : null}
-                            </View>
+                                {/* Affordance so it reads as tappable. */}
+                                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.35)" />
+                            </TouchableOpacity>
 
                             {trainer.bio ? (
                                 <Text style={styles.trainerBio} numberOfLines={3}>{trainer.bio}</Text>

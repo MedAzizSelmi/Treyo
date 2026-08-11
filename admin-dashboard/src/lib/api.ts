@@ -155,6 +155,17 @@ export const approveTrainerCourse = (
 export const rejectTrainerCourse = (courseId: string, note?: string) =>
   api.put(`/admin/courses/${courseId}/reject-trainer`, note ? { note } : {});
 
+// ── Trainer reports (student-raised, admin-moderated) ──
+export const listTrainerReports = (status?: string) =>
+  api.get('/admin/reports', { params: status && status !== 'ALL' ? { status } : {} });
+export const getOpenReportCount = () =>
+  api.get<{ openCount: number }>('/admin/reports/open-count');
+export const updateReportStatus = (
+  reportId: string,
+  status: 'OPEN' | 'REVIEWED' | 'DISMISSED',
+  adminNote?: string,
+) => api.put(`/admin/reports/${reportId}/status`, { status, adminNote });
+
 // ── System settings (admin-tunable globals) ──
 // Currently just the revenue display currency. Read is public so
 // screens that display prices anywhere can pick up the code without

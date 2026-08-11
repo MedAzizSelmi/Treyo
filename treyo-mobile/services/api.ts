@@ -714,6 +714,25 @@ export const studentService = {
 // ══════════════════════════════════════════════
 // Trainer Services
 // ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// Trainer Reports (student → admin moderation)
+// ══════════════════════════════════════════════
+export const reportService = {
+    /** Report a trainer to the admins.
+     *  Throws with a readable message on 409 (a report from this student
+     *  about this trainer is already awaiting review). */
+    reportTrainer: async (payload: {
+        studentId: string;
+        trainerId: string;
+        reason: string;
+        details?: string;
+        courseId?: string;
+    }) => {
+        const response = await api.post('/reports/trainer', payload);
+        return response.data;
+    },
+};
+
 export const trainerService = {
     /** Get all active trainers */
     getAllTrainers: async () => {

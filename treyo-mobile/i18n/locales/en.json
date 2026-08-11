@@ -526,5 +526,28 @@
     "network": {
         "offline": "You're offline — Some features may be unavailable.",
         "backOnline": "Back online"
+    },
+    "report": {
+        "title": "Report trainer",
+        "subtitle": "Tell the admins what went wrong. Your report is reviewed confidentially.",
+        "reasonLabel": "Reason",
+        "detailsLabel": "Details (optional)",
+        "detailsPlaceholder": "Describe what happened…",
+        "submit": "Submit report",
+        "cancel": "Cancel",
+        "reportAction": "Report",
+        "success": "Report sent",
+        "successBody": "Thank you. Our team will review this shortly.",
+        "alreadyReported": "You already have a report about this trainer awaiting review.",
+        "pickReason": "Please choose a reason.",
+        "failed": "Could not send the report. Please try again.",
+        "reasons": {
+            "INAPPROPRIATE_BEHAVIOUR": "Inappropriate behaviour",
+            "MISLEADING_CONTENT": "Misleading content",
+            "NO_SHOW": "Did not show up",
+            "HARASSMENT": "Harassment",
+            "SPAM": "Spam",
+            "OTHER": "Other"
+        }
     }
 }

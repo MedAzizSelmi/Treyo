@@ -526,5 +526,28 @@
     "network": {
         "offline": "Estás sin conexión — Algunas funciones pueden no estar disponibles.",
         "backOnline": "De nuevo en línea"
+    },
+    "report": {
+        "title": "Reportar formador",
+        "subtitle": "Cuéntales a los administradores qué ocurrió. Tu reporte se revisa de forma confidencial.",
+        "reasonLabel": "Motivo",
+        "detailsLabel": "Detalles (opcional)",
+        "detailsPlaceholder": "Describe lo que ocurrió…",
+        "submit": "Enviar reporte",
+        "cancel": "Cancelar",
+        "reportAction": "Reportar",
+        "success": "Reporte enviado",
+        "successBody": "Gracias. Nuestro equipo lo revisará en breve.",
+        "alreadyReported": "Ya tienes un reporte pendiente de revisión sobre este formador.",
+        "pickReason": "Por favor elige un motivo.",
+        "failed": "No se pudo enviar el reporte. Inténtalo de nuevo.",
+        "reasons": {
+            "INAPPROPRIATE_BEHAVIOUR": "Comportamiento inapropiado",
+            "MISLEADING_CONTENT": "Contenido engañoso",
+            "NO_SHOW": "No se presentó",
+            "HARASSMENT": "Acoso",
+            "SPAM": "Spam",
+            "OTHER": "Otro"
+        }
     }
 }

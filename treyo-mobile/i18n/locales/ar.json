@@ -526,5 +526,28 @@
     "network": {
         "offline": "أنت غير متصل — قد لا تتوفر بعض الميزات.",
         "backOnline": "عاد الاتصال"
+    },
+    "report": {
+        "title": "الإبلاغ عن المدرب",
+        "subtitle": "أخبر المشرفين بما حدث. تتم مراجعة بلاغك بسرية.",
+        "reasonLabel": "السبب",
+        "detailsLabel": "التفاصيل (اختياري)",
+        "detailsPlaceholder": "صف ما حدث…",
+        "submit": "إرسال البلاغ",
+        "cancel": "إلغاء",
+        "reportAction": "إبلاغ",
+        "success": "تم إرسال البلاغ",
+        "successBody": "شكرًا لك. سيقوم فريقنا بمراجعته قريبًا.",
+        "alreadyReported": "لديك بالفعل بلاغ قيد المراجعة بخصوص هذا المدرب.",
+        "pickReason": "يرجى اختيار سبب.",
+        "failed": "تعذر إرسال البلاغ. حاول مرة أخرى.",
+        "reasons": {
+            "INAPPROPRIATE_BEHAVIOUR": "سلوك غير لائق",
+            "MISLEADING_CONTENT": "محتوى مضلل",
+            "NO_SHOW": "لم يحضر",
+            "HARASSMENT": "تحرش",
+            "SPAM": "رسائل مزعجة",
+            "OTHER": "أخرى"
+        }
     }
 }
