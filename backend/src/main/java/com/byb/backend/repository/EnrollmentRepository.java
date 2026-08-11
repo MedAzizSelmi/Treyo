@@ -43,4 +43,17 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, String> 
 
     @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.courseId = :courseId AND e.enrollmentStatus = 'confirmed'")
     long countConfirmedEnrollments(String courseId);
+
+    /**
+     * Students the trainer is currently training for this course.
+     *
+     * Deliberately excludes 'completed' and 'cancelled': once
+     * CourseLifecycleService closes a group it flips those enrollments to
+     * 'completed', so this count drops back down and the trainer's card
+     * reflects who they're teaching *now* rather than a lifetime total.
+     * (countByCourseId, used for totalEnrolled, keeps the lifetime figure
+     * the admin dashboard reports.)
+     */
+    @Query("SELECT COUNT(e) FROM Enrollment e WHERE e.courseId = :courseId AND e.enrollmentStatus IN ('confirmed','active')")
+    long countActiveEnrollments(String courseId);
 }

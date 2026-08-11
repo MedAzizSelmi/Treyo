@@ -351,6 +351,7 @@
         "cantAttend": "No puedo asistir",
         "read": "✓ Leído",
         "urgent": "Urgente",
+        "high": "Alta",
         "allCaughtUp": "¡Estás al día!",
         "groupFormingTitle": "Grupo formándose para {{course}}",
         "groupFormingMessage": "¡Buenas noticias! Tenemos {{current}}/{{min}} estudiantes interesados en « {{course}} ». Confirma tu presencia para unirte al grupo.",
@@ -521,5 +522,9 @@
         "groupUpdates": "Actualizaciones de grupo",
         "courseAnnouncements": "Anuncios de cursos",
         "marketing": "Marketing y consejos"
+    },
+    "network": {
+        "offline": "Estás sin conexión — Algunas funciones pueden no estar disponibles.",
+        "backOnline": "De nuevo en línea"
     }
 }

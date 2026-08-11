@@ -351,6 +351,7 @@
         "cantAttend": "لا أستطيع الحضور",
         "read": "✓ مقروء",
         "urgent": "عاجل",
+        "high": "مرتفع",
         "allCaughtUp": "لا توجد إشعارات جديدة!",
         "groupFormingTitle": "مجموعة قيد التكوين لـ {{course}}",
         "groupFormingMessage": "خبر سار! لدينا {{current}}/{{min}} طلاب مهتمين بـ « {{course}} ». أكّد حضورك للانضمام إلى المجموعة!",
@@ -521,5 +522,9 @@
         "groupUpdates": "تحديثات المجموعة",
         "courseAnnouncements": "إعلانات الدورات",
         "marketing": "تسويق ونصائح"
+    },
+    "network": {
+        "offline": "أنت غير متصل — قد لا تتوفر بعض الميزات.",
+        "backOnline": "عاد الاتصال"
     }
 }

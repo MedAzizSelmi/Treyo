@@ -392,6 +392,11 @@ export default function NotificationsScreen() {
                                                 <Text style={styles.urgentText}>{t('notifications.urgent')}</Text>
                                             </View>
                                         )}
+                                        {notif.priority === 'high' && (
+                                            <View style={styles.highBadge}>
+                                                <Text style={styles.highText}>{t('notifications.high')}</Text>
+                                            </View>
+                                        )}
                                         {!notif.isRead && <View style={styles.unreadDot} />}
                                     </View>
                                     <Text style={styles.message} numberOfLines={2}>{localized.message}</Text>
@@ -615,6 +620,14 @@ const styles = StyleSheet.create({
         borderWidth: 1, borderColor: 'rgba(255,68,68,0.3)',
     },
     urgentText: { fontSize: 10, color: '#ff4444', fontWeight: '700' },
+    // "high" sits between normal and urgent — amber rather than red, so
+    // the two priorities stay visually distinguishable at a glance.
+    highBadge: {
+        backgroundColor: 'rgba(255,165,0,0.15)',
+        borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+        borderWidth: 1, borderColor: 'rgba(255,165,0,0.3)',
+    },
+    highText: { fontSize: 10, color: '#ffa500', fontWeight: '700' },
     unreadDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#7cce06' },
     message: { fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 19, marginBottom: 4 },
     time: { fontSize: 11, color: 'rgba(255,255,255,0.3)' },

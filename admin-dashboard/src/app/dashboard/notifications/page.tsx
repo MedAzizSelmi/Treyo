@@ -61,14 +61,18 @@ export default function NotificationsPage() {
     setUsersLoading(true);
     try {
       const [s, t] = await Promise.all([getAllStudents(), getAllTrainers()]);
+      // UserManagementResponse exposes a single `userId` field for both
+      // roles — there is no studentId/trainerId on the DTO, so reading
+      // those produced an undefined id and the backend rejected the
+      // insert on notifications.user_id NOT NULL.
       const students: UserOption[] = (s.data || []).map((u: any) => ({
-        id: u.studentId,
+        id: u.userId,
         name: u.name,
         email: u.email,
         type: 'STUDENT' as const,
       }));
       const trainers: UserOption[] = (t.data || []).map((u: any) => ({
-        id: u.trainerId,
+        id: u.userId,
         name: u.name,
         email: u.email,
         type: 'TRAINER' as const,

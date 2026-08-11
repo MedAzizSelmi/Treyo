@@ -149,7 +149,7 @@ export default function UsersPage() {
               message: `Are you sure you want to ${r.isActive ? 'disable' : 'enable'} ${r.name}?`,
               variant: r.isActive ? 'danger' : 'success',
               confirmLabel: r.isActive ? 'Disable' : 'Enable',
-              action: () => toggleUserStatus(r.studentId, 'STUDENT'),
+              action: () => toggleUserStatus(r.userId, 'STUDENT'),
             })}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               r.isActive ? 'bg-danger/10 text-danger hover:bg-danger/20' : 'bg-success/10 text-success hover:bg-success/20'
@@ -165,7 +165,7 @@ export default function UsersPage() {
               message: `Promote ${r.name} (${r.email}) to admin? They will receive a temporary password.`,
               variant: 'success',
               confirmLabel: 'Promote',
-              action: () => promoteToAdmin(r.studentId, 'STUDENT'),
+              action: () => promoteToAdmin(r.userId, 'STUDENT'),
             })}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 text-warning hover:bg-warning/20 transition"
           >
@@ -234,7 +234,7 @@ export default function UsersPage() {
               message: `Are you sure you want to ${r.isActive ? 'disable' : 'enable'} ${r.name}?`,
               variant: r.isActive ? 'danger' : 'success',
               confirmLabel: r.isActive ? 'Disable' : 'Enable',
-              action: () => toggleUserStatus(r.trainerId, 'TRAINER'),
+              action: () => toggleUserStatus(r.userId, 'TRAINER'),
             })}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
               r.isActive ? 'bg-danger/10 text-danger hover:bg-danger/20' : 'bg-success/10 text-success hover:bg-success/20'
@@ -250,7 +250,7 @@ export default function UsersPage() {
               message: `Promote ${r.name} (${r.email}) to admin? They will receive a temporary password.`,
               variant: 'success',
               confirmLabel: 'Promote',
-              action: () => promoteToAdmin(r.trainerId, 'TRAINER'),
+              action: () => promoteToAdmin(r.userId, 'TRAINER'),
             })}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 text-warning hover:bg-warning/20 transition"
           >

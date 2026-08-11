@@ -13,7 +13,7 @@ import Constants from 'expo-constants';
 // If that's `localhost`/`127.0.0.1`, we're in USB mode.
 // ─────────────────────────────────────────────────────────────────
 const BACKEND_PORT = 8085;
-const MANUAL_OVERRIDE = 'http://192.168.0.188:8085';
+const MANUAL_OVERRIDE = 'http://192.168.100.11:8085';
 
 function resolveApiBase(): string {
     // hostUri looks like "192.168.100.68:8081" or "localhost:8081"

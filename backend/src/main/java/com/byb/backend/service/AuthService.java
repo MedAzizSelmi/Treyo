@@ -155,14 +155,20 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        // Try to find student
+        // Try to find student.
+        //
+        // NOTE: the password check is part of the guard, not a throw inside
+        // the block. One email can legitimately exist in more than one table
+        // — promoting a student/trainer to admin creates an Admin row while
+        // leaving the original row intact. Throwing on the first mismatch
+        // meant a promoted user could never sign in with their admin
+        // password, because the student lookup matched the email, failed the
+        // password, and aborted before the admin branch ran. Falling through
+        // lets each account type be tried in turn.
         var studentOpt = studentRepository.findByEmail(request.getEmail());
-        if (studentOpt.isPresent()) {
+        if (studentOpt.isPresent()
+                && passwordEncoder.matches(request.getPassword(), studentOpt.get().getPasswordHash())) {
             Student student = studentOpt.get();
-
-            if (!passwordEncoder.matches(request.getPassword(), student.getPasswordHash())) {
-                throw new BadCredentialsException("Invalid email or password");
-            }
 
             // Update last login
             student.setLastLoginAt(LocalDateTime.now());
@@ -187,14 +193,13 @@ public class AuthService {
                     .build();
         }
 
-        // Try to find trainer
+        // Try to find trainer. Same fall-through rule as the student branch
+        // above — the approval gate below still throws, but only *after* the
+        // password has actually matched.
         var trainerOpt = trainerRepository.findByEmail(request.getEmail());
-        if (trainerOpt.isPresent()) {
+        if (trainerOpt.isPresent()
+                && passwordEncoder.matches(request.getPassword(), trainerOpt.get().getPasswordHash())) {
             Trainer trainer = trainerOpt.get();
-
-            if (!passwordEncoder.matches(request.getPassword(), trainer.getPasswordHash())) {
-                throw new BadCredentialsException("Invalid email or password");
-            }
 
             // Approval gate — trainers can't sign in until an admin
             // has reviewed their onboarding submission and approved
@@ -233,14 +238,13 @@ public class AuthService {
                     .build();
         }
 
-        // Try to find admin
+        // Try to find admin. Last in the chain, so a promoted user whose
+        // student/trainer password didn't match still lands here and can
+        // sign in with their admin (temporary) password.
         var adminOpt = adminRepository.findByEmail(request.getEmail());
-        if (adminOpt.isPresent()) {
+        if (adminOpt.isPresent()
+                && passwordEncoder.matches(request.getPassword(), adminOpt.get().getPasswordHash())) {
             Admin admin = adminOpt.get();
-
-            if (!passwordEncoder.matches(request.getPassword(), admin.getPasswordHash())) {
-                throw new BadCredentialsException("Invalid email or password");
-            }
 
             // Update last login
             admin.setLastLoginAt(LocalDateTime.now());

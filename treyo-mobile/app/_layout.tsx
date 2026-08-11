@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { configureNotifications, registerForPushNotifications } from '../services/push';
 import { authService } from '../services/api';
 import { initI18n } from '../i18n';
+import NetworkBanner from '../components/NetworkBanner';
 
 // Keep native splash while loading
 ExpoSplashScreen.preventAutoHideAsync();
@@ -129,6 +130,10 @@ export default function RootLayout() {
                 <Stack.Screen name="(student-tabs)" />
                 <Stack.Screen name="(trainer-tabs)" />
             </Stack>
+            {/* Rendered after the Stack so it paints above every route
+                (later siblings win in RN), giving the offline warning and
+                the "back online" confirmation a spot on top of any screen. */}
+            <NetworkBanner />
         </ThemeProvider>
     );
 }

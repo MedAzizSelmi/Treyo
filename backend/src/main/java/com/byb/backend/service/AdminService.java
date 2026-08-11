@@ -306,10 +306,18 @@ public class AdminService {
     }
 
     /**
-     * Get all courses
+     * Get all courses for the admin Courses page.
+     *
+     * Only APPROVED courses belong here — a course still awaiting review
+     * (PENDING) or refused (REJECTED) lives on the dedicated Pending
+     * Courses page instead, so the admin isn't managing/pricing a course
+     * they haven't accepted yet. Legacy rows with a null approvalStatus
+     * predate the review workflow and count as approved.
      */
     public List<CourseManagementResponse> getAllCourses() {
         return courseRepository.findAll().stream()
+                .filter(c -> c.getApprovalStatus() == null
+                        || "APPROVED".equalsIgnoreCase(c.getApprovalStatus()))
                 .map(this::mapCourseToResponse)
                 .collect(Collectors.toList());
     }
@@ -443,6 +451,12 @@ public class AdminService {
         String type = req.getRecipientType();
 
         if ("SPECIFIC".equalsIgnoreCase(type)) {
+            // Fail loudly with a usable message instead of letting a null
+            // id reach the DB and surface as an opaque NOT NULL violation.
+            if (req.getTargetUserId() == null || req.getTargetUserId().isBlank()) {
+                throw new IllegalArgumentException(
+                        "targetUserId is required when recipientType is SPECIFIC.");
+            }
             saveNotification(req.getTargetUserId(),
                     req.getTargetUserType() != null ? req.getTargetUserType().toLowerCase() : "student",
                     req.getTitle(), req.getMessage(), req.getPriority());

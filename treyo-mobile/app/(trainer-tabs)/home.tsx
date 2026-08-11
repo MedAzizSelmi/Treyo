@@ -48,9 +48,16 @@ export default function TrainerHomeScreen() {
                 // designed as lifetime aggregates and are commonly zero.
                 // Summing across courses gives us a live number that
                 // matches what shows in the My Courses section below.
+                // activeStudentsCount excludes completed/cancelled
+                // enrollments, so this total drops back down once a group
+                // finishes instead of showing a lifetime tally. Falls back
+                // to the older fields if the backend predates that field.
                 const studentsCount = trainerCourses.reduce(
                     (sum: number, c: any) =>
-                        sum + (c.totalEnrolled ?? c.interestedStudentsCount ?? 0),
+                        sum + (c.activeStudentsCount
+                            ?? c.totalEnrolled
+                            ?? c.interestedStudentsCount
+                            ?? 0),
                     0,
                 );
                 setStats({
@@ -130,8 +137,19 @@ export default function TrainerHomeScreen() {
     // Courses returned by /api/courses/trainer/{id} carry isPublished /
     // isActive booleans, NOT a stringly-typed "status" field — the
     // earlier filter checked phantom fields and dropped everything.
-    // Drafts were removed app-wide, so every active row is live.
     const activeCourses = courses.filter((c: any) => c.isActive !== false);
+
+    // Same approvalStatus-driven mapping the Courses tab uses. The home
+    // screen used to hardcode "Active" on every card, so a course still
+    // waiting on (or refused by) admin review showed up as live.
+    const mapStatus = (c: any): 'Active' | 'Pending' | 'Rejected' => {
+        const s = String(c?.approvalStatus || '').toUpperCase();
+        if (s === 'PENDING') return 'Pending';
+        if (s === 'REJECTED') return 'Rejected';
+        return 'Active';
+    };
+    const statusColor = (status: string) =>
+        status === 'Pending' ? '#ffa500' : status === 'Rejected' ? '#ff5454' : '#7cce06';
 
     return (
         <ScreenBackground>
@@ -236,17 +254,19 @@ export default function TrainerHomeScreen() {
                                     <FormationCard
                                         key={c.courseId || c.id}
                                         title={c.title || 'Untitled'}
-                                        // CourseResponse uses totalEnrolled (paid) +
-                                        // interestedStudentsCount (queue) — fall back
-                                        // through both before the legacy enrolledCount.
+                                        // Students currently in training — resets when
+                                        // the group completes. Falls back through the
+                                        // older fields for backwards compatibility.
                                         students={
-                                            c.totalEnrolled
+                                            c.activeStudentsCount
+                                            ?? c.totalEnrolled
                                             ?? c.interestedStudentsCount
                                             ?? c.enrolledCount
                                             ?? 0
                                         }
                                         groups={c.currentGroupsCount ?? c.groupsCount ?? 0}
-                                        status="Active"
+                                        status={mapStatus(c)}
+                                        statusColor={statusColor(mapStatus(c))}
                                     />
                                 ))
                             ) : (
@@ -360,19 +380,19 @@ function SessionCard({ session }: { session: any }) {
     );
 }
 
-function FormationCard({ title, students, groups, status }: any) {
+function FormationCard({ title, students, groups, status, statusColor = '#7cce06' }: any) {
     return (
         <TouchableOpacity style={styles.formationCard} activeOpacity={0.85}>
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={styles.formationIcon}>
-                <Ionicons name="book" size={24} color="#7cce06" />
+            <View style={[styles.formationIcon, { backgroundColor: statusColor + '20' }]}>
+                <Ionicons name="book" size={24} color={statusColor} />
             </View>
             <View style={styles.formationInfo}>
                 <Text style={styles.formationTitle}>{title}</Text>
                 <Text style={styles.formationStat}>{students} students • {groups} groups</Text>
             </View>
-            <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>{status}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor + '50' }]}>
+                <Text style={[styles.statusText, { color: statusColor }]}>{status}</Text>
             </View>
         </TouchableOpacity>
     );

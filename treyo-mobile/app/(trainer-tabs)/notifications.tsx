@@ -203,7 +203,19 @@ export default function TrainerNotificationsScreen() {
                             />
                         </View>
                         <View style={styles.notifContent}>
-                            <Text style={styles.notifTitle}>{localized.title}</Text>
+                            <View style={styles.notifTitleRow}>
+                                <Text style={styles.notifTitle} numberOfLines={1}>{localized.title}</Text>
+                                {notif.priority === 'urgent' && (
+                                    <View style={styles.urgentBadge}>
+                                        <Text style={styles.urgentText}>{t('notifications.urgent')}</Text>
+                                    </View>
+                                )}
+                                {notif.priority === 'high' && (
+                                    <View style={styles.highBadge}>
+                                        <Text style={styles.highText}>{t('notifications.high')}</Text>
+                                    </View>
+                                )}
+                            </View>
                             <Text style={styles.notifDesc}>{localized.message}</Text>
                             <Text style={styles.notifTime}>{formatTime(notif.createdAt)}</Text>
                         </View>
@@ -328,6 +340,19 @@ const styles = StyleSheet.create({
     notifDesc: { fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 3, lineHeight: 19 },
     notifTime: { fontSize: 11, color: 'rgba(255,255,255,0.3)' },
     unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7cce06', marginLeft: 8 },
+    notifTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    urgentBadge: {
+        backgroundColor: 'rgba(255,68,68,0.15)',
+        borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+        borderWidth: 1, borderColor: 'rgba(255,68,68,0.3)',
+    },
+    urgentText: { fontSize: 10, color: '#ff4444', fontWeight: '700' },
+    highBadge: {
+        backgroundColor: 'rgba(255,165,0,0.15)',
+        borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+        borderWidth: 1, borderColor: 'rgba(255,165,0,0.3)',
+    },
+    highText: { fontSize: 10, color: '#ffa500', fontWeight: '700' },
 
     emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 24 },
     emptyIconWrap: {

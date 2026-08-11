@@ -35,7 +35,11 @@ public class CourseResponse {
     private Integer currentGroupsCount;
     private BigDecimal averageRating;
     private Integer totalRatings;
+    /** Lifetime enrollments — never decreases. Used by admin reporting. */
     private Integer totalEnrolled;
+    /** Students currently in training (excludes completed/cancelled), so it
+     *  resets once a group finishes. Used by the trainer's own screens. */
+    private Integer activeStudentsCount;
     private Integer totalCompleted;
     private BigDecimal completionRate;
     private Boolean isPublished;

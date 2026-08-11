@@ -272,6 +272,7 @@ public class CourseService {
         // Count interested students AND actual enrollments (dynamic — stays in sync with DB)
         long interestedCount = interactionRepository.countInterestedStudents(course.getCourseId());
         long actualEnrolled = enrollmentRepository.countByCourseId(course.getCourseId());
+        long activeStudents = enrollmentRepository.countActiveEnrollments(course.getCourseId());
         boolean canFormGroup = course.canFormGroup((int) interestedCount);
 
         return CourseResponse.builder()
@@ -297,6 +298,7 @@ public class CourseService {
                 .averageRating(course.getAverageRating())
                 .totalRatings(course.getTotalRatings())
                 .totalEnrolled((int) actualEnrolled)
+                .activeStudentsCount((int) activeStudents)
                 .totalCompleted(course.getTotalCompleted())
                 .completionRate(course.getCompletionRate())
                 .isPublished(course.getIsPublished())

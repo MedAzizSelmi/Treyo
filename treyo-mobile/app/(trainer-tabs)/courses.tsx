@@ -188,7 +188,11 @@ export default function TrainerCoursesScreen() {
                                 <View style={styles.cardStat}>
                                     <Ionicons name="people-outline" size={14} color="#7cce06" />
                                     <Text style={styles.cardStatText}>
-                                        {course.enrolledCount ?? course.students ?? course.totalEnrolled ?? 0} students
+                                        {course.activeStudentsCount
+                                            ?? course.enrolledCount
+                                            ?? course.students
+                                            ?? course.totalEnrolled
+                                            ?? 0} students
                                     </Text>
                                 </View>
                                 <View style={styles.cardStat}>

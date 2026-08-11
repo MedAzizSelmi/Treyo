@@ -351,6 +351,7 @@
         "cantAttend": "Can't Attend",
         "read": "✓ Read",
         "urgent": "Urgent",
+        "high": "High",
         "allCaughtUp": "You're all caught up!",
         "groupFormingTitle": "Group Forming for {{course}}",
         "groupFormingMessage": "Great news! We have {{current}}/{{min}} students interested in '{{course}}'. Confirm your presence to join the group!",
@@ -521,5 +522,9 @@
         "groupUpdates": "Group Updates",
         "courseAnnouncements": "Course Announcements",
         "marketing": "Marketing & Tips"
+    },
+    "network": {
+        "offline": "You're offline — Some features may be unavailable.",
+        "backOnline": "Back online"
     }
 }

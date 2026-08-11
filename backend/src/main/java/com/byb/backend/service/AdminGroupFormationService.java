@@ -151,7 +151,15 @@ public class AdminGroupFormationService {
      * Used by the admin's "Requested" tab.
      */
     public List<Map<String, Object>> getRequestedCoursesOverview() {
-        return courseRepository.findByIsPublishedTrueAndIsActiveTrue().stream().map(course -> {
+        return courseRepository.findByIsPublishedTrueAndIsActiveTrue().stream()
+                // Only approved courses can accumulate real demand — a
+                // PENDING/REJECTED course isn't visible to students, so it
+                // can't have a meaningful interest funnel and must not be
+                // offered for group formation. Legacy rows (null status)
+                // predate the review workflow and count as approved.
+                .filter(course -> course.getApprovalStatus() == null
+                        || "APPROVED".equalsIgnoreCase(course.getApprovalStatus()))
+                .map(course -> {
             long interestedCount = getActiveRequestStudentIds(course.getCourseId()).size();
             long confirmedPending = enrollmentRepository.findByCourseId(course.getCourseId()).stream()
                     .filter(e -> "confirmed".equalsIgnoreCase(e.getEnrollmentStatus()) && e.getGroupId() == null)
