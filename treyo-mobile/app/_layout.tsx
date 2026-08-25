@@ -106,6 +106,8 @@ export default function RootLayout() {
                 <Stack.Screen name="settings-language" />
                 <Stack.Screen name="settings-currency" />
                 <Stack.Screen name="trainer-earnings" />
+                <Stack.Screen name="legal-terms" />
+                <Stack.Screen name="legal-privacy" />
                 <Stack.Screen name="settings-security" />
                 <Stack.Screen name="settings-payments" />
                 <Stack.Screen name="favorites" />

@@ -52,7 +52,6 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-6 border-b border-border">
-        <div className="w-12 h-12 rounded-xl bg-gray-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
           <Image
             src="/logo.png"
             alt="Treyo"
@@ -61,7 +60,6 @@ export default function Sidebar() {
             className="w-11 h-11 object-contain"
             priority
           />
-        </div>
         {!collapsed && (
           <div className="overflow-hidden">
             <h1 className="text-lg font-bold text-white tracking-tight">Treyo</h1>

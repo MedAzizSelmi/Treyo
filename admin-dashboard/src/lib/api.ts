@@ -155,6 +155,13 @@ export const approveTrainerCourse = (
 export const rejectTrainerCourse = (courseId: string, note?: string) =>
   api.put(`/admin/courses/${courseId}/reject-trainer`, note ? { note } : {});
 
+// ── Account (the signed-in admin's own credentials) ──
+// Hits the shared /account/change-password endpoint; the backend picks
+// the right table from the JWT's role, so this always targets the admin
+// record even when the same email also exists as a student/trainer.
+export const changeAdminPassword = (currentPassword: string, newPassword: string) =>
+  api.post('/account/change-password', { currentPassword, newPassword });
+
 // ── Trainer reports (student-raised, admin-moderated) ──
 export const listTrainerReports = (status?: string) =>
   api.get('/admin/reports', { params: status && status !== 'ALL' ? { status } : {} });

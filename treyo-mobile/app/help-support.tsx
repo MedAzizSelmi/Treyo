@@ -11,7 +11,7 @@ export default function HelpSupportScreen() {
     const { t } = useTranslation();
 
     const handleContactSupport = () => {
-        Linking.openURL('mailto:support@treyo.com?subject=Help Request');
+        Linking.openURL('mailto:support@lean-consulting.com?subject=Help Request');
     };
 
     const handleWhatsApp = () => {
@@ -42,7 +42,7 @@ export default function HelpSupportScreen() {
                     </View>
                     <View style={styles.contactInfo}>
                         <Text style={[styles.contactTitle, { color: colors.text }]}>{t('help.emailSupport')}</Text>
-                        <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>support@treyo.com</Text>
+                        <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>support@lean-consulting.com</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
@@ -101,20 +101,10 @@ export default function HelpSupportScreen() {
                     onPress={() => console.log('Videos')}
                     colors={colors}
                 />
-                <ResourceItem
-                    icon="shield-checkmark-outline"
-                    title={t('help.privacyPolicy')}
-                    description={t('help.privacyPolicyDesc')}
-                    onPress={() => console.log('Privacy')}
-                    colors={colors}
-                />
-                <ResourceItem
-                    icon="document-text-outline"
-                    title={t('help.termsOfService')}
-                    description={t('help.termsOfServiceDesc')}
-                    onPress={() => console.log('Terms')}
-                    colors={colors}
-                />
+                {/* Privacy Policy and Terms of Service intentionally live
+                    only under Settings > Support & Legal — they were
+                    duplicated here, which meant two entry points to the
+                    same documents. */}
             </ScrollView>
         </ScreenBackground>
     );

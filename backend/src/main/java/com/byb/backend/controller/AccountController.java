@@ -37,7 +37,15 @@ public class AccountController {
             @Valid @RequestBody ChangePasswordRequest request
     ) {
         String email = authentication.getName();
-        authService.changePassword(email, request.getCurrentPassword(), request.getNewPassword());
+        // JwtAuthenticationFilter puts the token's role in as ROLE_<X>;
+        // strip the prefix so the service can match on STUDENT/TRAINER/ADMIN.
+        String role = authentication.getAuthorities().stream()
+                .map(a -> a.getAuthority())
+                .filter(a -> a != null && a.startsWith("ROLE_"))
+                .map(a -> a.substring("ROLE_".length()))
+                .findFirst()
+                .orElse(null);
+        authService.changePassword(email, role, request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
     }
 }

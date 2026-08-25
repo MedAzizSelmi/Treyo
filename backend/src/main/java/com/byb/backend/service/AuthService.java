@@ -279,44 +279,79 @@ public class AuthService {
      * trainers, and admins — whichever table the email lives in.
      */
     @Transactional
-    public void changePassword(String email, String currentPassword, String newPassword) {
-        // Student
-        var studentOpt = studentRepository.findByEmail(email);
-        if (studentOpt.isPresent()) {
-            Student s = studentOpt.get();
-            if (!passwordEncoder.matches(currentPassword, s.getPasswordHash())) {
-                throw new BadCredentialsException("Current password is incorrect");
-            }
-            s.setPasswordHash(passwordEncoder.encode(newPassword));
-            studentRepository.save(s);
+    public void changePassword(String email, String role, String currentPassword, String newPassword) {
+        // Role-first, because one email can exist in more than one table:
+        // promoting a student/trainer to admin creates an Admin row and
+        // leaves the original intact. Scanning student-then-trainer-then-
+        // admin would let an admin "change their password" in the admin
+        // dashboard and silently rewrite their old student password
+        // instead — the caller's JWT role tells us which account they are
+        // actually signed in as.
+        String r = role == null ? "" : role.trim().toUpperCase();
+
+        if ("ADMIN".equals(r)) {
+            Admin a = adminRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Account not found"));
+            requireCurrentPassword(currentPassword, a.getPasswordHash());
+            a.setPasswordHash(passwordEncoder.encode(newPassword));
+            adminRepository.save(a);
             return;
         }
 
-        // Trainer
-        var trainerOpt = trainerRepository.findByEmail(email);
-        if (trainerOpt.isPresent()) {
-            Trainer t = trainerOpt.get();
-            if (!passwordEncoder.matches(currentPassword, t.getPasswordHash())) {
-                throw new BadCredentialsException("Current password is incorrect");
-            }
+        if ("TRAINER".equals(r)) {
+            Trainer t = trainerRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Account not found"));
+            requireCurrentPassword(currentPassword, t.getPasswordHash());
             t.setPasswordHash(passwordEncoder.encode(newPassword));
             trainerRepository.save(t);
             return;
         }
 
-        // Admin
+        if ("STUDENT".equals(r)) {
+            Student s = studentRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Account not found"));
+            requireCurrentPassword(currentPassword, s.getPasswordHash());
+            s.setPasswordHash(passwordEncoder.encode(newPassword));
+            studentRepository.save(s);
+            return;
+        }
+
+        // No usable role on the token — fall back to the historical scan
+        // so an older client can still change a password.
+        var studentOpt = studentRepository.findByEmail(email);
+        if (studentOpt.isPresent()) {
+            Student s = studentOpt.get();
+            requireCurrentPassword(currentPassword, s.getPasswordHash());
+            s.setPasswordHash(passwordEncoder.encode(newPassword));
+            studentRepository.save(s);
+            return;
+        }
+
+        var trainerOpt = trainerRepository.findByEmail(email);
+        if (trainerOpt.isPresent()) {
+            Trainer t = trainerOpt.get();
+            requireCurrentPassword(currentPassword, t.getPasswordHash());
+            t.setPasswordHash(passwordEncoder.encode(newPassword));
+            trainerRepository.save(t);
+            return;
+        }
+
         var adminOpt = adminRepository.findByEmail(email);
         if (adminOpt.isPresent()) {
             Admin a = adminOpt.get();
-            if (!passwordEncoder.matches(currentPassword, a.getPasswordHash())) {
-                throw new BadCredentialsException("Current password is incorrect");
-            }
+            requireCurrentPassword(currentPassword, a.getPasswordHash());
             a.setPasswordHash(passwordEncoder.encode(newPassword));
             adminRepository.save(a);
             return;
         }
 
         throw new RuntimeException("Account not found");
+    }
+
+    private void requireCurrentPassword(String supplied, String storedHash) {
+        if (!passwordEncoder.matches(supplied, storedHash)) {
+            throw new BadCredentialsException("Current password is incorrect");
+        }
     }
 
     // ── Email verification ────────────────────────────────────────────────

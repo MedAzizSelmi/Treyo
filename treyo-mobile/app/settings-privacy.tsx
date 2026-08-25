@@ -171,10 +171,10 @@ export default function SettingsPrivacyScreen() {
                          onPress={() => router.push('/help-support' as any)} />
                     <View style={styles.divider} />
                     <Row icon="document-text-outline" title={t('settings.termsOfService')}
-                         onPress={() => Alert.alert(t('settings.termsOfService'), '')} />
+                         onPress={() => router.push('/legal-terms' as any)} />
                     <View style={styles.divider} />
                     <Row icon="shield-checkmark-outline" title={t('settings.privacyPolicy')}
-                         onPress={() => Alert.alert(t('settings.privacyPolicy'), '')} />
+                         onPress={() => router.push('/legal-privacy' as any)} />
                 </View>
 
                 {/* ── About ── */}
