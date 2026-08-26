@@ -26,6 +26,7 @@ public class CourseService {
     private final InteractionRepository interactionRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final com.byb.backend.repository.ModuleRepository moduleRepository;
+    private final FileAccessService fileAccessService;
 
     @Transactional
     public CourseResponse createCourse(String trainerId, CreateCourseRequest request) {
@@ -313,7 +314,14 @@ public class CourseService {
                         moduleRepository.findById(course.getModuleId())
                                 .map(com.byb.backend.model.CourseModule::getName)
                                 .orElse(null))
-                .materialUrl(course.getMaterialUrl())
+                // Only administrators and the authoring trainer receive the
+                // material URL here. Exposing it to every authenticated
+                // caller meant a learner could read it straight out of the
+                // catalogue listing and download paid material without ever
+                // enrolling or paying. Enrolled learners reach the file
+                // through the download endpoint, which verifies enrollment.
+                .materialUrl(fileAccessService.canSeeMaterialUrl(course)
+                        ? course.getMaterialUrl() : null)
                 .materialName(course.getMaterialName())
                 .approvalStatus(course.getApprovalStatus() == null ? "APPROVED" : course.getApprovalStatus())
                 .approvalNote(course.getApprovalNote())

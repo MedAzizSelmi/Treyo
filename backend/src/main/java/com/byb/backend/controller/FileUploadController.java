@@ -1,5 +1,6 @@
 package com.byb.backend.controller;
 
+import com.byb.backend.service.FileAccessService;
 import com.byb.backend.service.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class FileUploadController {
 
     private final FileStorageService fileStorageService;
+    private final FileAccessService fileAccessService;
 
     /**
      * Upload profile picture
@@ -31,9 +33,20 @@ public class FileUploadController {
     @Operation(summary = "Upload profile picture")
     public ResponseEntity<Map<String, String>> uploadProfilePicture(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId,
-            @RequestParam("userType") String userType
+            @RequestParam(value = "userId", required = false) String userId,
+            @RequestParam(value = "userType", required = false) String userType
     ) {
+        // The owner is taken from the caller's token, never from the
+        // request. Accepting a client-supplied id let any authenticated
+        // user overwrite somebody else's profile picture. The parameters
+        // are still accepted so older clients keep working, but they are
+        // ignored for anyone other than an administrator.
+        var caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return ResponseEntity.status(401).build();
+        if (!caller.isAdmin()) {
+            userId = caller.getUserId();
+            userType = caller.getRole();
+        }
         String filePath = fileStorageService.storeProfilePicture(file, userId, userType);
 
         Map<String, String> response = new HashMap<>();
@@ -51,8 +64,16 @@ public class FileUploadController {
     @Operation(summary = "Upload CV/Resume (trainers only)")
     public ResponseEntity<Map<String, String>> uploadCv(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("trainerId") String trainerId
+            @RequestParam(value = "trainerId", required = false) String trainerId
     ) {
+        // Same rule as the profile picture: the owning trainer comes from
+        // the token, so a CV cannot be filed under someone else's identity.
+        var caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return ResponseEntity.status(401).build();
+        if (!caller.isAdmin()) {
+            if (!caller.isTrainer()) return ResponseEntity.status(403).build();
+            trainerId = caller.getUserId();
+        }
         String filePath = fileStorageService.storeCv(file, trainerId);
 
         Map<String, String> response = new HashMap<>();
@@ -70,8 +91,14 @@ public class FileUploadController {
     @Operation(summary = "Upload certificate (trainers only)")
     public ResponseEntity<Map<String, String>> uploadCertificate(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("trainerId") String trainerId
+            @RequestParam(value = "trainerId", required = false) String trainerId
     ) {
+        var caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return ResponseEntity.status(401).build();
+        if (!caller.isAdmin()) {
+            if (!caller.isTrainer()) return ResponseEntity.status(403).build();
+            trainerId = caller.getUserId();
+        }
         String filePath = fileStorageService.storeCertificate(file, trainerId);
 
         Map<String, String> response = new HashMap<>();
@@ -93,8 +120,17 @@ public class FileUploadController {
     @Operation(summary = "Upload a course material file before the course row exists")
     public ResponseEntity<Map<String, String>> uploadPendingMaterial(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("trainerId") String trainerId
+            @RequestParam(value = "trainerId", required = false) String trainerId
     ) {
+        // The namespace must be the caller's own id: FileAccessService
+        // grants "courses/pending-{trainerId}/..." only to that trainer,
+        // so letting a client choose it would hand out someone else's box.
+        var caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return ResponseEntity.status(401).build();
+        if (!caller.isAdmin()) {
+            if (!caller.isTrainer()) return ResponseEntity.status(403).build();
+            trainerId = caller.getUserId();
+        }
         // Same storage location as regular course materials — grouped
         // by trainer instead of course so the file has a home while
         // the trainer is still filling out the form.
@@ -158,6 +194,13 @@ public class FileUploadController {
     ) {
         // Decode file path (replace $ with /)
         String filePath = encodedFilePath.replace("$", "/");
+
+        // Authorization gate. This endpoint used to be fully public, so a
+        // known or guessed path returned a trainer's CV or a paid course's
+        // material to anyone. Refuse before touching the filesystem.
+        if (!fileAccessService.canDownload(filePath)) {
+            return ResponseEntity.status(403).build();
+        }
 
         // Load file as Resource
         Resource resource = fileStorageService.loadFileAsResource(filePath);

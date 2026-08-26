@@ -94,7 +94,7 @@ public class AuthService {
                 student.getStudentId(),
                 Role.STUDENT.name()
         );
-        String refreshToken = jwtService.generateRefreshToken(student.getEmail());
+        String refreshToken = jwtService.generateRefreshToken(student.getEmail(), student.getStudentId(), Role.STUDENT.name());
 
         return AuthResponse.builder()
                 .token(token)
@@ -141,7 +141,7 @@ public class AuthService {
                 trainer.getTrainerId(),
                 Role.TRAINER.name()
         );
-        String refreshToken = jwtService.generateRefreshToken(trainer.getEmail());
+        String refreshToken = jwtService.generateRefreshToken(trainer.getEmail(), trainer.getTrainerId(), Role.TRAINER.name());
 
         return AuthResponse.builder()
                 .token(token)
@@ -180,7 +180,7 @@ public class AuthService {
                     student.getStudentId(),
                     Role.STUDENT.name()
             );
-            String refreshToken = jwtService.generateRefreshToken(student.getEmail());
+            String refreshToken = jwtService.generateRefreshToken(student.getEmail(), student.getStudentId(), Role.STUDENT.name());
 
             return AuthResponse.builder()
                     .token(token)
@@ -225,7 +225,7 @@ public class AuthService {
                     trainer.getTrainerId(),
                     Role.TRAINER.name()
             );
-            String refreshToken = jwtService.generateRefreshToken(trainer.getEmail());
+            String refreshToken = jwtService.generateRefreshToken(trainer.getEmail(), trainer.getTrainerId(), Role.TRAINER.name());
 
             return AuthResponse.builder()
                     .token(token)
@@ -256,7 +256,7 @@ public class AuthService {
                     admin.getAdminId(),
                     Role.ADMIN.name()
             );
-            String refreshToken = jwtService.generateRefreshToken(admin.getEmail());
+            String refreshToken = jwtService.generateRefreshToken(admin.getEmail(), admin.getAdminId(), Role.ADMIN.name());
 
             return AuthResponse.builder()
                     .token(token)
@@ -278,6 +278,99 @@ public class AuthService {
      * password, then hashes and stores the new one. Works for students,
      * trainers, and admins — whichever table the email lives in.
      */
+    @Transactional
+    /**
+     * Exchange a valid refresh token for a fresh access token.
+     *
+     * Access tokens are deliberately short-lived (one hour), which is only
+     * workable if the client can renew them silently — otherwise a user is
+     * signed out mid-session every hour. The refresh token carries the
+     * same identity claims, so the replacement access token is issued for
+     * exactly the account the session began with.
+     *
+     * The refresh token itself is returned unchanged rather than rotated:
+     * rotation needs server-side state to detect replay, which this
+     * stateless design does not have. Revocation today means changing
+     * jwt.secret, which invalidates every token at once.
+     */
+    public AuthResponse refreshAccessToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BadCredentialsException("Refresh token is required");
+        }
+
+        final String email;
+        try {
+            if (jwtService.isTokenExpired(refreshToken)) {
+                throw new BadCredentialsException("Refresh token has expired");
+            }
+            email = jwtService.extractUsername(refreshToken);
+        } catch (BadCredentialsException e) {
+            throw e;
+        } catch (Exception e) {
+            // Malformed or wrong signature — do not echo the parser detail.
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+
+        String role = jwtService.extractRole(refreshToken);
+
+        // Resolve the account, preferring the role recorded in the token so
+        // a user who exists in more than one table keeps the same session
+        // identity. Tokens issued before the claims existed fall back to a
+        // lookup by email.
+        if (role == null || "STUDENT".equalsIgnoreCase(role)) {
+            var s = studentRepository.findByEmail(email).orElse(null);
+            if (s != null) {
+                return AuthResponse.builder()
+                        .token(jwtService.generateToken(s.getEmail(), s.getStudentId(), Role.STUDENT.name()))
+                        .refreshToken(refreshToken)
+                        .userId(s.getStudentId())
+                        .email(s.getEmail())
+                        .name(s.getName())
+                        .role(Role.STUDENT)
+                        .onboardingComplete(s.isOnboardingComplete())
+                        .build();
+            }
+        }
+
+        if (role == null || "TRAINER".equalsIgnoreCase(role)) {
+            var t = trainerRepository.findByEmail(email).orElse(null);
+            if (t != null) {
+                // Re-check the approval gate: an administrator may have
+                // suspended this trainer since the session started.
+                String approval = t.getApprovalStatus() == null ? "PENDING" : t.getApprovalStatus();
+                if (!"APPROVED".equalsIgnoreCase(approval)) {
+                    throw new BadCredentialsException("Account is not approved");
+                }
+                return AuthResponse.builder()
+                        .token(jwtService.generateToken(t.getEmail(), t.getTrainerId(), Role.TRAINER.name()))
+                        .refreshToken(refreshToken)
+                        .userId(t.getTrainerId())
+                        .email(t.getEmail())
+                        .name(t.getName())
+                        .role(Role.TRAINER)
+                        .onboardingComplete(t.isProfileComplete())
+                        .build();
+            }
+        }
+
+        if (role == null || "ADMIN".equalsIgnoreCase(role)) {
+            var a = adminRepository.findByEmail(email).orElse(null);
+            if (a != null) {
+                return AuthResponse.builder()
+                        .token(jwtService.generateToken(a.getEmail(), a.getAdminId(), Role.ADMIN.name()))
+                        .refreshToken(refreshToken)
+                        .userId(a.getAdminId())
+                        .email(a.getEmail())
+                        .name(a.getName())
+                        .role(Role.ADMIN)
+                        .onboardingComplete(true)
+                        .build();
+            }
+        }
+
+        throw new BadCredentialsException("Account not found");
+    }
+
     @Transactional
     public void changePassword(String email, String role, String currentPassword, String newPassword) {
         // Role-first, because one email can exist in more than one table:

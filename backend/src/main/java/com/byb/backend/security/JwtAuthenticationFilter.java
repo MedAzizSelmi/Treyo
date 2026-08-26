@@ -54,9 +54,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String role = jwtService.extractRole(jwt);
                     String userId = jwtService.extractUserId(jwt);
 
-                    // Create authentication token
+                    // Carry the id and role on the principal so ownership
+                    // checks downstream cost no database lookup. getName()
+                    // still returns the email, so existing callers that read
+                    // authentication.getName() are unaffected.
+                    AuthenticatedUser principal = new AuthenticatedUser(userEmail, userId, role);
+
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userEmail,
+                            principal,
                             null,
                             List.of(new SimpleGrantedAuthority("ROLE_" + role))
                     );

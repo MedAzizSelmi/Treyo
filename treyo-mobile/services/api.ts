@@ -13,6 +13,22 @@ import Constants from 'expo-constants';
 // If that's `localhost`/`127.0.0.1`, we're in USB mode.
 // ─────────────────────────────────────────────────────────────────
 const BACKEND_PORT = 8085;
+
+// Production API URL, baked in at build time via app.json →
+// expo.extra.apiBaseUrl (or EXPO_PUBLIC_API_BASE_URL).
+//
+// This is what makes a standalone/EAS build work: there is no Metro dev
+// server in a store build, so `hostUri` below is empty and resolution
+// would otherwise fall through to a LAN address — which only works on
+// your own WiFi, and which iOS App Transport Security blocks outright
+// because it is plain http. Set this to your public https:// API before
+// running `eas build`.
+const PRODUCTION_API_URL: string =
+    (Constants.expoConfig as any)?.extra?.apiBaseUrl ||
+    process.env.EXPO_PUBLIC_API_BASE_URL ||
+    '';
+
+// Last-resort LAN fallback for development only.
 const MANUAL_OVERRIDE = 'http://192.168.100.11:8085';
 
 function resolveApiBase(): string {
@@ -24,7 +40,8 @@ function resolveApiBase(): string {
         '';
     const host = String(hostUri).split(':')[0];
 
-    if (!host) return MANUAL_OVERRIDE;
+    // No Metro host => standalone build => use the baked-in production URL.
+    if (!host) return PRODUCTION_API_URL || MANUAL_OVERRIDE;
     if (host === 'localhost' || host === '127.0.0.1') {
         return `http://localhost:${BACKEND_PORT}`;
     }
@@ -62,15 +79,57 @@ api.interceptors.request.use(
 // AUTH_FAILURE_SAFE_PATHS skip this — those legitimately 401 (e.g. login
 // with wrong password) and we don't want to nuke an unrelated session.
 const AUTH_FAILURE_SAFE_PATHS = ['/auth/login', '/auth/register', '/auth/refresh'];
+
+// Single in-flight refresh shared by every request that 401s at once, so
+// a screen firing several calls together triggers one refresh, not five.
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+    if (refreshInFlight) return refreshInFlight;
+
+    refreshInFlight = (async () => {
+        try {
+            const refreshToken = await SecureStore.getItemAsync('refresh_token');
+            if (!refreshToken) return null;
+            // Bare axios, not `api` — going through the instance would
+            // re-enter this interceptor on failure and recurse.
+            const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+            const newToken = res?.data?.token;
+            if (!newToken) return null;
+            await SecureStore.setItemAsync('jwt_token', newToken);
+            return newToken;
+        } catch (_) {
+            return null;
+        } finally {
+            refreshInFlight = null;
+        }
+    })();
+
+    return refreshInFlight;
+}
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const status = error?.response?.status;
-        const url = String(error?.config?.url || '');
+        const original = error?.config;
+        const url = String(original?.url || '');
         const isSafe = AUTH_FAILURE_SAFE_PATHS.some(p => url.includes(p));
-        if (status === 401 && !isSafe) {
+
+        if (status === 401 && !isSafe && original && !original._retried) {
+            // Access tokens are short-lived, so a 401 usually means
+            // "expired", not "signed out". Try to renew once and replay
+            // the request; only wipe the session if renewal fails.
+            original._retried = true;
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+                original.headers = original.headers || {};
+                original.headers.Authorization = `Bearer ${newToken}`;
+                return api(original);
+            }
             try {
                 await SecureStore.deleteItemAsync('jwt_token');
+                await SecureStore.deleteItemAsync('refresh_token');
                 await SecureStore.deleteItemAsync('user_data');
             } catch (_) {}
         }
@@ -105,6 +164,11 @@ export const authService = {
         const response = await api.post('/auth/login', { email, password });
         if (response.data.token) {
             await SecureStore.setItemAsync('jwt_token', response.data.token);
+            // Needed by the 401 interceptor to renew the short-lived
+            // access token without forcing the user to sign in again.
+            if (response.data.refreshToken) {
+                await SecureStore.setItemAsync('refresh_token', response.data.refreshToken);
+            }
             const userData = {
                 userId: response.data.userId,
                 email: response.data.email,
@@ -122,6 +186,11 @@ export const authService = {
         const response = await api.post(endpoint, { name: data.name, email: data.email, password: data.password });
         if (response.data.token) {
             await SecureStore.setItemAsync('jwt_token', response.data.token);
+            // Needed by the 401 interceptor to renew the short-lived
+            // access token without forcing the user to sign in again.
+            if (response.data.refreshToken) {
+                await SecureStore.setItemAsync('refresh_token', response.data.refreshToken);
+            }
             const userData = {
                 userId: response.data.userId,
                 email: response.data.email,
@@ -144,6 +213,7 @@ export const authService = {
             await unregisterCurrentDevice();
         } catch (_) {}
         await SecureStore.deleteItemAsync('jwt_token');
+        await SecureStore.deleteItemAsync('refresh_token');
         await SecureStore.deleteItemAsync('user_data');
     },
 

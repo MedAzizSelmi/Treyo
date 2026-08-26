@@ -42,22 +42,58 @@ _SERVICE_STARTED_AT = time.time()
 # FASTAPI APP INITIALIZATION
 # ============================================
 
+# This service is an INTERNAL component: only the Spring Boot backend
+# ever calls it, and it holds a direct database connection. It must not
+# be reachable from the internet. Two settings enforce that:
+#   - it binds to 127.0.0.1 by default (see __main__ below), and
+#   - ML_API_KEY, when set, is required on every non-public route.
+# Deployments must ALSO firewall the port; the checks here are the
+# second and third lines of defence, not the first.
+_ML_API_KEY = os.getenv("ML_API_KEY", "").strip()
+_EXPOSE_DOCS = os.getenv("ML_EXPOSE_DOCS", "false").lower() == "true"
+_EXPOSE_DEBUG = os.getenv("ML_EXPOSE_DEBUG", "false").lower() == "true"
+
 app = FastAPI(
     title="ML Recommendation Service",
     description="AI-powered course recommendations microservice",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    # Interactive docs map every endpoint; off unless explicitly enabled.
+    docs_url="/docs" if _EXPOSE_DOCS else None,
+    redoc_url="/redoc" if _EXPOSE_DOCS else None,
 )
 
-# CORS
+# CORS: this service is called server-to-server, not from a browser, so
+# no origin needs access. Previously "*" with credentials, which would
+# have let any website call it directly had the port been reachable.
+_ml_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_ml_origins,
+    allow_credentials=bool(_ml_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_api_key(request, call_next):
+    """
+    Shared-secret gate between the backend and this service.
+
+    Disabled when ML_API_KEY is unset so local development keeps working
+    unchanged; set it in production. /health stays open so a load
+    balancer or monitoring probe can check liveness without the key.
+    """
+    if _ML_API_KEY:
+        open_paths = ("/health",)
+        if not request.url.path.startswith(open_paths):
+            supplied = request.headers.get("X-ML-API-Key", "")
+            # Constant-time compare so the key can't be recovered by timing.
+            import hmac
+            if not hmac.compare_digest(supplied, _ML_API_KEY):
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    return await call_next(request)
 
 # ============================================
 # GLOBAL ML MODEL
@@ -465,6 +501,10 @@ async def retrain_model():
 
 @app.get("/debug/student/{student_id}", tags=["Debug"])
 async def debug_student_data(student_id: str):
+    # Returns one learner's profile and interaction history, so it is
+    # off unless ML_EXPOSE_DEBUG is explicitly enabled.
+    if not _EXPOSE_DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
     """
     Debug endpoint to see what data the model has for a student
     """
@@ -552,6 +592,8 @@ async def debug_all_domains():
     """
     See all domains in database and their course counts
     """
+    if not _EXPOSE_DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
     if rec_engine is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
@@ -566,4 +608,11 @@ async def debug_all_domains():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Loopback by default: the backend calls this from the same host, so
+    # binding 0.0.0.0 only exposed an unauthenticated service that can
+    # retrain the model and read learner data. Override API_HOST
+    # deliberately (e.g. inside a private container network), never to
+    # put this on a public interface.
+    host = os.getenv("API_HOST", "127.0.0.1")
+    port = int(os.getenv("API_PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)

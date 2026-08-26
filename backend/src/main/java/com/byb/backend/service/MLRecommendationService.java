@@ -31,12 +31,31 @@ public class MLRecommendationService {
     @Value("${ml.service.url}")
     private String mlServiceUrl;
 
+    /** Shared secret for the ML service. Empty in development, where the
+     *  service accepts unauthenticated calls from loopback. */
+    @Value("${ml.service.api-key:}")
+    private String mlApiKey;
+
+    /**
+     * WebClient pre-loaded with the ML service credential, so no call
+     * site can forget it. The recommendation service holds a direct
+     * database connection, so it authenticates every request once a key
+     * is configured.
+     */
+    private WebClient mlClient() {
+        WebClient.Builder b = webClientBuilder.clone();
+        if (mlApiKey != null && !mlApiKey.isBlank()) {
+            b = b.defaultHeader("X-ML-API-Key", mlApiKey);
+        }
+        return b.build();
+    }
+
     public RecommendationResponse getRecommendations(String studentId, int count) {
         try {
             // Call FastAPI ML service
             String url = mlServiceUrl + "/recommendations/" + studentId + "?n=" + count;
 
-            WebClient webClient = webClientBuilder.build();
+            WebClient webClient = mlClient();
 
             Map<String, Object> mlResponse = webClient.get()
                     .uri(url)
@@ -79,7 +98,7 @@ public class MLRecommendationService {
                 request.put("student_domains", domains);
             }
 
-            WebClient webClient = webClientBuilder.build();
+            WebClient webClient = mlClient();
 
             Map<String, Object> mlResponse = webClient.post()
                     .uri(url)
@@ -113,7 +132,7 @@ public class MLRecommendationService {
             request.put("course_id", courseId);
             request.put("interaction_type", interactionType);
 
-            WebClient webClient = webClientBuilder.build();
+            WebClient webClient = mlClient();
 
             webClient.post()
                     .uri(url)

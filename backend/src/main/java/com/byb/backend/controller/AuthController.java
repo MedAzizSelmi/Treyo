@@ -40,6 +40,22 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Exchange a refresh token for a new access token.
+     *
+     * Access tokens last one hour; without this endpoint a user would be
+     * signed out every hour with no way back in short of re-entering their
+     * password. The client calls this transparently when a request comes
+     * back 401.
+     */
+    @PostMapping("/refresh")
+    @Operation(summary = "Exchange a refresh token for a new access token")
+    public ResponseEntity<AuthResponse> refresh(@RequestBody Map<String, String> body) {
+        String refreshToken = body == null ? null : body.get("refreshToken");
+        AuthResponse response = authService.refreshAccessToken(refreshToken);
+        return ResponseEntity.ok(response);
+    }
+
     // ── Email verification ───────────────────────────────────────────────
 
     @PostMapping("/verify-email")

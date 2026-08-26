@@ -16,6 +16,14 @@ public interface CourseRepository extends JpaRepository<Course, String> {
 
     Optional<Course> findByCourseId(String courseId);
 
+    /** Resolve which course owns a stored material file, so the download
+     *  endpoint can check enrollment before serving it. The stored URL is
+     *  the public download path, so we match on its trailing segment. */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT c FROM Course c WHERE c.materialUrl IS NOT NULL "
+                    + "AND c.materialUrl LIKE CONCAT('%', :storedPath)")
+    Optional<Course> findByMaterialUrlEndingWith(String storedPath);
+
     List<Course> findByTrainerId(String trainerId);
 
     List<Course> findByTemplateId(String templateId);

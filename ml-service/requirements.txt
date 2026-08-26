@@ -1,0 +1,39 @@
+# Treyo — recommendation service dependencies
+#
+# Pinned to the versions the service was developed and evaluated against,
+# so a deployment reproduces the behaviour measured in the report rather
+# than whatever happens to be latest on install day.
+#
+# Install:
+#   python -m venv .venv
+#   .venv/bin/pip install -r requirements.txt
+#
+# NOTE ON PYTHON VERSION
+# Developed on Python 3.14. If the server has an older interpreter
+# (Ubuntu 24.04 ships 3.12), these exact versions may not all resolve —
+# pandas 3.x and numpy 2.4 in particular are recent. Either install a
+# matching interpreter on the VPS, or relax the pins below and re-run
+# evaluate_recommender.py to confirm the results still hold.
+
+# --- API layer ---
+fastapi==0.128.5
+uvicorn==0.40.0
+pydantic==2.12.5
+
+# --- Data / modelling ---
+pandas==3.0.0
+numpy==2.4.2
+scikit-learn==1.8.0
+scipy==1.17.0
+
+# Approximate nearest-neighbour index for content-based similarity.
+# Optional at runtime: the service falls back to scikit-learn's
+# cosine_similarity if this is unavailable (see build_content_based_model).
+faiss-cpu==1.13.2
+
+# --- Database ---
+psycopg2-binary==2.9.11
+
+# --- Scheduling + config ---
+APScheduler==3.11.2
+python-dotenv==1.2.1

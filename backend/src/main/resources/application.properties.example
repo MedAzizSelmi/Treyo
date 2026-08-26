@@ -26,6 +26,12 @@ spring.datasource.password=CHANGE_ME
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 # JPA / Hibernate
+#
+# PRODUCTION: set this to "validate" and apply schema changes through the
+# scripts in db/migrations instead. "update" never alters an existing
+# constraint, which is how the stale courses_format_check drifted out of
+# sync with the application and rejected valid course submissions at
+# runtime. "validate" fails fast at startup on that kind of drift.
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.format_sql=true
@@ -51,10 +57,41 @@ server.tomcat.max-swallow-size=-1
 # Use a long random string (>= 256 bits). Generate one with e.g.:
 #   openssl rand -base64 48
 jwt.secret=CHANGE_ME_TO_A_LONG_RANDOM_SECRET
-# 90 days — keeps mobile users signed in until they explicitly log out.
-jwt.expiration=7776000000
+# Access token lifetime: 1 hour.
+#
+# This was 90 days. Because the API is stateless there is no revocation
+# list, so the token's lifetime IS the exposure window: a token captured
+# from a device, a log, or a proxy stayed valid for three months. One
+# hour keeps that window small; the refresh token below is what keeps
+# users signed in, and it can be invalidated by changing the secret.
+jwt.expiration=3600000
 # 365 days — reserved for /auth/refresh (not currently exposed).
-jwt.refresh-expiration=31536000000
+# Refresh token lifetime: 30 days (was 365). Long enough that a regular
+# user is not asked to sign in again, short enough that an abandoned
+# device stops working within a month.
+jwt.refresh-expiration=2592000000
+
+# ===================================================================
+# APPLICATION SECURITY
+# ===================================================================
+# Browser origins allowed to call this API, comma-separated. Only affects
+# browsers — the mobile app is not subject to CORS. Set this to the admin
+# dashboard's real origin in production; do NOT use "*" together with
+# credentials.
+app.cors.allowed-origins=http://localhost:3000
+
+# Interactive API documentation (Swagger UI). Leave false in production:
+# it publishes a complete map of every endpoint and payload.
+app.swagger.enabled=true
+
+# Throttling for unauthenticated endpoints. Login limits password
+# guessing; the email limit also protects our SMTP reputation, since
+# those endpoints send mail to an address the caller chooses.
+# In-memory and per-instance — move to a shared store if scaled out.
+app.ratelimit.enabled=true
+app.ratelimit.login-attempts=10
+app.ratelimit.email-attempts=5
+app.ratelimit.window-minutes=15
 
 # ===================================================================
 # SMTP (transactional email — verification + password reset)
@@ -81,6 +118,11 @@ app.url=https://treyo.app
 # ML SERVICE CONFIGURATION (FastAPI)
 # ===================================================================
 ml.service.url=http://localhost:8000
+# Shared secret sent as X-ML-API-Key. The ML service holds a direct
+# database connection and must never be publicly reachable; set this in
+# production to the same value as ML_API_KEY in ml-service/.env, and
+# firewall its port as well. Leave empty in local development.
+ml.service.api-key=
 ml.service.endpoints.recommendations=/recommendations/{studentId}
 ml.service.endpoints.cold-start=/recommendations/cold-start
 ml.service.endpoints.track-interaction=/interactions/track
@@ -90,7 +132,7 @@ ml.service.endpoints.explain=/recommendations/explain
 # ===================================================================
 # CORS CONFIGURATION
 # ===================================================================
-cors.allowed-origins=http://localhost:3000,http://localhost:19006,http://localhost:8081
+# (legacy cors.allowed-origins removed - superseded by app.cors.allowed-origins above)
 cors.allowed-methods=GET,POST,PUT,DELETE,PATCH
 cors.allowed-headers=*
 cors.exposed-headers=Authorization
@@ -99,10 +141,14 @@ cors.allow-credentials=true
 # ===================================================================
 # LOGGING
 # ===================================================================
+# PRODUCTION: keep these at INFO/WARN. Hibernate SQL at DEBUG writes
+# every statement (with parameters) to the log, which is both a
+# performance drag and a place personal data accumulates in plain text.
+# Spring Security at DEBUG similarly logs authentication internals.
 logging.level.root=INFO
-logging.level.com.byb.match=DEBUG
-logging.level.org.springframework.security=DEBUG
-logging.level.org.hibernate.SQL=DEBUG
+logging.level.com.byb.match=INFO
+logging.level.org.springframework.security=WARN
+logging.level.org.hibernate.SQL=WARN
 logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
 
 # ===================================================================
@@ -153,3 +199,14 @@ file.storage.upload-dir=uploads
 file.storage.max-file-size=10485760
 file.storage.max-profile-picture-size=5242880
 file.storage.max-document-size=20971520
+
+# ===================================================================
+# HEALTH / MONITORING
+# ===================================================================
+# Only the health endpoint is exposed; the other actuator endpoints can
+# reveal configuration and environment, so they stay off. Point the
+# reverse proxy and any uptime monitor at /actuator/health.
+management.endpoints.web.exposure.include=health
+management.endpoint.health.show-details=never
+management.endpoints.enabled-by-default=false
+management.endpoint.health.enabled=true

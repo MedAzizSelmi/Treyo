@@ -439,7 +439,9 @@ function Sparkline({
                 fontSize: 12,
               }}
               labelFormatter={(t) => new Date(t).toLocaleTimeString()}
-              formatter={(v: number) => [v == null ? '—' : `${v}`, title]}
+              // Value is typed ValueType | undefined by Recharts; annotating
+              // it as `number` here failed `next build`'s type-check.
+              formatter={(v) => [v == null ? '—' : `${v}`, title]}
             />
             <Area
               type="monotone"

@@ -3,7 +3,13 @@ import axios from 'axios';
 // Backend root (no /api suffix) — exported so screens that need to
 // resolve relative file URLs like "/files/profile-pictures/abc.jpg"
 // can prefix them properly.
-export const API_BASE_URL = 'http://localhost:8085';
+// Backend root (no /api suffix). Configurable so the same build can run
+// against localhost in development and the deployed API in production —
+// set NEXT_PUBLIC_API_BASE_URL in the environment (e.g. .env.production
+// or the hosting provider's config). Falls back to localhost so nothing
+// changes for local development.
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8085';
 const API_URL = `${API_BASE_URL}/api`;
 
 const api = axios.create({

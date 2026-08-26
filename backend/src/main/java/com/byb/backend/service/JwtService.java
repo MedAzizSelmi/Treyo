@@ -54,6 +54,24 @@ public class JwtService {
         return createToken(claims, email, expiration);
     }
 
+    /**
+     * Refresh token.
+     *
+     * Carries userId and role alongside the subject so /auth/refresh can
+     * mint a replacement access token for the SAME identity. This matters
+     * because one email can exist in more than one table — a learner or
+     * trainer promoted to administrator keeps their original record — so
+     * an email alone would not say which account the session belonged to.
+     */
+    public String generateRefreshToken(String email, String userId, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        if (userId != null) claims.put("userId", userId);
+        if (role != null) claims.put("role", role);
+        claims.put("type", "refresh");
+        return createToken(claims, email, refreshExpiration);
+    }
+
+    /** Legacy single-argument form, kept for any caller not yet updated. */
     public String generateRefreshToken(String email) {
         return createToken(new HashMap<>(), email, refreshExpiration);
     }
