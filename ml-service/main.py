@@ -13,6 +13,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import time
+from dotenv import load_dotenv
 from sklearn.metrics.pairwise import cosine_similarity
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -49,6 +50,14 @@ _SERVICE_STARTED_AT = time.time()
 #   - ML_API_KEY, when set, is required on every non-public route.
 # Deployments must ALSO firewall the port; the checks here are the
 # second and third lines of defence, not the first.
+#
+# load_dotenv() must run before the reads below. recommendation_engine
+# already calls it on import, but depending on that would tie the API-key
+# read to import order — move that import down and the key reads empty,
+# which silently DISABLES authentication. Calling it explicitly here makes
+# the guarantee local. It is idempotent, so the second call is free.
+load_dotenv()
+
 _ML_API_KEY = os.getenv("ML_API_KEY", "").strip()
 _EXPOSE_DOCS = os.getenv("ML_EXPOSE_DOCS", "false").lower() == "true"
 _EXPOSE_DEBUG = os.getenv("ML_EXPOSE_DEBUG", "false").lower() == "true"
@@ -133,19 +142,29 @@ async def startup_event():
     print("🚀 Starting ML Recommendation Service...")
     print("📊 Loading recommendation model...")
 
+    # Losing the database IS fatal — there is nothing to serve and nothing
+    # a retry inside this process would fix, so let systemd restart us.
     try:
         rec_engine = RecommendationEngine()
         rec_engine.load_data()
-        rec_engine.build_models()
-
-        print("✅ ML model loaded and ready!")
-        print(f"   - Students: {len(rec_engine.students)}")
-        print(f"   - Courses: {len(rec_engine.courses)}")
-        print(f"   - Interactions: {len(rec_engine.interactions)}")
-
     except Exception as e:
-        print(f"❌ Failed to load ML model: {e}")
+        print(f"❌ Failed to load data from the database: {e}")
         raise
+
+    # A build failure is NOT fatal. A freshly deployed instance has an
+    # empty catalogue, and a transient data problem shouldn't leave systemd
+    # restart-looping a service that is otherwise healthy. Start with
+    # whatever model state we have and let the refresh below recover.
+    try:
+        rec_engine.build_models()
+        print("✅ ML model loaded and ready!")
+    except Exception as e:
+        print(f"⚠️  Model build failed at startup — serving empty "
+              f"recommendations until the next refresh: {e}")
+
+    print(f"   - Students: {len(rec_engine.students)}")
+    print(f"   - Courses: {len(rec_engine.courses)}")
+    print(f"   - Interactions: {len(rec_engine.interactions)}")
 
     # Arm the periodic refresh so new students / courses / interactions
     # become visible without a restart. The scheduler runs on a daemon

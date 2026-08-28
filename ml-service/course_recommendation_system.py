@@ -49,6 +49,11 @@ class CourseRecommendationSystem:
         # the sklearn fallback when FAISS isn't installed).
         self._faiss_index = None                # IndexFlatIP over L2-normalized content vectors
         self._content_matrix_normalised = None  # numpy float32, kept for the sklearn fallback path
+        # False until build_content_based_model() has actually fitted the
+        # vectorizer. A fresh deployment has no courses to fit on, and
+        # querying an unfitted TfidfVectorizer raises — so the scorers
+        # check this flag instead of assuming a model exists.
+        self._content_model_ready = False
 
         print("✅ Course Recommendation System initialized")
 
@@ -80,6 +85,13 @@ class CourseRecommendationSystem:
         """Preprocess and engineer features"""
         print("\n🔧 Preprocessing data...")
 
+        # A freshly deployed instance starts with an empty catalogue. The
+        # sklearn scaler and encoder below both raise ValueError on zero-row
+        # input, so those steps are skipped and their columns filled with
+        # empty series instead. Every column still exists afterwards, so
+        # downstream code can index by name without knowing which path ran.
+        no_courses = self.courses_df is None or self.courses_df.empty
+
         # 1. Create course content features
         self.courses_df['content_text'] = (
             self.courses_df['title'].fillna('') + ' ' +
@@ -90,22 +102,31 @@ class CourseRecommendationSystem:
         )
 
         # 2. Normalize ratings
-        self.courses_df['rating_normalized'] = self.scaler.fit_transform(
-            self.courses_df[['rating']]
-        )
+        if no_courses:
+            self.courses_df['rating_normalized'] = pd.Series(dtype='float64')
+        else:
+            self.courses_df['rating_normalized'] = self.scaler.fit_transform(
+                self.courses_df[['rating']]
+            )
 
         # 3. Calculate course popularity
         course_interactions = self.interactions_df.groupby('course_id').size().reset_index(name='popularity')
         self.courses_df = self.courses_df.merge(course_interactions, on='course_id', how='left')
         self.courses_df['popularity'] = self.courses_df['popularity'].fillna(0)
-        self.courses_df['popularity_normalized'] = self.scaler.fit_transform(
-            self.courses_df[['popularity']]
-        )
+        if no_courses:
+            self.courses_df['popularity_normalized'] = pd.Series(dtype='float64')
+        else:
+            self.courses_df['popularity_normalized'] = self.scaler.fit_transform(
+                self.courses_df[['popularity']]
+            )
 
         # 4. Encode difficulty level
-        self.courses_df['level_encoded'] = self.label_encoder.fit_transform(
-            self.courses_df['level']
-        )
+        if no_courses:
+            self.courses_df['level_encoded'] = pd.Series(dtype='int64')
+        else:
+            self.courses_df['level_encoded'] = self.label_encoder.fit_transform(
+                self.courses_df['level']
+            )
 
         # 5. Create student interest profiles
         self.students_df['interest_text'] = (
@@ -113,7 +134,8 @@ class CourseRecommendationSystem:
             self.students_df['specific_interests'].fillna('')
         )
 
-        print("   ✓ Features engineered")
+        print("   ⚠️  Empty catalogue — numeric features skipped"
+              if no_courses else "   ✓ Features engineered")
         return self
 
     def build_content_based_model(self):
@@ -129,11 +151,28 @@ class CourseRecommendationSystem:
         """
         print("\n🧠 Building Content-Based Model...")
 
+        # A freshly deployed instance has no catalogue to fit on, and
+        # TfidfVectorizer raises "empty vocabulary" on zero documents.
+        # Leave the model unbuilt and flagged: _content_scores() returns
+        # zeros in that state, so every ranker still runs to completion and
+        # simply produces nothing. The scheduled refresh builds the real
+        # model as soon as the first courses are published.
+        if self.courses_df is None or self.courses_df.empty:
+            self._reset_content_model("empty catalogue")
+            return self
+
         # 1. TF-IDF matrix (sparse, kept for backwards-compat with any
         # caller that still expects course_content_matrix).
-        self.course_content_matrix = self.tfidf_vectorizer.fit_transform(
-            self.courses_df['content_text']
-        )
+        try:
+            self.course_content_matrix = self.tfidf_vectorizer.fit_transform(
+                self.courses_df['content_text']
+            )
+        except ValueError as e:
+            # Reachable with a tiny catalogue whose every document reduces
+            # to stop words — same "no vocabulary" failure, same handling.
+            self._reset_content_model(str(e))
+            return self
+
         print(f"   ✓ Content matrix shape: {self.course_content_matrix.shape}")
 
         # 2. L2-normalize the rows so dot product == cosine similarity.
@@ -156,7 +195,21 @@ class CourseRecommendationSystem:
             self._faiss_index = None
             print("   ⚠️  Skipping FAISS index — sklearn fallback will be used")
 
+        self._content_model_ready = True
         return self
+
+    def _reset_content_model(self, reason):
+        """Put the content model back into its unbuilt state.
+
+        Called when there is nothing to fit on. Clearing every artefact
+        together means no ranker can find a half-built model — either all
+        of them are present or none are.
+        """
+        self.course_content_matrix = None
+        self._content_matrix_normalised = None
+        self._faiss_index = None
+        self._content_model_ready = False
+        print(f"   ⚠️  Content model not built ({reason})")
 
     def _content_scores(self, query_text):
         """Compute cosine similarity between a free-text query and every
@@ -171,6 +224,13 @@ class CourseRecommendationSystem:
         candidate-generation pattern; see the docstring on
         _topk_candidates() below.
         """
+        # No fitted model (empty catalogue) — every course scores zero.
+        # Returning a correctly-sized array rather than raising keeps the
+        # callers' arithmetic valid; they go on to produce an empty top-N.
+        if not self._content_model_ready:
+            return np.zeros(0 if self.courses_df is None else len(self.courses_df),
+                            dtype='float32')
+
         # TF-IDF transform → sparse row vector
         q_sparse = self.tfidf_vectorizer.transform([query_text])
         # Densify + normalize so FAISS or sklearn both see the same shape.
@@ -198,6 +258,9 @@ class CourseRecommendationSystem:
         rating/popularity mix); kept here for future "candidate generation
         → reranking" refactors when course catalogue grows beyond ~100k.
         """
+        if not self._content_model_ready:
+            return np.array([], dtype='int64'), np.array([], dtype='float32')
+
         q_sparse = self.tfidf_vectorizer.transform([query_text])
         q_dense = normalize(q_sparse.toarray().astype('float32'), norm='l2', axis=1)
         if self._faiss_index is not None:
@@ -237,6 +300,15 @@ class CourseRecommendationSystem:
             ['student_id', 'course_id']
         )['weight'].sum().reset_index()
 
+        # No interactions yet — a real state for a fresh deployment, and
+        # for any instance whose first users haven't engaged with anything.
+        # An empty frame is the right answer: collaborative_recommendations()
+        # tests membership in .index, which is simply False for everyone.
+        if user_item_df.empty:
+            self.user_item_matrix = pd.DataFrame()
+            print("   ⚠️  No interactions — collaborative model is empty")
+            return self
+
         # Create pivot table (user-item matrix)
         self.user_item_matrix = user_item_df.pivot_table(
             index='student_id',
@@ -246,7 +318,12 @@ class CourseRecommendationSystem:
         )
 
         print(f"   ✓ User-Item matrix shape: {self.user_item_matrix.shape}")
-        print(f"   ✓ Sparsity: {(1 - (self.user_item_matrix > 0).sum().sum() / (self.user_item_matrix.shape[0] * self.user_item_matrix.shape[1])) * 100:.2f}%")
+        # Sparsity is undefined on a zero-cell matrix — guard the division
+        # rather than letting a fresh instance die on ZeroDivisionError.
+        n_cells = self.user_item_matrix.shape[0] * self.user_item_matrix.shape[1]
+        if n_cells:
+            filled = (self.user_item_matrix > 0).sum().sum()
+            print(f"   ✓ Sparsity: {(1 - filled / n_cells) * 100:.2f}%")
 
         return self
 

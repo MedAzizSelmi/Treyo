@@ -38,6 +38,12 @@ backend/src/main/resources/application.properties
 __pycache__/
 *.py[cod]
 
+# ── Deployment notes (kept local) ──
+# Server layout, service names and the hardening steps for the VPS.
+# No secrets in it — every credential is a CAPITALS placeholder — but
+# it maps the production estate, so it stays off a public repo.
+DEPLOYMENT_RUNBOOK.md
+
 # ── Personal / academic documents (kept local, not shared) ──
 # The PFE report source + its compiled output and LaTeX build artifacts.
 rapport_pfe_byb_match.tex
@@ -48,6 +54,17 @@ rapport_pfe_byb_match.out
 rapport_pfe_byb_match.toc
 rapport_pfe_byb_match.lof
 rapport_pfe_byb_match.lot
+
+# ── Database dumps and backups ──
+# These contain real user data (names, emails, password hashes). A dump
+# taken in the project folder would otherwise be picked up by `git add -A`
+# and pushed to GitHub. Prefer dumping outside the repo entirely; these
+# patterns are the safety net.
+*.dump
+*.sql.gz
+*.backup
+db_*.tar.gz
+uploads_*.tar.gz
 
 # ── OS junk ──
 .DS_Store
