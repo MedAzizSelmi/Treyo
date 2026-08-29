@@ -175,24 +175,30 @@ gemini.api.key=YOUR_GEMINI_API_KEY
 # Models tried in order (fallback handled in GeminiService): gemini-2.0-flash-lite, gemini-2.0-flash, gemini-flash-lite-latest, gemini-flash-latest
 
 # ===================================================================
-# KONNECT PAYMENTS (Tunisian PSP — replaced Stripe so we can charge in TND)
+# CLICTOPAY PAYMENTS (SMT / ATB — the Tunisian bank gateway)
 # ===================================================================
-# api-key  : "<wallet_owner_id>:<secret>", sent as the x-api-key header
-#            on every Konnect call. SERVER-ONLY — never expose to the app.
-# wallet-id: the receiverWalletId for the merchant account. Konnect routes
-#            funds to this wallet when a payment completes.
-# base-url : preprod for sandbox testing, prod for real charges.
-#              preprod -> https://api.preprod.konnect.network/api/v2
-#              prod    -> https://api.konnect.network/api/v2
-# return-url : custom scheme the mobile app handles to detect "user finished
-#              the Konnect-hosted payment page and is coming back to us".
-# webhook-url: Konnect calls this when a payment changes state. Leave empty
-#              in dev (falls back to polling).
-konnect.api.key=YOUR_KONNECT_API_KEY
-konnect.api.wallet-id=YOUR_KONNECT_WALLET_ID
-konnect.api.base-url=https://api.preprod.konnect.network/api/v2
-konnect.api.return-url=treyomobile://payment-return
-konnect.api.webhook-url=
+# Konnect was used for prototyping only and has been removed; its
+# implementation is in git history if the flow shape is ever needed.
+#
+# Every value here is issued by the bank once the merchant contract is
+# approved — none of it is self-service:
+#   affiliate-id : "Numéro Affilié" from the Fiche Technique
+#   terminal-id  : "Numéro Terminal" from the same form
+#   secret       : the credential SMT provides with the integration spec
+#   base-url     : SMT's gateway endpoint, per that spec
+#
+# return-url-base is the PUBLIC https origin the gateway redirects the
+# user back to. /payment/success and /payment/failure are appended, and
+# both were declared on the Fiche Technique — they must keep matching
+# what was filed, or the bank rejects the redirect.
+#
+# All five may be left empty. The service starts, free enrollments work
+# as normal, and paid ones answer 503 until credentials exist.
+clicktopay.api.base-url=
+clicktopay.api.affiliate-id=
+clicktopay.api.terminal-id=
+clicktopay.api.secret=
+clicktopay.return-url-base=https://your-domain.example
 
 # File Storage
 file.storage.upload-dir=uploads

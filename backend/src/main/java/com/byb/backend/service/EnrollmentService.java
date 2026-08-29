@@ -28,17 +28,17 @@ public class EnrollmentService {
     private final PaymentService paymentService;
 
     /**
-     * Confirm an enrollment after the student has paid for it via Konnect.
+     * Confirm an enrollment after the student has paid for it.
      *
      * @param studentId   who's enrolling
      * @param courseId    which course
      * @param groupId     the group offer being accepted (optional)
-     * @param paymentRef  the Konnect paymentRef returned by
-     *                    POST /payments/init-payment and confirmed via the
-     *                    user's redirect flow. Required UNLESS the course
-     *                    is free (price <= 0).
+     * @param paymentRef  the gateway reference returned by
+     *                    POST /api/payments/enrollment-payment, after the
+     *                    user completed the hosted payment page. Required
+     *                    UNLESS the course is free (price <= 0).
      *
-     * Verifies the payment against Konnect's API (status = completed AND
+     * Verifies the payment against the gateway (status = completed AND
      * orderId references this same student+course) before writing
      * anything to the DB. Never trusts the client's claim of having paid.
      */
@@ -59,11 +59,11 @@ public class EnrollmentService {
         boolean isPaidCourse = price.compareTo(BigDecimal.ZERO) > 0;
 
         // ─── Payment verification ────────────────────────────────────
-        // For free courses (price = 0) we skip Konnect entirely. For paid
-        // courses we MUST see a "completed" payment whose orderId points
-        // back to this exact (student, course). Re-pulling from Konnect's
-        // API on every confirm means the client can't fake confirmation
-        // by sending any random paymentRef.
+        // For free courses (price = 0) the gateway is skipped entirely.
+        // For paid courses we MUST see a "completed" payment whose orderId
+        // points back to this exact (student, course). Re-pulling from the
+        // gateway on every confirm means the client can't fake
+        // confirmation by sending any random paymentRef.
         BigDecimal amountPaid = BigDecimal.ZERO;
         LocalDateTime paidAt = null;
         if (isPaidCourse) {
@@ -72,7 +72,7 @@ public class EnrollmentService {
             }
             Map<String, Object> payment = paymentService.retrievePayment(paymentRef);
             if (payment == null) {
-                throw new RuntimeException("Payment not found at Konnect: " + paymentRef);
+                throw new RuntimeException("Payment not found at the gateway: " + paymentRef);
             }
             String status = String.valueOf(payment.get("status"));
             if (!"completed".equals(status)) {

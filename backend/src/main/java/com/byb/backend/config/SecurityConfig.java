@@ -62,7 +62,15 @@ public class SecurityConfig {
                             // handler still re-verifies every event with
                             // the gateway before doing anything, so a
                             // forged webhook cannot create an enrollment.
-                            "/api/payments/konnect-webhook",
+                            "/api/payments/clicktopay-webhook",
+                            // Where the gateway sends the user's browser
+                            // back to. Reached by an anonymous browser
+                            // mid-redirect, so it cannot require a JWT.
+                            // The pages only bounce into the app — they
+                            // grant nothing and touch no data, precisely
+                            // because anyone can open them.
+                            "/payment/success",
+                            "/payment/failure",
                             // Liveness probe for the reverse proxy and
                             // uptime monitoring. Details are suppressed
                             // (show-details=never), so it reveals only

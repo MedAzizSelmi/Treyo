@@ -51,10 +51,16 @@ public class Enrollment extends BaseEntity {
     @Column(name = "enrolled_at")
     private LocalDateTime enrolledAt;
 
-    // Konnect payment reference that paid for this enrollment. Stored
-    // so we can audit refunds / disputes against the actual charge, and
-    // so the confirm endpoint can verify the payment's status with
-    // Konnect before flipping enrollment to "confirmed".
+    // Gateway payment reference that paid for this enrollment. Stored so
+    // refunds and disputes can be audited against the actual charge, and
+    // so the confirm endpoint can verify status with the gateway before
+    // flipping enrollment to "confirmed".
+    //
+    // The column is still named after Konnect, the gateway used during
+    // prototyping. It is deliberately NOT renamed: the column exists in
+    // deployed databases, and ddl-auto=validate fails at startup on any
+    // mismatch between entity and schema. Renaming it would mean a
+    // migration for no behavioural gain.
     @Column(name = "konnect_payment_id", length = 100)
     private String konnectPaymentId;
 

@@ -5,86 +5,118 @@ import com.byb.backend.model.Student;
 import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Server-side integration with Konnect (Tunisian payment gateway).
+ * Server-side payment integration, targeting ClicToPay (SMT / ATB).
  *
- * Replaces our earlier Stripe integration. Konnect is REST-only (no Java
- * SDK), TND-native, and uses a redirect flow rather than a payment sheet:
+ * ── Status ──────────────────────────────────────────────────────────
+ * The two methods that talk to the gateway are NOT implemented. SMT does
+ * not release its integration specification until the merchant contract
+ * is approved, and guessing at a payment API's request format, signature
+ * scheme and status vocabulary produces code that looks plausible and
+ * fails in ways that are expensive to debug against real cards. They
+ * throw {@link PaymentProviderUnavailable} until the spec arrives.
  *
- *   1. POST /payments/init-payment — we send amount + customer info,
- *      Konnect returns { paymentRef, payUrl }.
- *   2. The mobile app opens payUrl in a browser/WebView (via
- *      expo-web-browser). The user pays on Konnect's hosted page.
- *   3. Konnect redirects back to our app's custom scheme (treyomobile://).
- *   4. The app calls POST /api/enrollments/confirm with the paymentRef.
- *   5. The backend calls GET /payments/{paymentRef} to verify
- *      payment.status == "completed" BEFORE creating the Enrollment row.
+ * Everything around them is real and provider-agnostic: price resolution,
+ * the free-course short-circuit, orderId encoding, and the verification
+ * contract the rest of the application relies on.
  *
- * Konnect also supports an outbound webhook ("silent webhook"). We
- * expose that endpoint too, but the confirm-then-verify flow above is
- * the source of truth — webhooks are advisory only. That way payment
- * works even without a publicly reachable backend (e.g. local dev).
+ * This replaced a working Konnect integration, which was only ever used
+ * for prototyping. That implementation is in git history (before the
+ * "ClicToPay" migration commit) and is the reference for the flow shape.
+ *
+ * ── The flow, once implemented ──────────────────────────────────────
+ *   1. Mobile calls POST /api/payments/enrollment-payment → we ask the
+ *      gateway to create a payment and return { payUrl, paymentRef }.
+ *   2. Mobile opens payUrl. The user pays on the gateway's hosted page,
+ *      including the 3-D Secure challenge (the contract mandates 3DS for
+ *      national and international cards alike, so the return happens
+ *      after an interstitial bank page, not straight from the card form).
+ *   3. The gateway redirects to /payment/success or /payment/failure,
+ *      which bounce back into the app via its custom scheme.
+ *   4. Mobile calls POST /api/enrollments/confirm with the paymentRef.
+ *   5. The backend re-verifies with the gateway BEFORE writing the row.
+ *
+ * ── The rule that must survive any rewrite ──────────────────────────
+ * Never trust a redirect or a webhook body. Both are attacker-reachable:
+ * the redirect passes through the user's browser, and the webhook URL is
+ * public by necessity. Confirmation always re-fetches state from the
+ * gateway server-to-server. Everything else here is negotiable; this is
+ * what stops a forged callback creating a paid enrollment for free.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PaymentService {
 
     private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
+    /** Retained for the gateway calls below, which are not yet written. */
+    @SuppressWarnings("unused")
     private final WebClient.Builder webClientBuilder;
 
-    @Value("${konnect.api.key}")
-    private String konnectApiKey;
+    // Every property below defaults to empty. A deployment without
+    // payment credentials must still start — the alternative is a
+    // service that refuses to boot because a feature nobody is using yet
+    // has not been configured.
+    //
+    // Affiliate and terminal numbers come from ATB on the signed
+    // contract ("Numéro Affilié" / "Numéro Terminal" on the Fiche
+    // Technique); they are not self-service values.
 
-    @Value("${konnect.api.wallet-id}")
-    private String konnectWalletId;
+    @Value("${clicktopay.api.base-url:}")
+    private String baseUrl;
 
-    @Value("${konnect.api.base-url}")
-    private String konnectBaseUrl;
+    @Value("${clicktopay.api.affiliate-id:}")
+    private String affiliateId;
 
-    @Value("${konnect.api.return-url}")
-    private String konnectReturnUrl;
+    @Value("${clicktopay.api.terminal-id:}")
+    private String terminalId;
 
-    @Value("${konnect.api.webhook-url:}")
-    private String konnectWebhookUrl;
+    @Value("${clicktopay.api.secret:}")
+    private String secret;
 
-    // Lazy WebClient — built once and reused. Konnect's API is responsive
-    // (sub-second) so a 10-second timeout is plenty even on cold networks.
-    private WebClient webClient;
+    /**
+     * Public HTTPS base the gateway redirects the user back to, e.g.
+     * https://treyo.leanconsulting.com.tn. The success and failure paths
+     * are appended to it. This is declared to SMT on the Fiche Technique
+     * and must match what is registered there.
+     */
+    @Value("${clicktopay.return-url-base:}")
+    private String returnUrlBase;
 
-    private WebClient client() {
-        if (webClient == null) {
-            webClient = webClientBuilder
-                    .baseUrl(konnectBaseUrl)
-                    .defaultHeader("x-api-key", konnectApiKey)
-                    .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-                    .build();
-        }
-        return webClient;
+    /** True once ATB has issued credentials and they are configured. */
+    public boolean isConfigured() {
+        return notBlank(baseUrl) && notBlank(affiliateId)
+                && notBlank(terminalId) && notBlank(secret);
     }
 
     /**
-     * Create a Konnect payment for an enrollment.
+     * Thrown when a payment is requested before the gateway is usable.
+     * Distinct from a gateway *error* so the controller can answer 503
+     * ("not available yet") rather than 502 ("provider misbehaved").
+     */
+    public static class PaymentProviderUnavailable extends RuntimeException {
+        public PaymentProviderUnavailable(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Begin payment for an enrollment.
      *
-     * @param studentId who's paying
-     * @param courseId  which course
-     * @param groupId   the group offer (kept in `orderId` metadata so the
-     *                  webhook can route back to the right enrollment)
-     * @return ready-to-send-to-client map: { payUrl, paymentRef, amount, currency, free }
+     * @param groupId the group offer, carried in `orderId` so a webhook
+     *                can route back to the right enrollment
+     * @return { payUrl, paymentRef, amount, currency, free }
      */
     public Map<String, Object> createEnrollmentPayment(String studentId, String courseId, String groupId) {
         Student student = studentRepository.findByStudentId(studentId)
@@ -92,16 +124,16 @@ public class PaymentService {
         Course course = courseRepository.findByCourseId(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
 
-        // Konnect expects amounts in MILLIMES (1 TND = 1000 millimes).
-        // Course.price is stored in major TND units (e.g. 49.99 TND).
+        // Tunisian gateways bill in MILLIMES (1 TND = 1000). Course.price
+        // is stored in major TND units, e.g. 49.99.
         BigDecimal priceMajor = course.getPrice() == null ? BigDecimal.ZERO : course.getPrice();
         long amountMillimes = priceMajor.setScale(3, RoundingMode.HALF_UP)
                 .movePointRight(3)
                 .longValueExact();
 
-        // Free course short-circuit — skip Konnect entirely. The client
-        // sees `free: true` and jumps straight to the confirm endpoint
-        // without going through the payment redirect.
+        // Free courses never reach the gateway. The client sees
+        // `free: true` and goes straight to the confirm endpoint. This
+        // path works today and is independent of the integration below.
         if (amountMillimes <= 0) {
             Map<String, Object> free = new HashMap<>();
             free.put("payUrl", null);
@@ -112,120 +144,72 @@ public class PaymentService {
             return free;
         }
 
-        // Build the init-payment body. Field semantics per Konnect docs:
-        //   token              "TND" — only Tunisian dinars are supported
-        //   type               "immediate" — charge happens straight away
-        //                       (vs "partial" for staggered payments)
-        //   lifespan           how long (minutes) the payUrl is valid
-        //   feesIncluded       false → Konnect's fee is added on top
-        //   acceptedPaymentMethods   restrict to card only; can include
-        //                            "wallet" / "bank_transfer" later
-        //   orderId            our internal pointer back to (student, course, group)
-        //                      so the webhook can do server-driven confirmation
-        //   successUrl/failUrl what the hosted page redirects to on outcome.
-        //                      Both go to the same custom-scheme URL — the
-        //                      backend then verifies status, so it doesn't
-        //                      matter which one fired.
         String orderId = composeOrderId(studentId, courseId, groupId);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("receiverWalletId", konnectWalletId);
-        body.put("token", "TND");
-        body.put("amount", amountMillimes);
-        body.put("type", "immediate");
-        body.put("description", "Enrollment in " + safeShort(course.getTitle(), 200));
-        body.put("acceptedPaymentMethods", new String[]{"bank_card", "wallet", "e-DINAR"});
-        body.put("lifespan", 10); // minutes — generous; user can retry within that window
-        body.put("checkoutForm", false); // we already collected name/email/phone at signup
-        body.put("addPaymentFeesToAmount", false);
-        body.put("firstName", firstNameOf(student.getName()));
-        body.put("lastName", lastNameOf(student.getName()));
-        body.put("phoneNumber", student.getPhone() == null ? "" : student.getPhone());
-        body.put("email", student.getEmail());
-        body.put("orderId", orderId);
-        body.put("successUrl", konnectReturnUrl + "?status=success");
-        body.put("failUrl", konnectReturnUrl + "?status=failed");
-        body.put("theme", "light");
-        body.put("silentWebhook", true); // server-to-server only, no user redirect on webhook
-        if (konnectWebhookUrl != null && !konnectWebhookUrl.isBlank()) {
-            body.put("webhook", konnectWebhookUrl);
+        if (!isConfigured()) {
+            log.warn("Payment requested for order {} but ClicToPay is not configured", orderId);
+            throw new PaymentProviderUnavailable(
+                    "Online payment is not available yet. Paid enrollment opens once "
+                            + "the bank has activated the merchant account.");
         }
 
-        Map<String, Object> response;
-        try {
-            response = client().post()
-                    .uri("/payments/init-payment")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .timeout(Duration.ofSeconds(10))
-                    .onErrorMap(WebClientResponseException.class, this::translateKonnectError)
-                    .block();
-        } catch (RuntimeException e) {
-            throw new RuntimeException("Could not initialise payment: " + e.getMessage(), e);
-        }
-
-        if (response == null || response.get("payUrl") == null || response.get("paymentRef") == null) {
-            throw new RuntimeException("Konnect returned an unexpected response: " + response);
-        }
-
-        Map<String, Object> out = new HashMap<>();
-        out.put("payUrl", response.get("payUrl"));
-        out.put("paymentRef", response.get("paymentRef"));
-        out.put("amount", amountMillimes);
-        out.put("currency", "TND");
-        out.put("free", false);
-        return out;
+        // ══ INTEGRATION POINT 1 — create the payment ══════════════════
+        // Send amount (millimes), currency TND, orderId, the affiliate
+        // and terminal numbers, the success/failure return URLs built
+        // from returnUrlBase, and whatever signature SMT specifies.
+        // Expect back a hosted-page URL and a gateway reference; return
+        // them as payUrl / paymentRef so the mobile client is unchanged.
+        //
+        // Student name/email/phone are available on `student` if the
+        // gateway wants cardholder details prefilled.
+        throw new PaymentProviderUnavailable(
+                "ClicToPay payment initiation is not implemented — awaiting SMT's "
+                        + "integration specification. Course: " + course.getCourseId());
     }
 
     /**
-     * Pull the current state of a Konnect payment. Returns the inner
-     * `payment` object (id, status, amount, token, …). Returns null when
-     * Konnect doesn't recognise the ID.
+     * Current state of a payment at the gateway, or null if unknown.
      *
-     * Status values we care about:
-     *   "completed" → user paid successfully
-     *   "pending"   → user hasn't finished yet
-     *   "failed"    → card declined, expired, etc.
+     * Called by {@link EnrollmentService} before an enrollment row is
+     * written, and by the webhook handler. Returning null must be safe:
+     * callers treat it as "not paid".
      */
-    @SuppressWarnings("unchecked")
     public Map<String, Object> retrievePayment(String paymentRef) {
-        try {
-            Map<String, Object> wrapper = client().get()
-                    .uri("/payments/{ref}", paymentRef)
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .timeout(Duration.ofSeconds(10))
-                    .onErrorResume(WebClientResponseException.NotFound.class, e -> Mono.empty())
-                    .block();
-            if (wrapper == null) return null;
-            // Konnect wraps the payload as { payment: {...} }.
-            Object inner = wrapper.get("payment");
-            return inner instanceof Map ? (Map<String, Object>) inner : null;
-        } catch (WebClientResponseException e) {
-            throw new RuntimeException("Konnect lookup failed: " + e.getMessage(), e);
+        if (!isConfigured()) {
+            // Not an exception: callers ask "is this paid?", and with no
+            // gateway the honest answer is "no", not a 500.
+            return null;
         }
+
+        // ══ INTEGRATION POINT 2 — verify the payment ══════════════════
+        // GET the payment by reference and return a map containing at
+        // least "status" and "orderId". Map the gateway's own status
+        // vocabulary onto "completed" for a successful capture, so
+        // isPaidFor() and the webhook handler stay provider-agnostic.
+        log.warn("retrievePayment({}) called but ClicToPay lookup is not implemented", paymentRef);
+        return null;
     }
 
     /**
-     * Convenience wrapper used by EnrollmentService.confirmEnrollment:
-     * returns true iff Konnect confirms the payment as completed AND its
-     * orderId metadata matches the (student, course) being enrolled.
+     * True iff the gateway confirms this payment completed AND its
+     * orderId matches the student and course being enrolled.
+     *
+     * The orderId check is not redundant. Without it a valid reference
+     * for a cheap course could be replayed to unlock an expensive one —
+     * the payment is genuine, just not for this thing.
      */
     public boolean isPaidFor(String paymentRef, String expectedStudentId, String expectedCourseId) {
         Map<String, Object> payment = retrievePayment(paymentRef);
         if (payment == null) return false;
         if (!"completed".equals(String.valueOf(payment.get("status")))) return false;
         String orderId = String.valueOf(payment.get("orderId"));
-        if (orderId == null || orderId.equals("null")) return false;
+        if (orderId.equals("null")) return false;
         return orderId.startsWith(expectedStudentId + ":" + expectedCourseId);
     }
 
     /**
-     * Parse the orderId encoded by composeOrderId back into its three
-     * components. Used by the webhook handler to route a Konnect event
-     * to the right enrollment.
+     * Parse an orderId back into its parts, for routing a gateway event
+     * to the right enrollment. Returns null when it is unparseable.
      */
     public OrderId parseOrderId(String orderId) {
         if (orderId == null) return null;
@@ -239,11 +223,10 @@ public class PaymentService {
     // ─── helpers ────────────────────────────────────────────────────
 
     /**
-     * Encode (studentId, courseId, groupId) into the orderId field that
-     * Konnect echoes back on every payment lookup. Colon-separated so
-     * parseOrderId can pull it apart. We don't use JSON because Konnect's
-     * dashboard renders the orderId as plain text — colon form is
-     * human-readable when an admin is investigating a payment.
+     * Encode (studentId, courseId, groupId) into the orderId the gateway
+     * echoes back on every lookup. Colon-separated rather than JSON
+     * because gateway dashboards render orderId as plain text, and this
+     * form stays readable when an admin is investigating a payment.
      */
     private String composeOrderId(String studentId, String courseId, String groupId) {
         StringBuilder sb = new StringBuilder(studentId).append(':').append(courseId);
@@ -253,28 +236,7 @@ public class PaymentService {
         return sb.toString();
     }
 
-    private String firstNameOf(String fullName) {
-        if (fullName == null || fullName.isBlank()) return "Student";
-        int sp = fullName.indexOf(' ');
-        return sp < 0 ? fullName : fullName.substring(0, sp);
-    }
-
-    private String lastNameOf(String fullName) {
-        if (fullName == null) return "";
-        int sp = fullName.indexOf(' ');
-        return sp < 0 ? "" : fullName.substring(sp + 1).trim();
-    }
-
-    private String safeShort(String s, int max) {
-        if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max);
-    }
-
-    private RuntimeException translateKonnectError(WebClientResponseException e) {
-        // Konnect returns structured errors like { errors: [{ message: "..." }] }.
-        // Surface the message if we can find it, otherwise fall back to
-        // status code + raw body for debugging.
-        String body = e.getResponseBodyAsString();
-        return new RuntimeException("Konnect " + e.getStatusCode() + ": " + body);
+    private boolean notBlank(String s) {
+        return s != null && !s.isBlank();
     }
 }
