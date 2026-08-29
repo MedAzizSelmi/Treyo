@@ -56,13 +56,11 @@ public class Enrollment extends BaseEntity {
     // so the confirm endpoint can verify status with the gateway before
     // flipping enrollment to "confirmed".
     //
-    // The column is still named after Konnect, the gateway used during
-    // prototyping. It is deliberately NOT renamed: the column exists in
-    // deployed databases, and ddl-auto=validate fails at startup on any
-    // mismatch between entity and schema. Renaming it would mean a
-    // migration for no behavioural gain.
-    @Column(name = "konnect_payment_id", length = 100)
-    private String konnectPaymentId;
+    // Renamed from konnect_payment_id — see the migration dated
+    // 2026-08-29. It must be applied BEFORE this version starts:
+    // ddl-auto=validate fails on any entity/schema mismatch.
+    @Column(name = "payment_ref", length = 100)
+    private String paymentRef;
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;

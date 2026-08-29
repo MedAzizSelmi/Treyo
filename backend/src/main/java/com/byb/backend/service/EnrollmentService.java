@@ -107,7 +107,7 @@ public class EnrollmentService {
         enrollment.setEnrollmentStatus("confirmed");
         enrollment.setPaymentStatus(isPaidCourse ? "paid" : "unpaid");
         enrollment.setAmountPaid(amountPaid);
-        enrollment.setKonnectPaymentId(paymentRef);
+        enrollment.setPaymentRef(paymentRef);
         enrollment.setPaidAt(paidAt);
         enrollment.setEnrolledAt(LocalDateTime.now());
         enrollment.setProgressPercentage(BigDecimal.ZERO);
