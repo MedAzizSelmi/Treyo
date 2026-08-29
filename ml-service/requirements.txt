@@ -37,3 +37,10 @@ psycopg2-binary==2.9.11
 # --- Scheduling + config ---
 APScheduler==3.11.2
 python-dotenv==1.2.1
+
+# --- Process metrics ---
+# Optional at runtime: /health omits its CPU and memory section without
+# it rather than failing. Listed here because that section is what the
+# admin dashboard's System page renders — leave it out and those panels
+# are blank in production for no visible reason.
+psutil==7.2.2

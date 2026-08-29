@@ -28,14 +28,21 @@ public class GeminiService {
 
     private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 
-    // Models tried in order — first one that works wins
-    // -001 variants have separate quota buckets from their latest counterparts
+    // Models tried in order — first one that works wins.
+    //
+    // The 2.0 generation was retired: every call to gemini-2.0-flash-lite
+    // now returns 404 "no longer available", naming gemini-3.5-flash-lite
+    // as its replacement. Four dead entries also meant four wasted
+    // round-trips before the list reached anything that could answer.
+    //
+    // Each cheap model is followed by its floating -latest alias, which
+    // tracks whatever Google currently ships in that tier. When 3.5 is
+    // retired in turn, the alias keeps translation working instead of
+    // failing until someone notices the logs.
     private static final List<String> FALLBACK_MODELS = Arrays.asList(
-            "gemini-2.0-flash-lite",
-            "gemini-2.0-flash-lite-001",
-            "gemini-2.0-flash",
-            "gemini-2.0-flash-001",
+            "gemini-3.5-flash-lite",
             "gemini-flash-lite-latest",
+            "gemini-3.5-flash",
             "gemini-flash-latest"
     );
 
