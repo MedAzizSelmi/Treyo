@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { LEGAL_CONTACT_EMAIL } from '../constants/legal';
 
 export default function HelpSupportScreen() {
     const { colors } = useTheme();
@@ -11,7 +12,9 @@ export default function HelpSupportScreen() {
     const { t } = useTranslation();
 
     const handleContactSupport = () => {
-        Linking.openURL('mailto:support@lean-consulting.com?subject=Help Request');
+        // Sourced from constants/legal.ts so the support address and the
+        // one printed in the Terms can never drift apart.
+        Linking.openURL(`mailto:${LEGAL_CONTACT_EMAIL}?subject=Help Request`);
     };
 
     const handleWhatsApp = () => {
@@ -42,7 +45,7 @@ export default function HelpSupportScreen() {
                     </View>
                     <View style={styles.contactInfo}>
                         <Text style={[styles.contactTitle, { color: colors.text }]}>{t('help.emailSupport')}</Text>
-                        <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>support@lean-consulting.com</Text>
+                        <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>{LEGAL_CONTACT_EMAIL}</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>

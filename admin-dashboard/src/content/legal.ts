@@ -1,4 +1,19 @@
 /**
+ * ⚠️ COPY. The source of truth is treyo-mobile/constants/legal.ts.
+ *
+ * These are the same documents the mobile app shows, published on the
+ * web because the ClicToPay merchant contract requires them to be
+ * reachable before payment. The two projects have no shared package, so
+ * this is a copy rather than an import.
+ *
+ * EDIT THE MOBILE FILE, THEN RE-COPY:
+ *   cp treyo-mobile/constants/legal.ts admin-dashboard/src/content/legal.ts
+ *
+ * Editing only one side means the app and the website state different
+ * terms for the same service, which is worse than having no web copy.
+ *
+ * ── Original header ─────────────────────────────────────────────────
+ *
  * Terms of Service + Privacy Policy content.
  *
  * Legal entity: LeanConsulting
