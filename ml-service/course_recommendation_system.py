@@ -34,6 +34,10 @@ class CourseRecommendationSystem:
         self.interactions_df = None
         self.trainers_df = None
         self.searches_df = None
+        # (student_id, course_id) pairs the learner is already committed
+        # to. Optional: left None by the offline evaluation, which must be
+        # able to recommend the course it withheld. See _enrolled_ids().
+        self.enrollments_df = None
 
         # Models
         self.tfidf_vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
@@ -363,6 +367,30 @@ class CourseRecommendationSystem:
             out_domain_weight,
         )
 
+    def _enrolled_ids(self, student_id):
+        """Courses this learner is already enrolled in.
+
+        Returns an empty set when enrollments_df is None, which is how the
+        offline evaluation runs: leave-one-out withholds an interaction,
+        not the enrollment row behind it, so filtering there would make the
+        held-out course unrecommendable and drive HitRate to zero.
+        """
+        if self.enrollments_df is None or self.enrollments_df.empty:
+            return set()
+        mine = self.enrollments_df[self.enrollments_df['student_id'] == student_id]
+        return set(mine['course_id'])
+
+    def _drop_enrolled(self, df, student_id, label):
+        """Remove already-enrolled courses from a scored frame."""
+        enrolled = self._enrolled_ids(student_id)
+        if not enrolled or df is None or df.empty:
+            return df
+        filtered = df[~df['course_id'].isin(enrolled)]
+        removed = len(df) - len(filtered)
+        if removed:
+            print(f"   🚫 {label}: removed {removed} course(s) already enrolled in")
+        return filtered
+
     def content_based_recommendations(self, student_id, n_recommendations=10):
         """
         Generate recommendations based on student interests and course content.
@@ -429,6 +457,7 @@ class CourseRecommendationSystem:
         else:
             scores_df = scores_df.sort_values('final_score', ascending=False)
 
+        scores_df = self._drop_enrolled(scores_df, student_id, 'content-based')
         top_courses = scores_df.head(n_recommendations)
 
         # Merge with course details
@@ -554,6 +583,7 @@ class CourseRecommendationSystem:
             'search_score': course_scores
         })
 
+        scores_df = self._drop_enrolled(scores_df, student_id, 'search-based')
         top_courses = scores_df.nlargest(n_recommendations, 'search_score')
 
         recommendations = self.courses_df.merge(top_courses, on='course_id')
@@ -697,6 +727,13 @@ class CourseRecommendationSystem:
         else:
             # No declared domain → fall back to pure score ordering.
             aggregated = aggregated.sort_values('final_score', ascending=False)
+
+        # Last gate before the top N. Only the collaborative source removes
+        # courses the learner engaged with, and it reads interactions —
+        # which enrolling never writes. Content (45 %), search (15 %) and
+        # popularity (5 %) could all surface a course they are already
+        # taking, so the enrollment list is applied to the merged result.
+        aggregated = self._drop_enrolled(aggregated, student_id, 'hybrid')
 
         # Get top N
         final_recommendations = aggregated.head(n_recommendations)

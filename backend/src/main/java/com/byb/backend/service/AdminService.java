@@ -95,9 +95,10 @@ public class AdminService {
         long totalMessages = messageRepository.count();
         long messagesToday = messageRepository.countByCreatedAtAfter(todayStart);
 
-        // Financial statistics (if implemented)
-        BigDecimal totalRevenue = courseRepository.getTotalRevenue();
-        BigDecimal revenueThisMonth = courseRepository.getRevenueAfter(monthAgo);
+        // Financial statistics — real money, read from the enrollments the
+        // backend confirmed after verifying each payment with the gateway.
+        BigDecimal totalRevenue = enrollmentRepository.getTotalPaid();
+        BigDecimal revenueThisMonth = enrollmentRepository.getPaidAfter(monthAgo);
         BigDecimal averageCoursePrice = courseRepository.getAverageCoursePrice();
 
         return DashboardStatsResponse.builder()
@@ -539,7 +540,11 @@ public class AdminService {
                 .skills(trainer.getSkills() != null ?
                         trainer.getSkills() : new String[]{})
                 .experienceYears(trainer.getExperienceYears())
-                .rating(null) // TODO: Calculate trainer rating
+                // Kept current by ReviewController on every review. Ratings run
+                // 1-5, so an average of 0 means "no reviews yet": send null.
+                .rating(trainer.getAverageRating() != null && trainer.getAverageRating().signum() > 0
+                        ? trainer.getAverageRating().doubleValue()
+                        : null)
                 .profileComplete(null) // TODO: Check profile completeness
                 .verificationStatus(trainer.getApprovalStatus() == null
                         ? "PENDING"

@@ -353,12 +353,29 @@ class RecommendationEngine:
                 print("   ⚠️  No search logs found")
                 searches = pd.DataFrame()
 
+            # What each learner is already committed to. Recommending a
+            # course someone has already enrolled in is the one obviously
+            # wrong answer the ranking can give, and the interaction log
+            # cannot prevent it: enrolling records no interaction, so the
+            # collaborative filter's "drop what they engaged with" step
+            # never sees it. The enrollment table is the actual truth.
+            # Dropped enrollments are excluded — a learner who left a
+            # course may legitimately be offered it again.
+            enrollments = pd.read_sql("""
+                SELECT student_id, course_id
+                FROM enrollments
+                WHERE enrollment_status IS NULL
+                   OR LOWER(enrollment_status) NOT IN ('dropped', 'cancelled')
+            """, conn)
+            print(f"   ✓ Loaded {len(enrollments)} enrollments (excluded from recommendations)")
+
         return {
             'students': students,
             'courses': courses,
             'interactions': interactions,
             'trainers': trainers,
             'searches': searches,
+            'enrollments': enrollments,
         }
 
     def load_data(self):
@@ -393,6 +410,10 @@ class RecommendationEngine:
         rs.interactions_df = frames['interactions']
         rs.trainers_df = frames['trainers']
         rs.searches_df = frames['searches']
+        # Optional on purpose: the offline evaluation builds a system
+        # without it, because excluding enrolled courses there would hide
+        # the very item the leave-one-out protocol withholds.
+        rs.enrollments_df = frames.get('enrollments')
 
         rs.preprocess_data()
         rs.build_content_based_model()

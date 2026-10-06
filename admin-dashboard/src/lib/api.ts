@@ -41,6 +41,35 @@ api.interceptors.response.use(
   }
 );
 
+// Protected files (CVs, certificates, course material) are only served to an
+// authenticated user, and a plain <a href> cannot carry the token. Fetch the
+// file with it, then show it in a tab when the browser can display it (PDF,
+// image, text) or download it under its real name otherwise (Word,
+// PowerPoint...). The tab is opened before the request so the browser still
+// treats it as a response to the click rather than a popup.
+export async function openProtectedFile(url: string, filename?: string) {
+  const tab = window.open('', '_blank');
+  try {
+    const res = await api.get(url, { responseType: 'blob' });
+    const blobUrl = URL.createObjectURL(res.data);
+    if (/^(application\/pdf|image\/|text\/)/.test(res.data.type || '')) {
+      if (tab) tab.location.href = blobUrl;
+      else window.location.href = blobUrl;
+    } else {
+      tab?.close();
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      // Default to the stored name, the last segment of ".../download/dir$dir$name.ext".
+      a.download = filename || decodeURIComponent(url.split('/').pop() || '').split('$').pop() || 'file';
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}
+
 // ── Auth ──
 export async function loginAdmin(email: string, password: string) {
   const res = await api.post('/auth/login', { email, password });

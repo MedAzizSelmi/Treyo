@@ -9,10 +9,13 @@ import { authService, enrollmentService } from '../services/api';
 
 /**
  * Payment history.
- * The platform doesn't yet have a transactions table or a payment processor,
- * so we surface the closest proxy we have: the student's enrollments,
- * each priced from the underlying course. Anything with price = 0 is shown
- * as "Free" — the rest is treated as a billable receipt placeholder.
+ *
+ * There is no transactions table: an enrollment IS the receipt. It carries
+ * amountPaid and paidAt, written only after the backend verified the
+ * payment with ClicToPay, so that is what a row displays. The course price
+ * is the fallback for rows created before the gateway existed, and the
+ * currency comes from the course — never hard-coded, since the platform
+ * bills in TND.
  */
 export default function PaymentsScreen() {
     const router = useRouter();
@@ -35,8 +38,15 @@ export default function PaymentsScreen() {
         })();
     }, []);
 
-    const totalSpent = items.reduce((sum, e) => sum + (Number(e.coursePrice ?? e.price ?? 0)), 0);
-    const paidCount = items.filter(e => Number(e.coursePrice ?? e.price ?? 0) > 0).length;
+    /** What this enrollment cost: what was charged, or the listed price. */
+    const amountOf = (e: any) =>
+        Number(e.amountPaid ?? 0) > 0 ? Number(e.amountPaid) : Number(e.coursePrice ?? 0);
+    /** All courses are priced in one currency today; fall back to TND. */
+    const currency = items.find(e => e.courseCurrency)?.courseCurrency ?? 'TND';
+    const money = (n: number) => `${n.toFixed(2)} ${currency}`;
+
+    const totalSpent = items.reduce((sum, e) => sum + amountOf(e), 0);
+    const paidCount = items.filter(e => amountOf(e) > 0).length;
 
     return (
         <ScreenBackground>
@@ -56,7 +66,7 @@ export default function PaymentsScreen() {
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.summaryItem}>
                         <Text style={styles.summaryLabel}>{t('payments.totalSpent')}</Text>
-                        <Text style={styles.summaryValue}>${totalSpent.toFixed(2)}</Text>
+                        <Text style={styles.summaryValue}>{money(totalSpent)}</Text>
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
@@ -104,7 +114,7 @@ export default function PaymentsScreen() {
                     </View>
                 ) : (
                     items.map((e: any, i: number) => {
-                        const price = Number(e.coursePrice ?? e.price ?? 0);
+                        const price = amountOf(e);
                         const free = price === 0;
                         return (
                             <View key={e.enrollmentId || i} style={styles.txnCard}>
@@ -122,7 +132,7 @@ export default function PaymentsScreen() {
                                     </Text>
                                 </View>
                                 <Text style={[styles.txnPrice, free && { color: '#aaaaaa' }]}>
-                                    {free ? t('payments.free') : `$${price.toFixed(2)}`}
+                                    {free ? t('payments.free') : money(price)}
                                 </Text>
                             </View>
                         );

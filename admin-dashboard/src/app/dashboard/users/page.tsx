@@ -35,7 +35,7 @@ import {
   Globe,
   Eye,
 } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/api';
+import { API_BASE_URL, openProtectedFile } from '@/lib/api';
 
 type Tab = 'students' | 'trainers' | 'pending';
 
@@ -204,18 +204,24 @@ export default function UsersPage() {
       ),
     },
     {
-      key: 'averageRating', label: 'Rating', sortable: true,
+      key: 'rating', label: 'Rating', sortable: true,
       render: (r: any) => (
         <span className="text-warning font-medium">
-          {r.averageRating ? `★ ${r.averageRating.toFixed(1)}` : '—'}
+          {r.rating ? `★ ${Number(r.rating).toFixed(1)}` : '—'}
         </span>
       ),
     },
     {
-      key: 'isVerified', label: 'Verified',
-      render: (r: any) => (
-        <Badge variant={r.isVerified ? 'success' : 'warning'}>{r.isVerified ? 'Verified' : 'Pending'}</Badge>
-      ),
+      // The admin's decision on the application. verificationStatus carries
+      // the trainer's approvalStatus; isVerified only means the email
+      // address was confirmed, so it is deliberately not shown here.
+      key: 'verificationStatus', label: 'Approval',
+      render: (r: any) => {
+        const s = String(r.verificationStatus || 'PENDING').toUpperCase();
+        const variant = s === 'APPROVED' ? 'success' : s === 'REJECTED' ? 'danger' : 'warning';
+        const label = s === 'APPROVED' ? 'Approved' : s === 'REJECTED' ? 'Rejected' : 'Pending';
+        return <Badge variant={variant}>{label}</Badge>;
+      },
     },
     {
       key: 'isActive', label: 'Status',
@@ -575,14 +581,13 @@ function TrainerReviewModal({
         {/* CV */}
         <Section title="CV / resume">
           {cvUrl ? (
-            <a
-              href={cvUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => openProtectedFile(cvUrl).catch(() => alert('Could not open the CV.'))}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-black text-sm font-semibold hover:bg-accent/90"
             >
               <FileText className="w-4 h-4" /> Open CV
-            </a>
+            </button>
           ) : (
             <p className="text-sm text-muted italic">No CV attached.</p>
           )}

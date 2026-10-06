@@ -8,10 +8,11 @@ import {
   rejectTrainerCourse,
   getRevenueCurrency,
   API_BASE_URL,
+  openProtectedFile,
 } from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { ShieldCheck, ShieldX, FileText, Clock, User, Layers, X, Loader2, Coins } from 'lucide-react';
+import { ShieldCheck, ShieldX, FileText, Clock, User, Layers, X, Loader2, Coins, Search } from 'lucide-react';
 
 /**
  * Pending course review queue.
@@ -33,6 +34,7 @@ export default function PendingCoursesPage() {
   const [priceCurrency, setPriceCurrency] = useState<string>('TND');
   const [defaultCurrency, setDefaultCurrency] = useState<string>('TND');
   const [priceError, setPriceError] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,12 +99,34 @@ export default function PendingCoursesPage() {
     }
   };
 
+  // Matches the course's specialty (module, specific topic, level, format,
+  // language) as well as its title, trainer and description.
+  const query = search.trim().toLowerCase();
+  const shown = query
+    ? courses.filter(c =>
+        [c.title, c.moduleName, c.specificTopic, c.trainerName, c.level, c.format, c.language, c.description]
+          .some(v => String(v ?? '').toLowerCase().includes(query)))
+    : courses;
+
   return (
     <div>
       <PageHeader
         title="Pending courses"
         subtitle="Courses submitted by trainers, waiting for your review"
       />
+
+      {!loading && courses.length > 0 && (
+        <div className="relative max-w-sm mb-5">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <input
+            type="text"
+            placeholder="Search title, module, topic, trainer..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+          />
+        </div>
+      )}
 
       {loading ? (
         <LoadingSpinner />
@@ -112,9 +136,15 @@ export default function PendingCoursesPage() {
           <p className="text-sm text-foreground font-semibold mb-1">Queue is empty</p>
           <p className="text-xs text-muted">Trainer-submitted courses will show up here.</p>
         </div>
+      ) : shown.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <Search className="w-10 h-10 text-muted mx-auto mb-3" />
+          <p className="text-sm text-foreground font-semibold mb-1">No matching courses</p>
+          <p className="text-xs text-muted">Try another word or clear the search.</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {courses.map(c => (
+          {shown.map(c => (
             <button
               key={c.courseId}
               onClick={() => {
@@ -205,16 +235,19 @@ export default function PendingCoursesPage() {
 
             <Section title="Training material">
               {reviewing.materialUrl ? (
-                <a
-                  href={String(reviewing.materialUrl).startsWith('http')
-                    ? reviewing.materialUrl
-                    : `${API_BASE_URL}${reviewing.materialUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = String(reviewing.materialUrl).startsWith('http')
+                      ? reviewing.materialUrl
+                      : `${API_BASE_URL}${reviewing.materialUrl}`;
+                    openProtectedFile(url, reviewing.materialName)
+                      .catch(() => alert('Could not open the material.'));
+                  }}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-black text-sm font-semibold hover:bg-accent/90"
                 >
                   <FileText className="w-4 h-4" /> Open {reviewing.materialName || 'material'}
-                </a>
+                </button>
               ) : (
                 <p className="text-sm text-muted italic">No material attached.</p>
               )}

@@ -3,8 +3,10 @@ package com.byb.backend.repository;
 import com.byb.backend.model.Enrollment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +15,22 @@ import java.util.Optional;
 public interface EnrollmentRepository extends JpaRepository<Enrollment, String> {
 
     Optional<Enrollment> findByEnrollmentId(String enrollmentId);
+
+    /**
+     * Money actually received, summed from what the gateway reported and
+     * the backend verified before writing the row.
+     *
+     * This replaced SUM(price × total_enrolled) on Course, which was
+     * "what every enrolled learner would owe if they all paid" — and was
+     * structurally zero anyway, since total_enrolled is never maintained.
+     */
+    @Query("SELECT COALESCE(SUM(e.amountPaid), 0) FROM Enrollment e WHERE e.paymentStatus = 'paid'")
+    BigDecimal getTotalPaid();
+
+    /** Same, restricted to payments settled after the given instant. */
+    @Query("SELECT COALESCE(SUM(e.amountPaid), 0) FROM Enrollment e "
+            + "WHERE e.paymentStatus = 'paid' AND e.paidAt > :date")
+    BigDecimal getPaidAfter(@Param("date") LocalDateTime date);
 
     List<Enrollment> findByStudentId(String studentId);
 

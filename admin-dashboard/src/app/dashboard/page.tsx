@@ -113,12 +113,13 @@ export default function DashboardPage() {
           trend={{ value: `+${stats.newTrainersThisWeek || 0} this week`, up: true }}
         />
         {/*
-          Revenue card was previously removed because backend computes
-          SUM(price × total_enrolled) — "potential revenue if every
-          enrolled student had paid", not real money. Kept the metric
-          but labelled it explicitly + made the currency admin-tunable
-          via /dashboard/settings so it can be re-denominated without
-          a code change once payments are wired up.
+          Real money now that ClicToPay is wired up: the backend sums
+          amount_paid over enrollments whose payment it verified with the
+          gateway, so this is what was actually collected — not the old
+          SUM(price × total_enrolled), which measured "what everyone would
+          owe if they all paid" and read zero regardless, since
+          total_enrolled is never maintained. Currency stays admin-tunable
+          via /dashboard/settings.
         */}
         <StatCard
           label={`Revenue (${currency})`}

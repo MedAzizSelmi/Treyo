@@ -107,14 +107,14 @@ export default function TrainerProfileScreen() {
      *  /trainers/me/availability. */
     const handleToggleActive = async (next: boolean) => {
         if (!user?.userId || savingAvailability) return;
-        const prevActive = !!profile?.active;
-        setProfile((p: any) => ({ ...(p || {}), active: next }));
+        const prevActive = !!profile?.isActive;
+        setProfile((p: any) => ({ ...(p || {}), isActive: next }));
         setSavingAvailability(true);
         try {
             await trainerService.updateAvailability(user.userId, { isActive: next });
         } catch (_) {
             // Roll back
-            setProfile((p: any) => ({ ...(p || {}), active: prevActive }));
+            setProfile((p: any) => ({ ...(p || {}), isActive: prevActive }));
             Alert.alert(t('common.error'), t('common.retry'));
         } finally {
             setSavingAvailability(false);
@@ -318,24 +318,24 @@ export default function TrainerProfileScreen() {
                         <View style={styles.availRow}>
                             <View style={styles.availIconWrap}>
                                 <Ionicons
-                                    name={profile?.active ? 'flash' : 'pause-circle-outline'}
+                                    name={profile?.isActive ? 'flash' : 'pause-circle-outline'}
                                     size={20}
-                                    color={profile?.active ? '#7cce06' : '#ffa500'}
+                                    color={profile?.isActive ? '#7cce06' : '#ffa500'}
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.availTitle}>
-                                    {profile?.active ? t('profile.active') : t('profile.inactive')}
+                                    {profile?.isActive ? t('profile.active') : t('profile.inactive')}
                                 </Text>
                                 <Text style={styles.availSubtitle}>
-                                    {profile?.active ? t('profile.activeBody') : t('profile.inactiveBody')}
+                                    {profile?.isActive ? t('profile.activeBody') : t('profile.inactiveBody')}
                                 </Text>
                             </View>
                             <Switch
-                                value={!!profile?.active}
+                                value={!!profile?.isActive}
                                 onValueChange={handleToggleActive}
                                 trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(124,206,6,0.5)' }}
-                                thumbColor={profile?.active ? '#7cce06' : '#ffffff'}
+                                thumbColor={profile?.isActive ? '#7cce06' : '#ffffff'}
                                 ios_backgroundColor="rgba(255,255,255,0.15)"
                             />
                         </View>

@@ -76,34 +76,33 @@ export default function NotificationsScreen() {
             let paidRef: string | undefined;
 
             if (!payment.free && payment.payUrl) {
-                // 2. Open the Konnect-hosted payment page. openAuthSessionAsync
-                // is the right primitive here because:
+                // 2. Open the ClicToPay-hosted payment page.
+                // openAuthSessionAsync is the right primitive here because:
                 //   - it opens a system browser (Chrome Custom Tabs / SFSafariViewController)
                 //     for a trusted payment experience
                 //   - it watches for the return-url custom scheme and auto-closes
                 //     so the user lands back in our app without a manual "done" tap
-                //   - the returned result tells us why the browser closed
-                //     (success redirect / user dismissal / error)
-                const result = await WebBrowser.openAuthSessionAsync(
+                await WebBrowser.openAuthSessionAsync(
                     payment.payUrl,
                     'treyomobile://payment-return',
                 );
 
-                // User backed out of the browser — silently bail.
-                // They can retap "Confirm" to retry.
-                if (result.type === 'cancel' || result.type === 'dismiss') {
-                    return;
-                }
-                if (result.type !== 'success') {
-                    throw new Error('Payment was not completed');
-                }
-
+                // Deliberately NOT branching on result.type. It only says
+                // HOW the browser closed, which is not the same question as
+                // whether the card was charged: a user who pays and then
+                // closes the tab by hand (or whose return redirect does not
+                // fire) reports "dismiss" on a completed payment. Bailing
+                // there left them charged and not enrolled.
+                //
+                // So we always ask the backend, which asks the gateway. A
+                // payment that did not complete simply fails the check
+                // below — the client's belief never grants anything.
                 paidRef = payment.paymentRef ?? undefined;
             }
 
             // 3. Confirm the enrollment. For paid courses this triggers
-            // a Konnect API lookup on the backend; only "completed"
-            // payments whose orderId matches student+course will pass.
+            // a ClicToPay status lookup on the backend; only "completed"
+            // payments whose orderNumber matches student+course pass.
             await enrollmentService.confirmEnrollment(userId, courseId, undefined, paidRef);
             await notificationService.markAsRead(notif.notificationId);
             setNotifications(prev => prev.map(n =>
@@ -117,7 +116,18 @@ export default function NotificationsScreen() {
             );
         } catch (e: any) {
             const msg = e?.response?.data?.message || e?.message || 'Could not confirm enrollment';
-            if (msg.toLowerCase().includes('already enrolled')) {
+            const low = msg.toLowerCase();
+            // Abandoned or refused payment: expected, not an error worth
+            // alarming the user about. The notification stays pending so
+            // they can retry.
+            if (low.includes('payment not completed')
+                || low.includes('payment not found')
+                || low.includes('payment required')) {
+                Alert.alert(
+                    'Payment not completed',
+                    'Your payment was not completed, so your spot is not confirmed yet. You can try again.',
+                );
+            } else if (low.includes('already enrolled')) {
                 await notificationService.markAsRead(notif.notificationId);
                 setNotifications(prev => prev.map(n =>
                     n.notificationId === notif.notificationId ? { ...n, isRead: true } : n

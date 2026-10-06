@@ -25,6 +25,7 @@ import {
   Mail,
   Filter,
   Trash2,
+  Search,
 } from 'lucide-react';
 
 type Filter = 'all' | 'ready' | 'waiting';
@@ -34,6 +35,7 @@ export default function RequestsPage() {
   const [requested, setRequested] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
 
   const [selected, setSelected] = useState<any | null>(null);
   const [interest, setInterest] = useState<any | null>(null);
@@ -164,9 +166,14 @@ export default function RequestsPage() {
   };
 
   // Filtered list
+  const query = search.trim().toLowerCase();
   const filtered = requested.filter((c) => {
-    if (filter === 'ready') return c.canNotify || c.canFormGroup;
-    if (filter === 'waiting') return c.interestedCount > 0 && !c.canNotify;
+    if (filter === 'ready' && !(c.canNotify || c.canFormGroup)) return false;
+    if (filter === 'waiting' && !(c.interestedCount > 0 && !c.canNotify)) return false;
+    if (query) {
+      return [c.courseTitle, c.domain, c.trainerName]
+        .some((v) => (v || '').toLowerCase().includes(query));
+    }
     return true;
   });
 
@@ -189,6 +196,18 @@ export default function RequestsPage() {
         <StatCard icon={CheckCircle2} color="accent" value={totalConfirmed} label="Awaiting Group" />
         <StatCard icon={Send} color="info" value={readyToNotify} label="Ready to Notify" />
         <StatCard icon={GitBranch} color="success" value={readyToForm} label="Ready to Form" />
+      </div>
+
+      {/* Search */}
+      <div className="relative max-w-sm mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+        <input
+          type="text"
+          placeholder="Search course, domain or trainer..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+        />
       </div>
 
       {/* Filter chips + cleanup */}
@@ -229,11 +248,11 @@ export default function RequestsPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title={filter === 'all' ? 'No published courses' : 'No matching courses'}
+            title={requested.length === 0 ? 'No published courses' : 'No matching courses'}
             hint={
-              filter === 'all'
+              requested.length === 0
                 ? 'Once trainers publish courses, requests will appear here.'
-                : 'Try changing the filter to see other courses.'
+                : 'Try clearing the search or changing the filter.'
             }
           />
         ) : (
