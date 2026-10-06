@@ -92,6 +92,17 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Google ID token verification for "Sign in with Google".
+             The token the app receives must be checked against Google's
+             own signing keys on the server: a client can claim anything,
+             and the whole point of the flow is that we do not take its
+             word for who the user is. -->
+        <dependency>
+            <groupId>com.google.api-client</groupId>
+            <artifactId>google-api-client</artifactId>
+            <version>2.7.0</version>
+        </dependency>
+
         <!-- Lombok (reduces boilerplate) -->
         <dependency>
             <groupId>org.projectlombok</groupId>

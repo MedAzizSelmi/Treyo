@@ -50,8 +50,11 @@ public class PaymentReturnController {
     public ResponseEntity<String> success(
             @RequestParam(required = false) String orderId,
             @RequestParam(required = false) String paymentRef) {
+        // ClicToPay appends its own orderId to the return URL; older
+        // clients sent paymentRef. Either is the reference the app then
+        // posts to /api/enrollments/confirm, where it is re-verified.
         log.info("Payment return (success) orderId={} paymentRef={}", orderId, paymentRef);
-        return page("success", paymentRef,
+        return page("success", paymentRef != null ? paymentRef : orderId,
                 "Paiement confirmé",
                 "Retour à l'application…");
     }
@@ -62,7 +65,7 @@ public class PaymentReturnController {
             @RequestParam(required = false) String orderId,
             @RequestParam(required = false) String paymentRef) {
         log.info("Payment return (failure) orderId={} paymentRef={}", orderId, paymentRef);
-        return page("failed", paymentRef,
+        return page("failed", paymentRef != null ? paymentRef : orderId,
                 "Paiement non abouti",
                 "Retour à l'application…");
     }

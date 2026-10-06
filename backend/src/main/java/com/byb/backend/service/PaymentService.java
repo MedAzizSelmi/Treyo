@@ -8,50 +8,43 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Server-side payment integration, targeting ClicToPay (SMT / ATB).
+ * Server-side payment integration with ClicToPay (SMT / ATB), REST API
+ * "Basic 1.0" — reference CTP-API-BASIC-01.
  *
- * ── Status ──────────────────────────────────────────────────────────
- * The two methods that talk to the gateway are NOT implemented. SMT does
- * not release its integration specification until the merchant contract
- * is approved, and guessing at a payment API's request format, signature
- * scheme and status vocabulary produces code that looks plausible and
- * fails in ways that are expensive to debug against real cards. They
- * throw {@link PaymentProviderUnavailable} until the spec arrives.
+ * ── The two calls ───────────────────────────────────────────────────
+ *   register.do               → registers an order, returns orderId
+ *                               (gateway UUID) + formUrl (hosted page)
+ *   getOrderStatusExtended.do → the real state of that order
  *
- * Everything around them is real and provider-agnostic: price resolution,
- * the free-course short-circuit, orderId encoding, and the verification
- * contract the rest of the application relies on.
- *
- * This replaced a working Konnect integration, which was only ever used
- * for prototyping. That implementation is in git history (before the
- * "ClicToPay" migration commit) and is the reference for the flow shape.
- *
- * ── The flow, once implemented ──────────────────────────────────────
- *   1. Mobile calls POST /api/payments/enrollment-payment → we ask the
- *      gateway to create a payment and return { payUrl, paymentRef }.
- *   2. Mobile opens payUrl. The user pays on the gateway's hosted page,
- *      including the 3-D Secure challenge (the contract mandates 3DS for
- *      national and international cards alike, so the return happens
- *      after an interstitial bank page, not straight from the card form).
- *   3. The gateway redirects to /payment/success or /payment/failure,
- *      which bounce back into the app via its custom scheme.
- *   4. Mobile calls POST /api/enrollments/confirm with the paymentRef.
- *   5. The backend re-verifies with the gateway BEFORE writing the row.
+ * Authentication is userName / password as form fields on every call;
+ * there is no signature scheme in this version of the API.
  *
  * ── The rule that must survive any rewrite ──────────────────────────
  * Never trust a redirect or a webhook body. Both are attacker-reachable:
  * the redirect passes through the user's browser, and the webhook URL is
  * public by necessity. Confirmation always re-fetches state from the
- * gateway server-to-server. Everything else here is negotiable; this is
- * what stops a forged callback creating a paid enrollment for free.
+ * gateway server-to-server and requires orderStatus == 2. The manual
+ * states the same rule: "Ne jamais valider une commande sur la seule
+ * base de la redirection vers returnUrl."
+ *
+ * ── Vocabulary, because the two sides use the same words differently ─
+ *   ClicToPay orderNumber = OUR reference  → {@link #composeOrderId}
+ *   ClicToPay orderId     = THEIR UUID     → stored as Enrollment.paymentRef
+ * {@link #retrievePayment} returns the former under the key "orderId",
+ * which is what {@link #parseOrderId} and EnrollmentService consume.
  */
 @Service
 @Slf4j
@@ -60,44 +53,63 @@ public class PaymentService {
 
     private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
-    /** Retained for the gateway calls below, which are not yet written. */
-    @SuppressWarnings("unused")
     private final WebClient.Builder webClientBuilder;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+    /** ISO 4217 numeric code for the Tunisian dinar, per the manual. */
+    private static final String CURRENCY_TND = "788";
+    /** orderStatus 2 = "Paiement accepté — montant débité avec succès". */
+    private static final int ORDER_STATUS_PAID = 2;
+    /** Hard cap from the spec: orderNumber is AN..32. */
+    private static final int ORDER_NUMBER_MAX = 32;
+
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Duration TIMEOUT = Duration.ofSeconds(20);
 
     // Every property below defaults to empty. A deployment without
     // payment credentials must still start — the alternative is a
     // service that refuses to boot because a feature nobody is using yet
     // has not been configured.
-    //
-    // Affiliate and terminal numbers come from ATB on the signed
-    // contract ("Numéro Affilié" / "Numéro Terminal" on the Fiche
-    // Technique); they are not self-service values.
 
+    /** Test: https://test.clictopay.com/payment/rest/ — Production: https://ipay.clictopay.com/payment/rest/ */
     @Value("${clicktopay.api.base-url:}")
     private String baseUrl;
 
-    @Value("${clicktopay.api.affiliate-id:}")
-    private String affiliateId;
+    /** "Nom d'utilisateur API" from the Cahier des Recettes. */
+    @Value("${clicktopay.api.username:}")
+    private String username;
 
-    @Value("${clicktopay.api.terminal-id:}")
-    private String terminalId;
-
-    @Value("${clicktopay.api.secret:}")
-    private String secret;
+    /** "Mot de passe API" — case sensitive. */
+    @Value("${clicktopay.api.password:}")
+    private String password;
 
     /**
      * Public HTTPS base the gateway redirects the user back to, e.g.
      * https://treyo.leanconsulting.com.tn. The success and failure paths
-     * are appended to it. This is declared to SMT on the Fiche Technique
-     * and must match what is registered there.
+     * are appended to it. Must be reachable from the internet: ClicToPay
+     * validates the integration against a deployed environment.
      */
     @Value("${clicktopay.return-url-base:}")
     private String returnUrlBase;
 
+    /** Language of the hosted payment page and of error messages (fr / en / ar). */
+    @Value("${clicktopay.api.language:fr}")
+    private String language;
+
+    /**
+     * Template of the hosted page: DESKTOP (the gateway's default) or
+     * MOBILE. MOBILE only works if that template is provisioned for the
+     * merchant — when it is not, formUrl resolves to a page that does not
+     * exist and the payer gets a 404 from ClicToPay. Leave blank to send
+     * nothing and let the gateway decide.
+     */
+    @Value("${clicktopay.api.page-view:DESKTOP}")
+    private String pageView;
+
     /** True once ATB has issued credentials and they are configured. */
     public boolean isConfigured() {
-        return notBlank(baseUrl) && notBlank(affiliateId)
-                && notBlank(terminalId) && notBlank(secret);
+        return notBlank(baseUrl) && notBlank(username)
+                && notBlank(password) && notBlank(returnUrlBase);
     }
 
     /**
@@ -111,12 +123,19 @@ public class PaymentService {
         }
     }
 
+    /** The gateway answered, but with an error code (see §6.2 of the manual). */
+    public static class PaymentGatewayException extends RuntimeException {
+        public PaymentGatewayException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Begin payment for an enrollment.
      *
-     * @param groupId the group offer, carried in `orderId` so a webhook
-     *                can route back to the right enrollment
-     * @return { payUrl, paymentRef, amount, currency, free }
+     * @param groupId the group offer, carried in the orderNumber so a
+     *                gateway event can route back to the right enrollment
+     * @return { payUrl, paymentRef, orderNumber, amount, currency, free }
      */
     public Map<String, Object> createEnrollmentPayment(String studentId, String courseId, String groupId) {
         Student student = studentRepository.findByStudentId(studentId)
@@ -124,16 +143,15 @@ public class PaymentService {
         Course course = courseRepository.findByCourseId(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
 
-        // Tunisian gateways bill in MILLIMES (1 TND = 1000). Course.price
-        // is stored in major TND units, e.g. 49.99.
+        // ClicToPay bills in MILLIMES (1 TND = 1000) with no decimal
+        // separator. Course.price is stored in major TND units, e.g. 49.99.
         BigDecimal priceMajor = course.getPrice() == null ? BigDecimal.ZERO : course.getPrice();
         long amountMillimes = priceMajor.setScale(3, RoundingMode.HALF_UP)
                 .movePointRight(3)
                 .longValueExact();
 
         // Free courses never reach the gateway. The client sees
-        // `free: true` and goes straight to the confirm endpoint. This
-        // path works today and is independent of the integration below.
+        // `free: true` and goes straight to the confirm endpoint.
         if (amountMillimes <= 0) {
             Map<String, Object> free = new HashMap<>();
             free.put("payUrl", null);
@@ -144,27 +162,59 @@ public class PaymentService {
             return free;
         }
 
-        String orderId = composeOrderId(studentId, courseId, groupId);
+        String orderNumber = composeOrderId(studentId, courseId, groupId);
 
         if (!isConfigured()) {
-            log.warn("Payment requested for order {} but ClicToPay is not configured", orderId);
+            log.warn("Payment requested for order {} but ClicToPay is not configured", orderNumber);
             throw new PaymentProviderUnavailable(
                     "Online payment is not available yet. Paid enrollment opens once "
                             + "the bank has activated the merchant account.");
         }
 
-        // ══ INTEGRATION POINT 1 — create the payment ══════════════════
-        // Send amount (millimes), currency TND, orderId, the affiliate
-        // and terminal numbers, the success/failure return URLs built
-        // from returnUrlBase, and whatever signature SMT specifies.
-        // Expect back a hosted-page URL and a gateway reference; return
-        // them as payUrl / paymentRef so the mobile client is unchanged.
-        //
-        // Student name/email/phone are available on `student` if the
-        // gateway wants cardholder details prefilled.
-        throw new PaymentProviderUnavailable(
-                "ClicToPay payment initiation is not implemented — awaiting SMT's "
-                        + "integration specification. Course: " + course.getCourseId());
+        MultiValueMap<String, String> form = credentials();
+        form.add("orderNumber", orderNumber);
+        form.add("amount", String.valueOf(amountMillimes));
+        form.add("currency", CURRENCY_TND);
+        form.add("returnUrl", returnUrlBase + "/payment/success");
+        form.add("failUrl", returnUrlBase + "/payment/failure");
+        form.add("description", truncate(course.getTitle(), 512));
+        form.add("language", language);
+        if (notBlank(pageView)) {
+            form.add("pageView", pageView);
+        }
+
+        // Logged without the credentials: the return URLs are the part that
+        // goes wrong in practice, and the gateway echoes nothing about them.
+        log.info("[ClicToPay] register.do request orderNumber={} amount={} currency={} returnUrl={} failUrl={} pageView={} language={}",
+                orderNumber, amountMillimes, CURRENCY_TND,
+                form.getFirst("returnUrl"), form.getFirst("failUrl"),
+                form.getFirst("pageView"), form.getFirst("language"));
+
+        Map<String, Object> response = post("register.do", form);
+
+        String errorCode = str(response.get("errorCode"));
+        if (errorCode != null && !"0".equals(errorCode)) {
+            throw new PaymentGatewayException("ClicToPay refused the order (errorCode="
+                    + errorCode + "): " + str(response.get("errorMessage")));
+        }
+
+        String orderId = str(response.get("orderId"));
+        String formUrl = str(response.get("formUrl"));
+        if (orderId == null || formUrl == null) {
+            throw new PaymentGatewayException(
+                    "ClicToPay returned no orderId/formUrl for order " + orderNumber);
+        }
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("payUrl", formUrl);
+        out.put("paymentRef", orderId);
+        out.put("orderNumber", orderNumber);
+        out.put("amount", amountMillimes);
+        out.put("currency", "TND");
+        out.put("free", false);
+        log.info("Payment initiated for {} / {} — orderNumber={} orderId={}",
+                student.getStudentId(), course.getCourseId(), orderNumber, orderId);
+        return out;
     }
 
     /**
@@ -173,6 +223,8 @@ public class PaymentService {
      * Called by {@link EnrollmentService} before an enrollment row is
      * written, and by the webhook handler. Returning null must be safe:
      * callers treat it as "not paid".
+     *
+     * @param paymentRef the ClicToPay orderId (UUID) from register.do
      */
     public Map<String, Object> retrievePayment(String paymentRef) {
         if (!isConfigured()) {
@@ -180,21 +232,54 @@ public class PaymentService {
             // gateway the honest answer is "no", not a 500.
             return null;
         }
+        if (paymentRef == null || paymentRef.isBlank()) {
+            return null;
+        }
 
-        // ══ INTEGRATION POINT 2 — verify the payment ══════════════════
-        // GET the payment by reference and return a map containing at
-        // least "status" and "orderId". Map the gateway's own status
-        // vocabulary onto "completed" for a successful capture, so
-        // isPaidFor() and the webhook handler stay provider-agnostic.
-        log.warn("retrievePayment({}) called but ClicToPay lookup is not implemented", paymentRef);
-        return null;
+        MultiValueMap<String, String> form = credentials();
+        form.add("orderId", paymentRef);
+        form.add("language", language);
+
+        Map<String, Object> response;
+        try {
+            response = post("getOrderStatusExtended.do", form);
+        } catch (RuntimeException e) {
+            // A gateway that cannot be reached must not become a 500 on
+            // the confirm path: unknown means "not paid".
+            log.error("ClicToPay getOrderStatusExtended.do failed for {}: {}",
+                    paymentRef, e.getMessage());
+            return null;
+        }
+        log.info("ClicToPay getOrderStatusExtended.do orderId={} response={}", paymentRef, response);
+
+        String errorCode = str(response.get("errorCode"));
+        if (errorCode != null && !"0".equals(errorCode)) {
+            log.warn("ClicToPay lookup error for {} (errorCode={}): {}",
+                    paymentRef, errorCode, str(response.get("errorMessage")));
+            return null;
+        }
+
+        Integer orderStatus = intOrNull(response.get("orderStatus"));
+        Map<String, Object> out = new HashMap<>();
+        // Mapped onto the provider-agnostic vocabulary the rest of the
+        // application uses: only orderStatus 2 is a completed payment.
+        out.put("status", orderStatus != null && orderStatus == ORDER_STATUS_PAID ? "completed" : "not_completed");
+        // Our own reference, which is what the callers match against.
+        out.put("orderId", str(response.get("orderNumber")));
+        out.put("amount", response.get("amount"));
+        out.put("currency", str(response.get("currency")));
+        out.put("orderStatus", orderStatus);
+        out.put("actionCode", response.get("actionCode"));
+        out.put("actionCodeDescription", str(response.get("actionCodeDescription")));
+        out.put("gatewayOrderId", paymentRef);
+        return out;
     }
 
     /**
      * True iff the gateway confirms this payment completed AND its
-     * orderId matches the student and course being enrolled.
+     * orderNumber refers to the student and course being enrolled.
      *
-     * The orderId check is not redundant. Without it a valid reference
+     * The identity check is not redundant. Without it a valid reference
      * for a cheap course could be replayed to unlock an expensive one —
      * the payment is genuine, just not for this thing.
      */
@@ -202,20 +287,30 @@ public class PaymentService {
         Map<String, Object> payment = retrievePayment(paymentRef);
         if (payment == null) return false;
         if (!"completed".equals(String.valueOf(payment.get("status")))) return false;
-        String orderId = String.valueOf(payment.get("orderId"));
-        if (orderId.equals("null")) return false;
-        return orderId.startsWith(expectedStudentId + ":" + expectedCourseId);
+        return matches(str(payment.get("orderId")), expectedStudentId, expectedCourseId);
+    }
+
+    /** True when an orderNumber refers to exactly this student and course. */
+    public boolean matches(String orderNumber, String expectedStudentId, String expectedCourseId) {
+        OrderId parsed = parseOrderId(orderNumber);
+        return parsed != null
+                && parsed.studentId().equals(expectedStudentId)
+                && parsed.courseId().equals(expectedCourseId);
     }
 
     /**
-     * Parse an orderId back into its parts, for routing a gateway event
-     * to the right enrollment. Returns null when it is unparseable.
+     * Parse an orderNumber back into its parts, for routing a gateway
+     * event to the right enrollment. Returns null when it is unparseable.
      */
-    public OrderId parseOrderId(String orderId) {
-        if (orderId == null) return null;
-        String[] parts = orderId.split(":", 3);
-        if (parts.length < 2) return null;
-        return new OrderId(parts[0], parts[1], parts.length > 2 ? parts[2] : null);
+    public OrderId parseOrderId(String orderNumber) {
+        if (orderNumber == null) return null;
+        String[] parts = orderNumber.split(":", -1);
+        if (parts.length != 4) return null;
+        String studentId = expand(parts[0], "STU_");
+        String courseId = expand(parts[1], "CRS_");
+        String groupId = parts[2].isEmpty() ? null : expand(parts[2], "GRP_");
+        if (studentId == null || courseId == null) return null;
+        return new OrderId(studentId, courseId, groupId);
     }
 
     public record OrderId(String studentId, String courseId, String groupId) {}
@@ -223,17 +318,186 @@ public class PaymentService {
     // ─── helpers ────────────────────────────────────────────────────
 
     /**
-     * Encode (studentId, courseId, groupId) into the orderId the gateway
-     * echoes back on every lookup. Colon-separated rather than JSON
-     * because gateway dashboards render orderId as plain text, and this
-     * form stays readable when an admin is investigating a payment.
+     * Build the orderNumber the gateway stores and echoes back.
+     *
+     * Two constraints from the spec drive the format: it is AN..32, and
+     * it must be unique per merchant — a repeat is rejected with
+     * errorCode 1, which would otherwise break every retry after a
+     * refused card. So the identifiers are carried without their fixed
+     * prefixes (STU_ / CRS_ / GRP_, re-added on parse) and a short
+     * random nonce makes each attempt distinct:
+     *
+     *   8 + 1 + 8 + 1 + 8 + 1 + 4 = 31 characters, groupId optional.
      */
     private String composeOrderId(String studentId, String courseId, String groupId) {
-        StringBuilder sb = new StringBuilder(studentId).append(':').append(courseId);
-        if (groupId != null && !groupId.isBlank()) {
-            sb.append(':').append(groupId);
+        String order = shorten(studentId, "STU_") + ":"
+                + shorten(courseId, "CRS_") + ":"
+                + (groupId == null || groupId.isBlank() ? "" : shorten(groupId, "GRP_")) + ":"
+                + nonce();
+        if (order.length() > ORDER_NUMBER_MAX) {
+            // Unreachable with current id formats; fail loudly rather
+            // than let the gateway reject the order with errorCode 5.
+            throw new IllegalStateException(
+                    "orderNumber exceeds " + ORDER_NUMBER_MAX + " characters: " + order);
+        }
+        return order;
+    }
+
+    /** Drop the fixed prefix so the composite fits in 32 characters. */
+    private String shorten(String id, String prefix) {
+        return id != null && id.startsWith(prefix) ? id.substring(prefix.length()) : id;
+    }
+
+    /** Re-add the prefix stripped by {@link #shorten}. */
+    private String expand(String part, String prefix) {
+        if (part == null || part.isEmpty()) return null;
+        return part.startsWith(prefix) ? part : prefix + part;
+    }
+
+    /** 4 base-36 characters — enough to separate retries of one order. */
+    private String nonce() {
+        StringBuilder sb = new StringBuilder(4);
+        String alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (int i = 0; i < 4; i++) {
+            sb.append(alphabet.charAt(RANDOM.nextInt(alphabet.length())));
         }
         return sb.toString();
+    }
+
+    private MultiValueMap<String, String> credentials() {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("userName", username);
+        form.add("password", password);
+        return form;
+    }
+
+    /**
+     * One form-encoded POST. The API answers 200 with a JSON body even
+     * for business errors, which the callers read from errorCode.
+     *
+     * The raw body is logged verbatim, not the parsed map: the cahier
+     * des recettes requires the untouched JSON of each call, taken from
+     * the site's own logs, and explicitly rejects results produced with
+     * simulation tools such as Postman.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> post(String path, MultiValueMap<String, String> form) {
+        String raw = postRaw(path, form);
+        try {
+            return objectMapper.readValue(raw, Map.class);
+        } catch (Exception e) {
+            throw new PaymentGatewayException(
+                    "Unreadable response from ClicToPay " + path + ": " + raw);
+        }
+    }
+
+    /** The untouched response body, logged verbatim. */
+    private String postRaw(String path, MultiValueMap<String, String> form) {
+        String raw = webClientBuilder.build()
+                .post()
+                .uri(normalizedBase() + path)
+                .body(BodyInserters.fromFormData(form))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(TIMEOUT);
+        log.info("[ClicToPay] {} raw response: {}", path, raw);
+        if (raw == null || raw.isBlank()) {
+            throw new PaymentGatewayException("Empty response from ClicToPay " + path);
+        }
+        return raw;
+    }
+
+    // ─── Cahier des recettes: cases the normal flow cannot produce ───
+
+    /**
+     * CTP-06, CTP-07 and CTP-08 require calls a real enrollment never
+     * makes — a request with a missing parameter, a deliberately
+     * duplicated orderNumber, and a lookup of an order that does not
+     * exist. They are run from here so the evidence comes from the
+     * application's own logs: the cahier rejects results produced with
+     * simulation tools such as Postman.
+     *
+     * Refused outside the sandbox: these calls register junk orders and
+     * have no business running against a live merchant account.
+     */
+    public Map<String, Object> runSandboxCase(String caseId) {
+        if (!isConfigured()) {
+            throw new PaymentProviderUnavailable("ClicToPay is not configured.");
+        }
+        if (!normalizedBase().contains("test.clictopay.com")) {
+            throw new IllegalStateException(
+                    "Sandbox diagnostics only run against https://test.clictopay.com — "
+                            + "current base-url is " + baseUrl);
+        }
+
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("case", caseId);
+
+        switch (caseId) {
+            case "CTP-06" -> {
+                // register.do with no amount at all → expected errorCode 4,
+                // "Montant vide", and no orderId.
+                MultiValueMap<String, String> form = credentials();
+                form.add("orderNumber", "MISSING-AMOUNT-" + nonce());
+                form.add("currency", CURRENCY_TND);
+                form.add("returnUrl", returnUrlBase + "/payment/success");
+                out.put("expected", "errorCode != 0, descriptive message, no orderId");
+                out.put("response", postRaw("register.do", form));
+            }
+            case "CTP-07" -> {
+                // The same orderNumber twice. The cahier names the value.
+                out.put("expected", "second call: error, or the same orderId — never a silent duplicate");
+                out.put("response1", postRaw("register.do", duplicateOrderForm()));
+                out.put("response2", postRaw("register.do", duplicateOrderForm()));
+            }
+            case "CTP-08" -> {
+                // A well-formed UUID that was never registered.
+                MultiValueMap<String, String> form = credentials();
+                form.add("orderId", "00000000-0000-0000-0000-000000000000");
+                form.add("language", language);
+                out.put("expected", "errorCode != 0, handled cleanly, no crash");
+                out.put("response", postRaw("getOrderStatusExtended.do", form));
+            }
+            default -> throw new IllegalArgumentException(
+                    "Unknown case: " + caseId + " (expected CTP-06, CTP-07 or CTP-08)");
+        }
+        return out;
+    }
+
+    /** Both halves of CTP-07 must send exactly the same orderNumber. */
+    private MultiValueMap<String, String> duplicateOrderForm() {
+        MultiValueMap<String, String> form = credentials();
+        form.add("orderNumber", "ORDER-DUP-TEST");
+        form.add("amount", "10000");
+        form.add("currency", CURRENCY_TND);
+        form.add("returnUrl", returnUrlBase + "/payment/success");
+        form.add("failUrl", returnUrlBase + "/payment/failure");
+        form.add("language", language);
+        return form;
+    }
+
+    private String normalizedBase() {
+        return baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+    }
+
+    private static String str(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
+
+    /** orderStatus comes back as a number, actionCode sometimes as a string. */
+    private static Integer intOrNull(Object o) {
+        if (o instanceof Number n) return n.intValue();
+        if (o == null) return null;
+        try {
+            return Integer.valueOf(String.valueOf(o).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private boolean notBlank(String s) {

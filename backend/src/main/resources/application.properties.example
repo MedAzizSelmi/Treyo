@@ -109,10 +109,12 @@ spring.mail.properties.mail.smtp.starttls.required=true
 app.mail.from=no-reply@yourdomain.com
 app.mail.from-name=Treyo
 
-# Base URL the email links resolve against. Production = your marketing
-# site, which deep-links into the app. Dev = your local web bounce page
-# or the Expo dev server.
-app.url=https://treyo.app
+# Base URL the email links resolve against: {app.url}/verify-email?token=…
+# and {app.url}/reset-password?token=…. Both paths are served by the
+# Next.js front end, which spends the token against the API, so this must
+# point at the deployed site — a domain with no such pages means a user
+# can request a reset and never complete it.
+app.url=https://treyo.leanconsulting.com.tn
 
 # ===================================================================
 # ML SERVICE CONFIGURATION (FastAPI)
@@ -137,6 +139,43 @@ cors.allowed-methods=GET,POST,PUT,DELETE,PATCH
 cors.allowed-headers=*
 cors.exposed-headers=Authorization
 cors.allow-credentials=true
+
+# ===================================================================
+# SOCIAL SIGN-IN (Google / Apple / LinkedIn)
+# ===================================================================
+# POST /api/auth/social/{provider} verifies the provider's token against
+# that provider's own signing keys before trusting any identity in it.
+# The audience check is what stops a token minted for somebody else's
+# app being replayed here, so these ids are a security control, not a
+# convenience.
+#
+# google.client-ids: comma-separated OAuth client IDs from Google Cloud
+#   Console — the Web client id plus the Android and iOS ones, since each
+#   platform's SDK mints tokens for its own client.
+# apple.client-ids: the app's bundle identifier (and the Services ID if
+#   the web flow is used).
+#
+# LinkedIn needs nothing here: its access token is presented to LinkedIn
+# itself, which decides whether it is valid.
+#
+# Leave empty to disable a provider — the endpoint then answers 401 with
+# "not configured" and the app keeps email sign-in.
+social.google.client-ids=
+social.apple.client-ids=
+
+# ===================================================================
+# AFFINDA (CV parsing during onboarding)
+# ===================================================================
+# Used by POST /api/cv/parse, which the mobile app calls with the
+# uploaded CV. The key lives here rather than in the app: an
+# EXPO_PUBLIC_ variable is compiled into the bundle and can be read out
+# of any published build, and rotating it would mean shipping a new
+# version to every device.
+#
+# Leave empty to disable parsing. Onboarding still works — the screens
+# fall back to manual entry, which they already support.
+affinda.api.key=
+affinda.api.base-url=https://api.affinda.com/v2
 
 # ===================================================================
 # LOGGING
@@ -180,24 +219,36 @@ gemini.api.key=YOUR_GEMINI_API_KEY
 # Konnect was used for prototyping only and has been removed; its
 # implementation is in git history if the flow shape is ever needed.
 #
-# Every value here is issued by the bank once the merchant contract is
-# approved — none of it is self-service:
-#   affiliate-id : "Numéro Affilié" from the Fiche Technique
-#   terminal-id  : "Numéro Terminal" from the same form
-#   secret       : the credential SMT provides with the integration spec
-#   base-url     : SMT's gateway endpoint, per that spec
+# REST API "Basic 1.0" (ref. CTP-API-BASIC-01): register.do +
+# getOrderStatusExtended.do, authenticated by userName/password on every
+# call. Credentials are issued by the bank — none of it is self-service:
+#   username : "Nom d'utilisateur API" from the Cahier des Recettes
+#   password : "Mot de passe API" — case sensitive
+#   base-url : https://test.clictopay.com/payment/rest/   (sandbox)
+#              https://ipay.clictopay.com/payment/rest/   (production,
+#              only after the cahier des recettes is validated by SMT)
 #
 # return-url-base is the PUBLIC https origin the gateway redirects the
 # user back to. /payment/success and /payment/failure are appended, and
 # both were declared on the Fiche Technique — they must keep matching
-# what was filed, or the bank rejects the redirect.
+# what was filed, or the bank rejects the redirect. It must be reachable
+# from the internet: ClicToPay validates against a deployed environment.
 #
-# All five may be left empty. The service starts, free enrollments work
-# as normal, and paid ones answer 503 until credentials exist.
+# language drives the hosted payment page and the gateway's error
+# messages: fr | en | ar.
+#
+# page-view selects the hosted page template: DESKTOP (gateway default)
+# or MOBILE. MOBILE requires that template to be provisioned for the
+# merchant — otherwise formUrl points at a page that does not exist and
+# the payer gets a 404 from ClicToPay. Leave blank to send nothing.
+clicktopay.api.page-view=DESKTOP
+#
+# All may be left empty. The service starts, free enrollments work as
+# normal, and paid ones answer 503 until credentials exist.
 clicktopay.api.base-url=
-clicktopay.api.affiliate-id=
-clicktopay.api.terminal-id=
-clicktopay.api.secret=
+clicktopay.api.username=
+clicktopay.api.password=
+clicktopay.api.language=fr
 clicktopay.return-url-base=https://your-domain.example
 
 # File Storage

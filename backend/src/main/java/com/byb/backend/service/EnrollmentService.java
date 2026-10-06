@@ -26,6 +26,7 @@ public class EnrollmentService {
     private final NotificationService notificationService;
     private final CourseRepository courseRepository;
     private final PaymentService paymentService;
+    private final MLRecommendationService mlRecommendationService;
 
     /**
      * Confirm an enrollment after the student has paid for it.
@@ -78,17 +79,17 @@ public class EnrollmentService {
             if (!"completed".equals(status)) {
                 throw new RuntimeException("Payment not completed (status=" + status + ")");
             }
-            // Defence against ref reuse: the payment's orderId must
-            // reference the same student + course we're enrolling.
-            String orderId = String.valueOf(payment.get("orderId"));
-            String expectedPrefix = studentId + ":" + courseId;
-            if (orderId == null || !orderId.startsWith(expectedPrefix)) {
+            // Defence against ref reuse: the payment's own order number
+            // must reference the same student + course we're enrolling.
+            String orderNumber = String.valueOf(payment.get("orderId"));
+            if (!paymentService.matches(orderNumber, studentId, courseId)) {
                 throw new RuntimeException(
-                        "Payment does not match this enrollment (orderId=" + orderId + ")");
+                        "Payment does not match this enrollment (orderNumber=" + orderNumber + ")");
             }
-            // Trust Konnect's reported amount over the listed course price —
-            // covers the edge case where the price changed between init
-            // and confirmation. Konnect reports in millimes (1 TND = 1000).
+            // Trust the gateway's reported amount over the listed course
+            // price — covers the edge case where the price changed between
+            // initiation and confirmation. ClicToPay reports in millimes
+            // (1 TND = 1000).
             Object amtObj = payment.get("amount");
             if (amtObj instanceof Number amt) {
                 amountPaid = BigDecimal.valueOf(amt.longValue())
@@ -113,6 +114,23 @@ public class EnrollmentService {
         enrollment.setProgressPercentage(BigDecimal.ZERO);
 
         enrollment = enrollmentRepository.save(enrollment);
+
+        // Keep the course's enrollment counter current. Nothing maintained
+        // it before, so it stayed at 0 forever — which silently disabled
+        // the popularity signal in the recommendation engine (it reads
+        // total_enrolled as num_enrolled) and left the trainer's "students"
+        // figure at zero. Safe to increment unconditionally here: the
+        // duplicate check above guarantees one increment per enrollment.
+        course.setTotalEnrolled((course.getTotalEnrolled() == null ? 0 : course.getTotalEnrolled()) + 1);
+        courseRepository.save(course);
+
+        // Record the enrollment as an interaction. Interest, views and
+        // saves were tracked, but the strongest signal of all — actually
+        // committing to a course — never reached the engine, so it was
+        // missing from the collaborative matrix and from the positives the
+        // offline evaluation learns from. Best-effort: a recommendation
+        // service that is down must not fail a paid enrollment.
+        mlRecommendationService.trackInteraction(studentId, courseId, "enrolled");
 
         // Update group size
         if (groupId != null) {
@@ -164,6 +182,10 @@ public class EnrollmentService {
         enrollment.setEnrollmentStatus("completed");
         enrollment.setCompletedAt(LocalDateTime.now());
         enrollment.setProgressPercentage(BigDecimal.valueOf(100));
+
+        // Completion is the other strong positive the engine never saw.
+        mlRecommendationService.trackInteraction(
+                enrollment.getStudentId(), enrollment.getCourseId(), "completed");
 
         return enrollmentRepository.save(enrollment);
     }
