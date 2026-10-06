@@ -4,15 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import { authService } from '../../../services/api';
+import { authService, fetchUpload } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
-
-// Read from a gitignored .env file (see .env.example). Expo auto-loads
-// EXPO_PUBLIC_-prefixed vars at build time. Empty string if unset — the
-// CV-parse call then fails gracefully and the user fills the form
-// manually, which this screen already handles.
-const AFFINDA_API_KEY = process.env.EXPO_PUBLIC_AFFINDA_API_KEY ?? '';
+import { extractCvLinks } from '../../../utils/cvLinks';
 
 const EDUCATION_LEVELS = [
     "High School",
@@ -81,18 +76,12 @@ export default function StudentOnboardingStep3() {
                 type: file.mimeType || 'application/pdf',
             } as any);
 
-            const response = await fetch('https://api.affinda.com/v2/resumes', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${AFFINDA_API_KEY}`,
-                    Accept: 'application/json',
-                },
-                body: formData,
-            });
-
-            const json = await response.json();
-            const parsed = json?.data;
-            if (!parsed) return;
+            // Parsed server-side: the Affinda key stays on the backend
+            // instead of being compiled into this bundle, where anyone
+            // with the published app could read it. An empty object means
+            // "could not parse" — the user fills the form by hand.
+            const parsed = await fetchUpload('/cv/parse', formData);
+            if (!parsed || Object.keys(parsed).length === 0) return;
 
             // Professional experience — prefer summary, fallback to work history
             if (parsed.summary) {
@@ -114,6 +103,11 @@ export default function StudentOnboardingStep3() {
             if (parsed.education?.length > 0) {
                 setEducationLevel(mapEducationLevel(parsed.education[0]));
             }
+
+            // Optional links — filled only when the CV contains them.
+            const links = extractCvLinks(parsed);
+            if (links.linkedin) setLinkedinUrl(links.linkedin);
+            if (links.portfolio) setPortfolioUrl(links.portfolio);
         } catch (error) {
             console.log('Affinda CV parse failed — fill manually');
         } finally {

@@ -4,15 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState } from 'react';
 import * as DocumentPicker from 'expo-document-picker';
-import { authService } from '../../../services/api';
+import { authService, fetchUpload } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
-
-// Read from a gitignored .env file (see .env.example). Expo auto-loads
-// EXPO_PUBLIC_-prefixed vars at build time. Empty string if unset — the
-// CV-parse call then fails gracefully and the user fills the form
-// manually, which this screen already handles.
-const AFFINDA_API_KEY = process.env.EXPO_PUBLIC_AFFINDA_API_KEY ?? '';
+import { extractCvLinks } from '../../../utils/cvLinks';
 
 const EDUCATION_LEVELS = [
     "High School",
@@ -85,18 +80,12 @@ export default function TrainerOnboardingStep2() {
                 type: file.mimeType || 'application/pdf',
             } as any);
 
-            const response = await fetch('https://api.affinda.com/v2/resumes', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${AFFINDA_API_KEY}`,
-                    Accept: 'application/json',
-                },
-                body: formData,
-            });
-
-            const json = await response.json();
-            const parsed = json?.data;
-            if (!parsed) return;
+            // Parsed server-side: the Affinda key stays on the backend
+            // instead of being compiled into this bundle, where anyone
+            // with the published app could read it. An empty object means
+            // "could not parse" — the user fills the form by hand.
+            const parsed = await fetchUpload('/cv/parse', formData);
+            if (!parsed || Object.keys(parsed).length === 0) return;
 
             // Professional experience — prefer summary, fallback to work history
             if (parsed.summary) {
@@ -118,6 +107,11 @@ export default function TrainerOnboardingStep2() {
             if (parsed.education?.length > 0) {
                 setEducationLevel(mapEducationLevel(parsed.education[0]));
             }
+
+            // Optional links — filled only when the CV contains them.
+            const links = extractCvLinks(parsed);
+            if (links.linkedin) setLinkedinUrl(links.linkedin);
+            if (links.portfolio) setPortfolioUrl(links.portfolio);
         } catch (error) {
             console.log('Affinda CV parse failed — fill manually');
         } finally {
@@ -126,6 +120,12 @@ export default function TrainerOnboardingStep2() {
     };
 
     const handleContinue = async () => {
+        // The administrator decides on a trainer's application from the CV,
+        // so a trainer cannot continue without one.
+        if (!cvFile) {
+            Alert.alert('CV required', 'Please upload your CV to continue.');
+            return;
+        }
         if (!professionalExperience || !keySkills || !educationLevel) {
             Alert.alert('Required Fields', 'Please fill in all required fields');
             return;
@@ -141,8 +141,18 @@ export default function TrainerOnboardingStep2() {
 
             const skillsArray = keySkills.split(',').map((s: string) => s.trim()).filter(Boolean);
 
+            // Send the file itself to the server. cvFile.uri is a path on
+            // this phone, which the administrator's dashboard cannot open.
+            const cvForm = new FormData();
+            cvForm.append('file', {
+                uri: cvFile.uri,
+                name: cvFile.name,
+                type: cvFile.mimeType || 'application/pdf',
+            } as any);
+            const uploaded = await fetchUpload('/files/upload/cv', cvForm);
+
             await api.put(`/trainers/me/profile/page2?trainerId=${user.userId}`, {
-                cvUrl: cvFile?.uri || null,
+                cvUrl: uploaded.fileUrl,
                 professionalExperience,
                 specializations: skillsArray.slice(0, 5),
                 experienceYears: 0,
@@ -211,7 +221,7 @@ export default function TrainerOnboardingStep2() {
                                 <Ionicons name="cloud-upload-outline" size={44} color="#ffffff" />
                             </View>
                             <Text style={styles.uploadText}>Select CV / Resume</Text>
-                            <Text style={styles.uploadSubtext}>PDF or Word — fields auto-fill</Text>
+                            <Text style={styles.uploadSubtext}>Required · PDF or Word — fields auto-fill</Text>
                         </>
                     )}
                 </TouchableOpacity>
