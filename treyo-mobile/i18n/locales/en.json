@@ -549,5 +549,23 @@
             "SPAM": "Spam",
             "OTHER": "Other"
         }
+    },
+    "deleteAccount": {
+        "title": "Delete account",
+        "subtitle": "Permanently delete your Treyo account",
+        "warningTitle": "This cannot be undone",
+        "erased": "Your name, email, photo, CV and profile details are erased.",
+        "kept": "Enrolments and payments are kept as accounting records, and reviews keep their rating without your name.",
+        "noSignIn": "You will not be able to sign in again with this account.",
+        "trainerNote": "Your courses are withdrawn and stop being offered to learners.",
+        "confirmPassword": "Confirm your password to continue",
+        "passwordPlaceholder": "Your password",
+        "deleteButton": "Delete my account",
+        "confirmTitle": "Delete your account?",
+        "confirmBody": "This is permanent. Your personal data will be erased and you will be signed out.",
+        "deletedTitle": "Account deleted",
+        "deletedBody": "Your personal data has been erased. Thank you for using Treyo.",
+        "wrongPassword": "That password doesn't match this account.",
+        "failed": "Your account could not be deleted. Please try again."
     }
 }

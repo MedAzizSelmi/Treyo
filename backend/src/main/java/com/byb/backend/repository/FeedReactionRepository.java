@@ -12,6 +12,9 @@ public interface FeedReactionRepository extends JpaRepository<FeedReaction, Stri
 
     Optional<FeedReaction> findByUserIdAndPostIdAndType(String userId, String postId, FeedReaction.Type type);
 
+    /** Every reaction by one user — erased on account deletion. */
+    List<FeedReaction> findByUserId(String userId);
+
     List<FeedReaction> findByUserIdAndType(String userId, FeedReaction.Type type);
 
     List<FeedReaction> findByUserIdAndPostIdIn(String userId, List<String> postIds);

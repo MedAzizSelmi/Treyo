@@ -17,6 +17,10 @@ public interface ReviewRepository extends JpaRepository<Review, String> {
 
     List<Review> findByTrainerId(String trainerId);
 
+    /** Every review written by one learner — the free text is cleared on
+     *  account deletion while the ratings stay. */
+    List<Review> findByStudentId(String studentId);
+
     /** Public-facing course reviews — drops admin-hidden rows so the
      *  course-detail "What students said" list doesn't surface them. */
     List<Review> findByCourseIdAndIsHiddenFalseOrderByCreatedAtDesc(String courseId);

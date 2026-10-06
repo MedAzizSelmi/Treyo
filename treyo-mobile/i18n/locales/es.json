@@ -549,5 +549,23 @@
             "SPAM": "Spam",
             "OTHER": "Otro"
         }
+    },
+    "deleteAccount": {
+        "title": "Eliminar cuenta",
+        "subtitle": "Eliminar permanentemente tu cuenta de Treyo",
+        "warningTitle": "Esta acción no se puede deshacer",
+        "erased": "Tu nombre, correo, foto, CV y datos de perfil se borran.",
+        "kept": "Las inscripciones y los pagos se conservan como registros contables, y las reseñas mantienen su puntuación sin tu nombre.",
+        "noSignIn": "No podrás volver a iniciar sesión con esta cuenta.",
+        "trainerNote": "Tus cursos se retiran y dejan de ofrecerse a los estudiantes.",
+        "confirmPassword": "Confirma tu contraseña para continuar",
+        "passwordPlaceholder": "Tu contraseña",
+        "deleteButton": "Eliminar mi cuenta",
+        "confirmTitle": "¿Eliminar tu cuenta?",
+        "confirmBody": "Es permanente. Tus datos personales se borrarán y se cerrará tu sesión.",
+        "deletedTitle": "Cuenta eliminada",
+        "deletedBody": "Tus datos personales se han borrado. Gracias por usar Treyo.",
+        "wrongPassword": "Esa contraseña no coincide con esta cuenta.",
+        "failed": "No se pudo eliminar tu cuenta. Inténtalo de nuevo."
     }
 }

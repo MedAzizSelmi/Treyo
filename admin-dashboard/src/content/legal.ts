@@ -1,19 +1,4 @@
 /**
- * ⚠️ COPY. The source of truth is treyo-mobile/constants/legal.ts.
- *
- * These are the same documents the mobile app shows, published on the
- * web because the ClicToPay merchant contract requires them to be
- * reachable before payment. The two projects have no shared package, so
- * this is a copy rather than an import.
- *
- * EDIT THE MOBILE FILE, THEN RE-COPY:
- *   cp treyo-mobile/constants/legal.ts admin-dashboard/src/content/legal.ts
- *
- * Editing only one side means the app and the website state different
- * terms for the same service, which is worse than having no web copy.
- *
- * ── Original header ─────────────────────────────────────────────────
- *
  * Terms of Service + Privacy Policy content.
  *
  * Legal entity: LeanConsulting
@@ -29,7 +14,7 @@
  * LeanConsulting should have them reviewed by qualified legal counsel.
  */
 
-export const LEGAL_LAST_UPDATED = 'August 2026';
+export const LEGAL_LAST_UPDATED = 'October 2026';
 
 /**
  * The address users are told to write to for legal and support matters.
@@ -171,7 +156,9 @@ export const TERMS_SECTIONS: LegalSection[] = [
     {
         heading: '12. Account deletion',
         body: [
-            'You may request deletion of your Treyo account through the account-management functionality provided in the application or by contacting us at the address provided below.',
+            'You can delete your account yourself, at any time, from Settings → Security → Delete account in the app. The deletion happens immediately and asks for your password first. If you no longer have access to the app, write to us from your registered email address and we will complete the deletion within 30 days.',
+            'What is erased: your name, email address, phone number, address, profile photo, biography, CV, professional links and every profile detail, together with your notifications, saved items, search history, reactions and activity history. Your sign-in credentials are destroyed, so the account can no longer be used.',
+            'What is kept: enrolment and payment records, which we must retain as accounting documents, and the ratings you gave to courses and trainers, because other people’s averages are built from them. The written part of your reviews is erased and your name no longer appears on them. Messages you sent in a group remain visible to that group, attributed to a deleted user.',
             'When an account is deleted, Treyo will remove or anonymise personal information where reasonably possible, subject to information that must be retained for legal, accounting, security, fraud-prevention or dispute-resolution purposes.',
             'Some content may need to be retained in anonymised or aggregated form, for example statistical information that can no longer reasonably be associated with you.',
             'Deleting your account does not necessarily cancel obligations that arose before deletion, including payment-related obligations where applicable.',
@@ -220,6 +207,8 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
             'Communications — messages you send in group conversations, and reviews or reports you submit.',
             'Device data — a push notification token, so we can notify you about approvals, group formation and new messages.',
             'Technical and security information — information that may be generated when you use the Service, such as authentication information, security logs, error information and information necessary to maintain and protect the Service.',
+            'CV content — if you upload a CV during onboarding, its contents are read in order to pre-fill your profile. See section 5 for the provider that performs this.',
+            'Sign-in provider data — if you choose to sign in with Google, Apple or LinkedIn, that provider confirms your email address and name to us. We never receive your password for that account.',
         ],
     },
 
@@ -253,8 +242,11 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
         body: [
             'Payment provider — ClickToPay by Tunisie Monétique is used to process course payments. The payment provider receives the information necessary to process the transaction. Treyo does not store complete payment-card details.',
             'Cloud and hosting provider — OxaHost, a Tunisian provider of hosting and cloud solutions, currently provides the hosting infrastructure used by the Service. Data processed through this infrastructure may include information necessary to operate the application, backend services and databases.',
-            'Push notification provider — receives your device token and the notification text in order to deliver notifications.',
-            'Email provider — used to send verification, password reset and approval emails.',
+            'CV parsing provider — Affinda (affinda.com) receives the CV you upload during onboarding in order to extract the fields that pre-fill your profile. If you prefer not to use it, you can skip the upload and fill the form yourself.',
+            'AI provider — Google (Gemini) powers the generated home feed and the in-app assistant. See section 6 for exactly what is and is not sent.',
+            'Push notification provider — Expo (expo.dev) receives your device token and the notification text in order to deliver notifications to your device through Apple and Google.',
+            'Email provider — an SMTP email service is used to send verification, password reset and approval emails.',
+            'Sign-in providers — if you sign in with Google, Apple or LinkedIn, that provider tells us your email address and name so we can create or find your account. We do not post anything to those accounts and receive nothing else from them.',
             'Other users — your public profile (name, picture, and for trainers your bio, specializations and rating) is visible to other users. Messages you post in a group are visible to that group and to administrators.',
             'Administrators — can see account details, submitted courses, reviews, and any report naming you, in order to moderate the platform.',
             'Service providers — we may use technical service providers that process information on our behalf where necessary to operate, secure, maintain or improve the Service.',
@@ -265,8 +257,10 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
     {
         heading: '6. AI-generated content',
         body: [
-            'The daily tips and highlights on your home feed are generated by a third-party AI service. The same content is generated for everyone: we do not send your personal data to that service to produce it.',
-            'Treyo will not intentionally provide your profile, account information, private messages, payment information or other personal information to the AI service for the generation of these general daily tips and highlights.',
+            'The AI features are powered by Google (Gemini).',
+            'Home feed — the daily tips and highlights are generated once for everyone, not for you individually. No personal data is sent to produce them: not your profile, account information, private messages or payment information.',
+            'AI assistant — when you use the in-app assistant, the content of your conversation with it (including any image or voice message you choose to send) is transmitted to the AI provider in order to produce an answer. Nothing else is attached to it: we do not send your name, email address, profile, enrolments or payment information. The assistant only knows what you type into it, so please do not share sensitive information in that conversation.',
+            'Recommendations are not produced by this provider — they are computed on our own infrastructure, as described in section 4.',
         ],
     },
 

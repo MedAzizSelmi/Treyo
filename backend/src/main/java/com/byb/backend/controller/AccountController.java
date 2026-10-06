@@ -1,34 +1,49 @@
 package com.byb.backend.controller;
 
 import com.byb.backend.dto.auth.ChangePasswordRequest;
+import com.byb.backend.repository.StudentRepository;
+import com.byb.backend.repository.TrainerRepository;
+import com.byb.backend.service.AccountDeletionService;
 import com.byb.backend.service.AuthService;
+import com.byb.backend.service.FileAccessService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 /**
- * Authenticated account-management endpoints (password change, future 2FA, etc.).
- * Lives under /api/account/** so it inherits the catch-all .anyRequest().authenticated()
- * rule in SecurityConfig — unlike /api/auth/** which is permitAll for login/signup.
+ * The account's owner acting on their own account.
+ *
+ * Deletion is irreversible, so it asks for the password again rather
+ * than trusting the token alone: a phone left unlocked for two minutes
+ * should not be enough to erase someone's account.
+ *
+ * Administrators are deliberately not covered. An admin who could delete
+ * themselves could leave the platform with no administrator at all;
+ * removing one is another admin's job, from the dashboard.
  */
 @RestController
 @RequestMapping("/api/account")
 @RequiredArgsConstructor
-@Tag(name = "Account", description = "Authenticated account management")
+@Slf4j
+@Tag(name = "Account", description = "Self-service account management")
 @SecurityRequirement(name = "bearerAuth")
 public class AccountController {
 
     private final AuthService authService;
+    private final AccountDeletionService accountDeletionService;
+    private final FileAccessService fileAccessService;
+    private final StudentRepository studentRepository;
+    private final TrainerRepository trainerRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @PostMapping("/change-password")
     @Operation(summary = "Change password for the currently authenticated user")
@@ -47,5 +62,53 @@ public class AccountController {
                 .orElse(null);
         authService.changePassword(email, role, request.getCurrentPassword(), request.getNewPassword());
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+    }
+
+    @DeleteMapping
+    @Operation(summary = "Delete the signed-in user's own account")
+    public ResponseEntity<?> deleteOwnAccount(@RequestBody Map<String, String> body) {
+        var caller = fileAccessService.caller().orElse(null);
+        if (caller == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Not signed in"));
+        }
+        String password = body == null ? null : body.get("password");
+        if (password == null || password.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Password required",
+                    "message", "Confirm your password to delete your account."));
+        }
+
+        if (caller.isAdmin()) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "Not available for administrators",
+                    "message", "Ask another administrator to remove your account."));
+        }
+
+        if (caller.isTrainer()) {
+            var trainer = trainerRepository.findByTrainerId(caller.getUserId()).orElse(null);
+            if (trainer == null || !passwordEncoder.matches(password, trainer.getPasswordHash())) {
+                return wrongPassword();
+            }
+            accountDeletionService.deleteTrainer(trainer.getTrainerId());
+        } else {
+            var student = studentRepository.findByStudentId(caller.getUserId()).orElse(null);
+            if (student == null || !passwordEncoder.matches(password, student.getPasswordHash())) {
+                return wrongPassword();
+            }
+            accountDeletionService.deleteStudent(student.getStudentId());
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "status", "deleted",
+                "message", "Your account has been deleted."));
+    }
+
+    private ResponseEntity<?> wrongPassword() {
+        // 403 rather than 401: the token is valid, the confirmation is not.
+        // A 401 would make the client's interceptor sign the user out and
+        // hide the reason.
+        return ResponseEntity.status(403).body(Map.of(
+                "error", "Incorrect password",
+                "message", "That password doesn't match this account."));
     }
 }

@@ -207,6 +207,23 @@ export default function SecuritySettingsScreen() {
                     <Ionicons name="bulb-outline" size={16} color="#7cce06" />
                     <Text style={styles.tipText}>{t('security.tip')}</Text>
                 </View>
+
+                {/* Account deletion. Required in-app by Google Play for any
+                    app with accounts; the confirmation and warnings live on
+                    the destination screen, not behind this row. */}
+                <TouchableOpacity
+                    style={styles.dangerRow}
+                    onPress={() => router.push('/delete-account' as any)}
+                    activeOpacity={0.8}
+                >
+                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                    <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.dangerTitle}>{t('deleteAccount.title')}</Text>
+                        <Text style={styles.dangerSubtitle}>{t('deleteAccount.subtitle')}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />
+                </TouchableOpacity>
             </ScrollView>
         </ScreenBackground>
     );
@@ -298,6 +315,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
     },
 
+    dangerRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        marginTop: 16, padding: 16,
+        borderRadius: 14, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(255,107,107,0.22)',
+    },
+    dangerTitle: { fontSize: 15, fontWeight: '600', color: '#ff6b6b' },
+    dangerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
     tipWrap: {
         flexDirection: 'row', gap: 10, alignItems: 'flex-start',
         marginTop: 20, padding: 14,

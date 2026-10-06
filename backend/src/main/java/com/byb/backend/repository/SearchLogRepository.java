@@ -4,6 +4,11 @@ import com.byb.backend.model.SearchLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface SearchLogRepository extends JpaRepository<SearchLog, String> {
+
+    /** One learner's search history — erased on account deletion. */
+    List<SearchLog> findByStudentId(String studentId);
 }
