@@ -29,7 +29,7 @@ const PRODUCTION_API_URL: string =
     '';
 
 // Last-resort LAN fallback for development only.
-const MANUAL_OVERRIDE = 'http://192.168.100.11:8085';
+const MANUAL_OVERRIDE = 'http://192.168.0.188:8085';
 
 function resolveApiBase(): string {
     // hostUri looks like "192.168.100.68:8081" or "localhost:8081"
@@ -181,6 +181,39 @@ export const authService = {
         return response.data;
     },
 
+    /**
+     * Sign in with a provider. The provider's token goes to our backend,
+     * which verifies it against that provider's signing keys and answers
+     * with Treyo credentials — the app never decides who the user is.
+     *
+     * `userType` is only used if the account does not exist yet, so an
+     * existing learner is not turned into a trainer by signing in from
+     * the trainer screen.
+     */
+    socialLogin: async (provider: 'google' | 'apple' | 'linkedin', userType: 'STUDENT' | 'TRAINER' = 'STUDENT') => {
+        const { getProviderToken } = await import('./social-auth');
+        const token = await getProviderToken(provider);
+        const response = await api.post(`/auth/social/${provider}`, { token, userType });
+        if (response.data.token) {
+            await SecureStore.setItemAsync('jwt_token', response.data.token);
+            if (response.data.refreshToken) {
+                await SecureStore.setItemAsync('refresh_token', response.data.refreshToken);
+            }
+            await SecureStore.setItemAsync('user_data', JSON.stringify({
+                userId: response.data.userId,
+                email: response.data.email,
+                name: response.data.name,
+                role: response.data.role,
+                onboardingComplete: response.data.onboardingComplete,
+            }));
+        }
+        return response.data;
+    },
+
+    loginWithGoogle: () => authService.socialLogin('google'),
+    loginWithApple: () => authService.socialLogin('apple'),
+    loginWithLinkedIn: () => authService.socialLogin('linkedin'),
+
     register: async (data: { name: string; email: string; password: string; userType: string }) => {
         const endpoint = data.userType === 'STUDENT' ? '/auth/register/student' : '/auth/register/trainer';
         const response = await api.post(endpoint, { name: data.name, email: data.email, password: data.password });
@@ -201,6 +234,16 @@ export const authService = {
             };
             await SecureStore.setItemAsync('user_data', JSON.stringify(userData));
         }
+        return response.data;
+    },
+
+    /** Erase the signed-in user's own account. The password is re-checked
+     *  server-side: a token alone must not be enough for something
+     *  irreversible. Clears local credentials on success, since there is
+     *  nothing left to sign into. */
+    deleteAccount: async (password: string) => {
+        const response = await api.delete('/account', { data: { password } });
+        await authService.logout();
         return response.data;
     },
 

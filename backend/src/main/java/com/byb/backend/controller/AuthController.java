@@ -2,6 +2,7 @@ package com.byb.backend.controller;
 
 import com.byb.backend.dto.auth.*;
 import com.byb.backend.service.AuthService;
+import com.byb.backend.service.SocialIdentityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final SocialIdentityService socialIdentityService;
 
     @PostMapping("/register/student")
     @Operation(summary = "Register a new student")
@@ -38,6 +40,38 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Sign in with Google, Apple or LinkedIn.
+     *
+     * Body: { "token": "...", "userType": "STUDENT" | "TRAINER" }
+     *
+     * `token` is the provider's own token — an ID token for Google and
+     * Apple, an access token for LinkedIn. It is verified against the
+     * provider before anything else happens, so a forged body gets
+     * nowhere. `userType` is only read when the account does not exist
+     * yet; an existing learner does not become a trainer by signing in
+     * from a different screen.
+     *
+     * Public, like /login: the caller has no Treyo credentials yet.
+     */
+    @PostMapping("/social/{provider}")
+    @Operation(summary = "Login or sign up with Google, Apple or LinkedIn")
+    public ResponseEntity<?> socialLogin(
+            @PathVariable String provider,
+            @RequestBody Map<String, String> body) {
+        String token = body == null ? null : body.get("token");
+        String userType = body == null ? null : body.get("userType");
+        try {
+            var identity = socialIdentityService.verify(
+                    provider.toLowerCase(), token);
+            return ResponseEntity.ok(authService.socialLogin(identity, userType));
+        } catch (SocialIdentityService.SocialAuthException e) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Sign-in failed",
+                    "message", e.getMessage()));
+        }
     }
 
     /**

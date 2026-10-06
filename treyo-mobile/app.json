@@ -5,14 +5,20 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "treyomobile",
+    "scheme": [
+      "treyomobile",
+      "com.googleusercontent.apps.629625292510-eb62bn8v5eqsisvvpj89kj694mprqmp6",
+      "com.googleusercontent.apps.629625292510-v02fdagjn7b419g2nqc7796bn5d4ir92e"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "usesAppleSignIn": true,
+      "bundleIdentifier": "com.aziz001.treyomobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -44,10 +50,25 @@
           "color": "#7cce06"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-apple-authentication",
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "social": {
+        "googleAndroidClientId": "629625292510-eb62bn8v5eqsisvvpj89kj694mprqmp6.apps.googleusercontent.com",
+        "googleIosClientId": "629625292510-v02fdagjn7b419g2nqc7796bn5d4ir92e.apps.googleusercontent.com",
+        "linkedinClientId": ""
+      },
+      "router": {},
+      "eas": {
+        "projectId": "3adfcbf4-dd08-43c6-b630-102353c6d7a4"
+      }
     }
   }
 }
