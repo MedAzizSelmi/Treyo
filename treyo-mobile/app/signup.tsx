@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authService } from '../services/api';
 import { registerForPushNotifications } from '../services/push';
+import { authService } from '../services/api';
 
 // Use 'screen' (full physical screen) not 'window' (safe area). On Android
 // 'window' excludes the system nav bar, which shrinks the gradient view
@@ -39,14 +39,39 @@ export default function SignupScreen() {
      * When OAuth lands, replace the Alert with calls like
      * authService.registerWithGoogle(userType) etc.
      */
+    /**
+     * Sign up with a provider. The role picked on this screen is passed
+     * along, because it is the only moment the user states which one they
+     * are — it is ignored by the backend if the account already exists.
+     *
+     * No email verification afterwards: the provider has already proven
+     * the address, which is the point of signing up this way.
+     */
     const handleSocialSignup = async (provider: 'google' | 'apple' | 'linkedin') => {
         setSocialLoading(true);
         try {
-            const label = provider.charAt(0).toUpperCase() + provider.slice(1);
-            Alert.alert(
-                label,
-                `Sign up with ${label} will land once we ship the production build. Use email + password for now.`,
+            const response = await authService.socialLogin(provider, userType as 'STUDENT' | 'TRAINER');
+            if (response?.userId) {
+                registerForPushNotifications(response.userId, response.role).catch(() => {});
+            }
+            router.replace(
+                response.onboardingComplete
+                    ? (userType === 'STUDENT' ? '/(student-tabs)/home' : '/(trainer-tabs)/home') as any
+                    : (userType === 'STUDENT' ? '/onboarding/student/step1' : '/onboarding/trainer/step1') as any,
             );
+        } catch (error: any) {
+            // The user closing the provider's sheet is not a failure.
+            if (error?.message === 'CANCELLED') return;
+            const raw = String(error?.response?.data?.message || error?.message || '');
+            if (raw.includes('TRAINER_PENDING_APPROVAL')) {
+                router.replace('/trainer-pending' as any);
+                return;
+            }
+            if (raw.includes('TRAINER_REJECTED')) {
+                router.replace('/trainer-rejected' as any);
+                return;
+            }
+            Alert.alert(t('auth.signupFailed'), raw || t('auth.invalidCreds'));
         } finally {
             setSocialLoading(false);
         }
@@ -67,30 +92,14 @@ export default function SignupScreen() {
                 userType,
             });
 
-            // Hook up push notifications for the freshly-created account.
-            if (response?.userId) {
-                registerForPushNotifications(response.userId, userType).catch(() => {});
-            }
-
-            // Determine where to go after the success screen
-            let nextRoute: string;
-            if (!response.onboardingComplete) {
-                nextRoute = userType === 'STUDENT'
-                    ? '/onboarding/student/step1'
-                    : '/onboarding/trainer/step1';
-            } else {
-                nextRoute = userType === 'STUDENT'
-                    ? '/(student-tabs)/home'
-                    : '/(trainer-tabs)/home';
-            }
-
-            // Show animated success screen first
+            // Registration returns no token: the address must be confirmed
+            // before the account can be used, so there is nothing to sign
+            // into yet and onboarding waits until after the first login.
+            // Push notifications are registered at login, where a token
+            // exists — /devices/register is authenticated.
             router.replace({
-                pathname: '/success' as any,
-                params: {
-                    message: 'Your account has been\nsuccessfully created!',
-                    nextRoute,
-                },
+                pathname: '/verify-email-sent' as any,
+                params: { email: email.trim() },
             });
         } catch (error: any) {
             console.error('Signup error:', error);

@@ -65,6 +65,32 @@ export default function LoginScreen() {
                 || error?.message
                 || '',
             );
+            // The address was never confirmed. Offer the resend directly:
+            // asking the user to hunt for the original mail is how accounts
+            // get abandoned at this step.
+            if (raw.includes('EMAIL_NOT_VERIFIED')) {
+                Alert.alert(
+                    t('auth.verifyEmailTitle'),
+                    t('auth.verifyEmailBody', { email: email.trim() }),
+                    [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        {
+                            text: t('auth.resendEmail'),
+                            onPress: async () => {
+                                try {
+                                    await authService.resendVerification(email.trim());
+                                } catch (_) {
+                                    // Deliberately silent: the endpoint answers
+                                    // identically for unknown addresses, so an
+                                    // error here must not hint at the opposite.
+                                }
+                                Alert.alert(t('auth.verifyEmailTitle'), t('auth.resendSent'));
+                            },
+                        },
+                    ],
+                );
+                return;
+            }
             if (raw.includes('TRAINER_PENDING_APPROVAL')) {
                 router.replace('/trainer-pending' as any);
                 return;

@@ -41,50 +41,40 @@ public class EmailService {
     private static final String BRAND = "#7cce06";
 
     /**
-     * Verification + reset emails both surface the token TWICE:
-     *   1. As a clickable button — for users on a device with the app
-     *      installed and Universal Links / a bounce page wired up.
-     *   2. As a big copyable code block — for everyone else (no
-     *      installed app on this device, link broken, etc.). This is
-     *      the path the user will actually use until the bounce page
-     *      at app.url goes live.
-     *
-     * Showing the raw token makes the email work end-to-end with zero
-     * web infrastructure: open the email, copy the code, paste it in
-     * the reset / verification screen.
+     * Verification + reset emails carry the token once, inside the
+     * button's link. They used to also print it as a copyable code,
+     * because {@code app.url} pointed at a site with no page to receive
+     * the click — pasting the code into the app was the only route that
+     * worked. The pages at /verify-email and /reset-password exist now,
+     * so the code block is gone: one action, nothing to copy, and a
+     * secret that no longer sits in the body of the message where it can
+     * be read over a shoulder or forwarded by accident.
      */
     @Async
-    public void sendVerificationEmail(String toEmail, String userName, String verifyLink, String code) {
+    public void sendVerificationEmail(String toEmail, String userName, String verifyLink) {
         String subject = "Verify your Treyo email";
-        String html = baseTemplate(
+        String html = simpleTemplate(
                 "Welcome to Treyo!",
                 "Hi " + safe(userName) + ",",
-                "Tap the button below to confirm your email address. If the " +
-                        "button doesn't open the app, copy the code further down " +
-                        "and paste it into the verification screen. The code expires " +
-                        "in 24 hours.",
+                "Tap the button below to confirm your email address. " +
+                        "The link expires in 24 hours.",
                 "Verify email",
                 verifyLink,
-                code,
-                "Or enter this code in the app",
                 "If you didn't sign up for Treyo, you can ignore this message."
         );
         send(toEmail, subject, html);
     }
 
     @Async
-    public void sendPasswordResetEmail(String toEmail, String userName, String resetLink, String code) {
+    public void sendPasswordResetEmail(String toEmail, String userName, String resetLink) {
         String subject = "Reset your Treyo password";
-        String html = baseTemplate(
+        String html = simpleTemplate(
                 "Reset your password",
                 "Hi " + safe(userName) + ",",
-                "Tap the button below to choose a new password. If the button " +
-                        "doesn't open the app, copy the code further down and paste " +
-                        "it into the reset screen. The code expires in 15 minutes.",
+                "Tap the button below to choose a new password. " +
+                        "The link expires in 15 minutes.",
                 "Reset password",
                 resetLink,
-                code,
-                "Or enter this code in the app",
                 "If you didn't request this, you can safely ignore the email — " +
                         "your password won't change."
         );
@@ -137,10 +127,10 @@ public class EmailService {
     }
 
     /**
-     * Lighter cousin of {@link #baseTemplate} for transactional
-     * emails that don't need a copyable code block — approval /
-     * rejection notifications, future "your group is forming" digest,
-     * etc. Button is optional (pass null label + href to skip).
+     * The shell every transactional email uses: headline, greeting,
+     * body, an optional call-to-action button (pass null label + href
+     * to skip it) and a footer. Inline styles only — Gmail and Outlook
+     * strip <style> tags.
      */
     private String simpleTemplate(
             String headline, String greeting, String body,
@@ -222,44 +212,6 @@ public class EmailService {
             // SMTP / network errors. Don't fail the calling endpoint.
             log.warn("Email transport error for {} — {}", toEmail, e.getMessage());
         }
-    }
-
-    /** Minimal HTML email shell. Inline styles only — Gmail / Outlook
-     *  strip <style> tags. Kept under 3 KB so it fits comfortably in
-     *  the smallest preview pane.
-     *
-     *  Layout:
-     *    - headline + greeting + body
-     *    - big green CTA button (for the deep-link path)
-     *    - "Or enter this code in the app" label
-     *    - monospace code block — selectable and copy-paste friendly
-     *    - small footer disclaimer */
-    private String baseTemplate(
-            String headline, String greeting, String body,
-            String buttonLabel, String buttonHref,
-            String code, String codeLabel,
-            String footer
-    ) {
-        return "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f7f8fa;font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;\">" +
-                "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f7f8fa;padding:32px 16px;\"><tr><td align=\"center\">" +
-                "<table role=\"presentation\" width=\"100%\" style=\"max-width:520px;background:#ffffff;border-radius:14px;padding:32px;\" cellspacing=\"0\" cellpadding=\"0\">" +
-                "<tr><td style=\"font-size:22px;font-weight:700;color:#1a1a2e;padding-bottom:12px;\">" + safe(headline) + "</td></tr>" +
-                "<tr><td style=\"font-size:14px;color:#444;padding-bottom:8px;\">" + safe(greeting) + "</td></tr>" +
-                "<tr><td style=\"font-size:14px;color:#444;line-height:21px;padding-bottom:20px;\">" + safe(body) + "</td></tr>" +
-                "<tr><td align=\"center\" style=\"padding:4px 0 20px;\">" +
-                "<a href=\"" + safe(buttonHref) + "\" style=\"display:inline-block;background:" + BRAND + ";color:#000;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:10px;font-size:15px;\">" +
-                safe(buttonLabel) + "</a></td></tr>" +
-                // Code block — the path the user actually relies on until
-                // the bounce page goes live. Monospace + light grey
-                // background reads as "copy this".
-                "<tr><td style=\"text-align:center;font-size:12px;color:#888;letter-spacing:0.4px;text-transform:uppercase;font-weight:700;padding-top:8px;\">" +
-                safe(codeLabel) + "</td></tr>" +
-                "<tr><td align=\"center\" style=\"padding:10px 0 24px;\">" +
-                "<div style=\"display:inline-block;background:#f3f5f8;border:1px solid #e2e6ee;border-radius:10px;padding:14px 18px;font-family:Consolas,Menlo,monospace;font-size:14px;color:#1a1a2e;word-break:break-all;max-width:440px;line-height:20px;\">" +
-                safe(code) + "</div></td></tr>" +
-                "<tr><td style=\"font-size:12px;color:#888;line-height:18px;padding-top:16px;border-top:1px solid #eee;\">" + safe(footer) + "</td></tr>" +
-                "<tr><td style=\"font-size:11px;color:#aaa;padding-top:16px;\">Treyo · Smart match, swift growth</td></tr>" +
-                "</table></td></tr></table></body></html>";
     }
 
     /** Basic HTML-attribute / body escape. We construct the URLs and

@@ -128,15 +128,6 @@ export default function ForgotPasswordScreen() {
                                 </LinearGradient>
                             </TouchableOpacity>
 
-                            {/* Link for users who already have the email open
-                                — saves a round trip when re-entering. */}
-                            <TouchableOpacity
-                                style={styles.secondaryLink}
-                                onPress={() => router.push('/reset-password' as any)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={styles.secondaryLinkText}>{t('auth.haveResetCode')}</Text>
-                            </TouchableOpacity>
                         </View>
                     </>
                 ) : (
@@ -155,18 +146,9 @@ export default function ForgotPasswordScreen() {
 
                         <Text style={styles.subtitle}>{t('auth.checkInboxBody')}</Text>
 
-                        {/* Primary CTA — for users who already have the
-                            email open on this device, drops them into
-                            the reset screen to paste the code. */}
-                        <TouchableOpacity
-                            style={[styles.submitButton, { marginTop: 28 }]}
-                            onPress={() => router.push('/reset-password' as any)}
-                            activeOpacity={0.85}
-                        >
-                            <LinearGradient colors={['#7cce06', '#6bb805']} style={styles.buttonGradient}>
-                                <Text style={styles.submitButtonText}>{t('auth.haveResetCode')}</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
+                        {/* No "I have a code" shortcut any more: the email
+                            carries a single button that opens the reset page,
+                            and the token is no longer printed for copying. */}
 
                         {/* Resend block — text + button on one line, with
                             a 30s cooldown shown inline so the user knows

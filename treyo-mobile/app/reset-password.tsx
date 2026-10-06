@@ -14,11 +14,11 @@ const { width, height } = Dimensions.get('screen');
 /**
  * Forgot-password flow, screen 2 / 2.
  *
- * Receives the reset token either:
- *   1. As a `token` query param (when the email link deep-links into
- *      the app: treyomobile://reset-password?token=…), or
- *   2. Typed/pasted by the user into the "code" input — for when
- *      they're reading the email on a different device.
+ * The token arrives only as a `token` query param, from a deep link
+ * (treyomobile://reset-password?token=…). The email used to print the
+ * token as a copyable code so it could also be typed in here; it now
+ * carries a single button pointing at the web page, so there is nothing
+ * left to paste and no manual entry to offer.
  *
  * On submit: POST /api/auth/reset-password → flip the user's password
  * hash on the backend. Success bounces back to /login so they can
@@ -42,7 +42,9 @@ export default function ResetPasswordScreen() {
 
     const handleSubmit = async () => {
         if (!token.trim()) {
-            Alert.alert(t('common.error'), t('auth.pasteToken'));
+            // Reachable only if the screen was opened without a token,
+            // e.g. a truncated link. Send them back to request a new one.
+            Alert.alert(t('common.error'), t('auth.invalidResetLink'));
             return;
         }
         if (password.length < 8) {
@@ -92,24 +94,7 @@ export default function ResetPasswordScreen() {
                 </View>
 
                 <View style={styles.form}>
-                    {/* Hide the token field if it came from the deep link —
-                        no point asking the user to confirm something they
-                        already pasted via the email. */}
-                    {!tokenParam && (
-                        <View style={styles.inputContainer}>
-                            <Ionicons name="ticket-outline" size={20} color="#aaa" />
-                            <TextInput
-                                style={styles.input}
-                                placeholder={t('auth.pasteToken')}
-                                placeholderTextColor="#777"
-                                value={token}
-                                onChangeText={setToken}
-                                autoCapitalize="none"
-                                editable={!loading}
-                            />
-                        </View>
-                    )}
-
+                    {/* The token comes from the link, never from the user. */}
                     <View style={styles.inputContainer}>
                         <Ionicons name="lock-closed-outline" size={20} color="#aaa" />
                         <TextInput
