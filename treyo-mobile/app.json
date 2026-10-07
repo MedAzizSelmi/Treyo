@@ -4,11 +4,11 @@
     "slug": "treyo-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/icon.png",
     "scheme": [
       "treyomobile",
       "com.googleusercontent.apps.629625292510-eb62bn8v5eqsisvvpj89kj694mprqmp6",
-      "com.googleusercontent.apps.629625292510-v02fdagjn7b419g2nqc7796bn5d4ir92e"
+      "com.googleusercontent.apps.629625292510-v02fdagjn7b419g2nqc796bn5d4ir92e"
     ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -22,12 +22,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "backgroundImage": "./assets/images/adaptive-icon-background.png",
+        "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
+        "backgroundColor": "#250ea9"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.aziz001.treyomobile"
+      "package": "com.aziz001.treyomobile",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -39,9 +42,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1a1a4d",
+          "backgroundColor": "#0c0729",
           "image": "./assets/images/Treyo-white.png",
-          "imageWidth": 200
+          "imageWidth": 220
         }
       ],
       [
@@ -62,8 +65,7 @@
     "extra": {
       "social": {
         "googleAndroidClientId": "629625292510-eb62bn8v5eqsisvvpj89kj694mprqmp6.apps.googleusercontent.com",
-        "googleIosClientId": "629625292510-v02fdagjn7b419g2nqc7796bn5d4ir92e.apps.googleusercontent.com",
-        "linkedinClientId": ""
+        "googleIosClientId": "629625292510-v02fdagjn7b419g2nqc796bn5d4ir92e.apps.googleusercontent.com"
       },
       "router": {},
       "eas": {

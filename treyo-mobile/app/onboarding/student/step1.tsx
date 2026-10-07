@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState } from 'react';
 import { ScreenBackground } from '../../../components/ScreenBackground';
+import { authService } from '../../../services/api';
 
 const FIELDS = [
     { id: 'informatique', name: 'Informatique', icon: '💻' },
@@ -26,6 +27,11 @@ export default function StudentOnboardingStep1() {
         );
     };
 
+    const handleSignOut = async () => {
+        await authService.logout();
+        router.replace('/' as any);
+    };
+
     const handleNext = () => {
         if (selectedFields.length === 0) {
             alert('Please select at least one field');
@@ -41,6 +47,16 @@ export default function StudentOnboardingStep1() {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
             >
+                {/* Onboarding is the first screen after signing in, so
+                    there is nothing behind it to go back to. Without this,
+                    an account that cannot finish onboarding — one deleted
+                    server-side, say — leaves the app with no way out at
+                    all. Signing out returns to the welcome screen. */}
+                <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
+                    <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.signOutText}>Sign out</Text>
+                </TouchableOpacity>
+
                 <View style={styles.header}>
                     <Text style={styles.title}>What interests you?</Text>
                     <Text style={styles.subtitle}>Select fields you want to learn</Text>
@@ -108,6 +124,8 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 16, color: '#aaaaaa', marginBottom: 8 },
     step: { fontSize: 13, color: '#7cce06', fontWeight: '600' },
 
+    signOut: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 4 },
+    signOutText: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
     progressTrack: { height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, marginBottom: 24 },
     progressFill: { height: 4, backgroundColor: '#7cce06', borderRadius: 2 },
 

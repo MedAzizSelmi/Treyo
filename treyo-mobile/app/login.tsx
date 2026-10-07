@@ -140,7 +140,20 @@ export default function LoginScreen() {
                 }
             }
         } catch (error: any) {
-            Alert.alert('Social Login Failed', error.response?.data?.message || `Could not sign in with ${provider}`);
+            // Dismissing the provider's sheet is a decision, not a failure.
+            if (error?.message === 'CANCELLED') return;
+            // Same markers as the email path: a trainer can sign in with a
+            // provider and still be waiting on approval.
+            const raw = String(error?.response?.data?.message || error?.message || '');
+            if (raw.includes('TRAINER_PENDING_APPROVAL')) {
+                router.replace('/trainer-pending' as any);
+                return;
+            }
+            if (raw.includes('TRAINER_REJECTED')) {
+                router.replace('/trainer-rejected' as any);
+                return;
+            }
+            Alert.alert('Social Login Failed', raw || `Could not sign in with ${provider}`);
         } finally {
             setSocialLoading(false);
         }

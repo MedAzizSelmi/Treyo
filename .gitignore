@@ -66,6 +66,23 @@ rapport_pfe_byb_match.lot
 db_*.tar.gz
 uploads_*.tar.gz
 
+# ── Firebase / push credentials ──
+# Deliberately NOT ignoring google-services.json / GoogleService-Info.plist.
+# Google ships those inside the app binary, so anyone holding the APK
+# already has the contents; the API key in them is restricted by package
+# name and cannot send push. Ignoring them only breaks the build, because
+# EAS uploads what git tracks — the file would be missing on the builder
+# and the app would come out with no FCM configuration at all. Keeping
+# them out instead needs app.config.js and an EAS file env var, which is
+# a lot of machinery for something that is not a secret.
+#
+# The service-account key IS a secret: it authorises sending push to
+# every user of the app. It never goes in the repo — keep it in ~ and
+# upload it to EAS with `eas credentials`.
+*-firebase-adminsdk-*.json
+service-account*.json
+firebase-adminsdk*.json
+
 # ── OS junk ──
 .DS_Store
 Thumbs.db

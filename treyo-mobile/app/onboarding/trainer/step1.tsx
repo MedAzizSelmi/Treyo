@@ -16,6 +16,11 @@ export default function TrainerOnboardingStep1() {
     const [postCode, setPostCode] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const handleSignOut = async () => {
+        await authService.logout();
+        router.replace('/' as any);
+    };
+
     const handleNext = async () => {
         if (!phone || !address || !town || !state || !postCode) {
             Alert.alert('Error', 'Please fill in all required fields');
@@ -62,6 +67,16 @@ export default function TrainerOnboardingStep1() {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
+                    {/* Nothing sits behind onboarding to go back to, so
+                        without this an account that cannot finish it —
+                        one deleted server-side, say — leaves the app with
+                        no way out. Signing out returns to the welcome
+                        screen. */}
+                    <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
+                        <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.7)" />
+                        <Text style={styles.signOutText}>Sign out</Text>
+                    </TouchableOpacity>
+
                     <View style={styles.header}>
                         <Text style={styles.title}>Contact Information</Text>
                         <Text style={styles.subtitle}>Help students reach you</Text>
@@ -180,6 +195,8 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 16, color: '#aaaaaa', marginBottom: 8 },
     step: { fontSize: 14, color: '#7cce06', fontWeight: '600' },
 
+    signOut: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingVertical: 8, paddingRight: 12, marginBottom: 4 },
+    signOutText: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
     progressContainer: { height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, marginBottom: 32 },
     progressBar: { height: 4, backgroundColor: '#7cce06', borderRadius: 2 },
 

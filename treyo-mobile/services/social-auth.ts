@@ -1,4 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
@@ -10,10 +11,16 @@ import { Platform } from 'react-native';
  * provider's own signing keys before issuing Treyo credentials. The app
  * never decides who you are — it only carries the proof.
  *
- * Configuration lives in app.json under `extra.social` (or the matching
- * EXPO_PUBLIC_ variables) because client IDs differ per platform and are
- * not secrets: the OAuth flow is designed around a public client, which
- * is exactly why the backend re-verifies everything.
+ * Google and Apple run their flow here on the device. LinkedIn cannot —
+ * it refuses custom-scheme redirects and needs a client secret — so the
+ * backend drives that one and the app only opens the browser; see
+ * linkedinOneTimeCode below.
+ *
+ * Google's and Apple's configuration lives in app.json under
+ * `extra.social` (or the matching EXPO_PUBLIC_ variables) because client
+ * IDs differ per platform and are not secrets: the OAuth flow is designed
+ * around a public client, which is exactly why the backend re-verifies
+ * everything. LinkedIn's credentials are on the server only.
  */
 
 // Finish any browser session left open by a previous attempt.
@@ -31,7 +38,11 @@ export function isProviderConfigured(provider: Provider): boolean {
         case 'google':
             return !!(Platform.OS === 'ios' ? cfg('googleIosClientId') : cfg('googleAndroidClientId'));
         case 'linkedin':
-            return !!cfg('linkedinClientId');
+            // Nothing to check here: LinkedIn's client id and secret live
+            // on the backend (see linkedinOneTimeCode below). If the server
+            // has not been configured, it returns to the app with an error
+            // message, which the sign-in screen shows.
+            return true;
         case 'apple':
             // Apple's native sheet exists on iOS only; Android would need
             // the web flow, which Apple requires a Services ID for.
@@ -42,24 +53,28 @@ export function isProviderConfigured(provider: Provider): boolean {
 }
 
 /**
- * Run the provider's flow and return the token our backend expects:
- * an ID token for Google and Apple, an access token for LinkedIn.
+ * Run the provider's own flow on the device and return the ID token our
+ * backend verifies. Google and Apple only: LinkedIn cannot work this way,
+ * and goes through linkedinOneTimeCode instead.
  */
-export async function getProviderToken(provider: Provider): Promise<string> {
+export async function getProviderToken(provider: 'google' | 'apple'): Promise<string> {
     switch (provider) {
         case 'google':
             return googleIdToken();
-        case 'linkedin':
-            return linkedinAccessToken();
         case 'apple':
             return appleIdentityToken();
     }
 }
 
 /**
- * Google, via the implicit id_token flow: no client secret, nothing to
- * exchange server-side, and the backend gets a signed token it can
- * verify on its own.
+ * Google, via authorization code + PKCE.
+ *
+ * Not the implicit id_token flow: Google refuses it for installed apps
+ * ("doesn't comply with Google's OAuth 2.0 policy for keeping apps
+ * secure"), and PKCE is what replaces the client secret a mobile app
+ * cannot keep. The code is exchanged on the device — native client types
+ * have no secret — and the token response carries the id_token our
+ * backend verifies.
  */
 async function googleIdToken(): Promise<string> {
     const clientId = Platform.OS === 'ios' ? cfg('googleIosClientId') : cfg('googleAndroidClientId');
@@ -70,45 +85,17 @@ async function googleIdToken(): Promise<string> {
     // not an app scheme of our choosing. Using treyomobile:// here returns
     // redirect_uri_mismatch. That reversed value must also be registered
     // as a URL scheme of the app (see app.json "scheme").
-    const redirectUri = AuthSession.makeRedirectUri({
-        scheme: reversedClientId(clientId),
-        path: 'oauthredirect',
-    });
+    // Built by hand, not with makeRedirectUri, which produces
+    // "scheme://oauthredirect": Google's form for installed apps has a
+    // single slash, and the two-slash variant is refused.
+    //
+    // Reversed client id on both platforms. On Android this requires
+    // "Custom URI scheme" to be enabled on the OAuth client — Google
+    // disables it by default on new Android clients and answers
+    // "Custom URI scheme is not enabled for your Android client".
+    const redirectUri = `${reversedClientId(clientId)}:/oauthredirect`;
+    console.log('[google] redirectUri =', redirectUri);
     const discovery = await AuthSession.fetchDiscoveryAsync('https://accounts.google.com');
-
-    const request = new AuthSession.AuthRequest({
-        clientId,
-        redirectUri,
-        scopes: ['openid', 'profile', 'email'],
-        responseType: AuthSession.ResponseType.IdToken,
-        // Google requires a nonce for the id_token response type; the
-        // library generates and checks one when asked.
-        extraParams: { nonce: await nonce() },
-    });
-
-    const result = await request.promptAsync(discovery);
-    if (result.type !== 'success') {
-        throw new Error('CANCELLED');
-    }
-    const idToken = result.params?.id_token;
-    if (!idToken) throw new Error('Google did not return an identity token.');
-    return idToken;
-}
-
-/**
- * LinkedIn, via authorization code + PKCE. LinkedIn does not issue an
- * id_token to public clients, so the backend receives the access token
- * and asks LinkedIn's userinfo endpoint who it belongs to.
- */
-async function linkedinAccessToken(): Promise<string> {
-    const clientId = cfg('linkedinClientId');
-    if (!clientId) throw new Error('LinkedIn sign-in is not configured in this build.');
-
-    const redirectUri = AuthSession.makeRedirectUri({ scheme: 'treyomobile' });
-    const discovery = {
-        authorizationEndpoint: 'https://www.linkedin.com/oauth/v2/authorization',
-        tokenEndpoint: 'https://www.linkedin.com/oauth/v2/accessToken',
-    };
 
     const request = new AuthSession.AuthRequest({
         clientId,
@@ -132,8 +119,51 @@ async function linkedinAccessToken(): Promise<string> {
         },
         discovery,
     );
-    if (!token.accessToken) throw new Error('LinkedIn did not return an access token.');
-    return token.accessToken;
+    if (!token.idToken) throw new Error('Google did not return an identity token.');
+    return token.idToken;
+}
+
+/**
+ * LinkedIn, run by the backend rather than on the device.
+ *
+ * Two things rule out the Google approach here. LinkedIn refuses
+ * custom-scheme redirect URLs, so the return has to land on an https
+ * address; and its token exchange requires the client secret, which
+ * cannot be shipped inside an app — a bundle can be unpacked and read.
+ *
+ * So the backend drives the exchange, and the app's part is just to open
+ * the browser and catch the return:
+ *
+ *   /api/auth/linkedin/start → LinkedIn → /api/auth/linkedin/callback
+ *     → treyomobile://auth?code=…
+ *
+ * What comes back on that last hop is a one-time reference, not tokens.
+ * Any Android app may claim a scheme, so tokens in the URL would be
+ * handed to whatever app answered; this reference is worthless without a
+ * call to /api/auth/linkedin/exchange, which is what api.ts does next.
+ *
+ * Returns the one-time code. Throws 'CANCELLED' if the browser is
+ * dismissed, or the server's message if it sent one back.
+ */
+export async function linkedinOneTimeCode(startUrl: string): Promise<string> {
+    // openAuthSessionAsync intercepts the redirect to this scheme itself,
+    // so no route has to exist at treyomobile://auth.
+    const result = await WebBrowser.openAuthSessionAsync(startUrl, 'treyomobile://auth');
+
+    if (result.type !== 'success' || !result.url) {
+        throw new Error('CANCELLED');
+    }
+
+    const { queryParams } = Linking.parse(result.url);
+    const error = queryParams?.error;
+    if (error) {
+        // The backend puts a readable sentence here — an unapproved
+        // trainer, an unverified address, or its own misconfiguration.
+        throw new Error(String(error));
+    }
+    const code = queryParams?.code;
+    if (!code) throw new Error('LinkedIn sign-in did not complete.');
+    return String(code);
 }
 
 /**
@@ -169,10 +199,4 @@ async function appleIdentityToken(): Promise<string> {
 function reversedClientId(clientId: string): string {
     const id = clientId.replace('.apps.googleusercontent.com', '');
     return `com.googleusercontent.apps.${id}`;
-}
-
-async function nonce(): Promise<string> {
-    const Crypto = await import('expo-crypto');
-    const bytes = await Crypto.getRandomBytesAsync(16);
-    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }

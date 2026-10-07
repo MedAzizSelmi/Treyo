@@ -23,16 +23,21 @@ export default function WelcomeScreen() {
     const [checking, setChecking] = useState(true);
 
     // Persistent session: on mount, look for a stored JWT + user. If both
-    // exist, route straight to the role's tab home (the JWT is good for
-    // 90 days, and any API call that hits an expired token will 401 and
-    // get caught downstream — at which point we re-route to login from
-    // here). This is what gives the app its "always signed in until you
-    // tap log out" behavior.
+    // exist, route straight to the role's tab home. This is what gives the
+    // app its "always signed in until you tap log out" behavior.
+    //
+    // The session is checked against the server first, because the account
+    // behind a stored token can be gone — deleted from the dashboard or in
+    // the database. Routing on stored data alone would drop such a user
+    // into onboarding, where every save fails and there is no way back
+    // out. verifySession clears the credentials in that case, and leaves
+    // them untouched when the server simply could not be reached.
     useEffect(() => {
         (async () => {
             try {
-                const token = await SecureStore.getItemAsync('jwt_token');
-                const user = await authService.getCurrentUser();
+                const valid = await authService.verifySession();
+                const token = valid ? await SecureStore.getItemAsync('jwt_token') : null;
+                const user = valid ? await authService.getCurrentUser() : null;
                 if (token && user?.userId) {
                     // Onboarding gate — if the user hasn't finished step 3,
                     // we still want them to land back where they left off

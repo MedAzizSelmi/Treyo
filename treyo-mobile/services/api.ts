@@ -29,7 +29,7 @@ const PRODUCTION_API_URL: string =
     '';
 
 // Last-resort LAN fallback for development only.
-const MANUAL_OVERRIDE = 'http://192.168.0.188:8085';
+const MANUAL_OVERRIDE = 'http://10.28.247.140:8085';
 
 function resolveApiBase(): string {
     // hostUri looks like "192.168.100.68:8081" or "localhost:8081"
@@ -182,32 +182,46 @@ export const authService = {
     },
 
     /**
-     * Sign in with a provider. The provider's token goes to our backend,
-     * which verifies it against that provider's signing keys and answers
-     * with Treyo credentials — the app never decides who the user is.
+     * Sign in with a provider. Whatever route it takes, the identity is
+     * established by our backend against the provider itself, and the
+     * answer is a set of Treyo credentials — the app never decides who
+     * the user is.
      *
      * `userType` is only used if the account does not exist yet, so an
      * existing learner is not turned into a trainer by signing in from
      * the trainer screen.
      */
     socialLogin: async (provider: 'google' | 'apple' | 'linkedin', userType: 'STUDENT' | 'TRAINER' = 'STUDENT') => {
-        const { getProviderToken } = await import('./social-auth');
-        const token = await getProviderToken(provider);
-        const response = await api.post(`/auth/social/${provider}`, { token, userType });
-        if (response.data.token) {
-            await SecureStore.setItemAsync('jwt_token', response.data.token);
-            if (response.data.refreshToken) {
-                await SecureStore.setItemAsync('refresh_token', response.data.refreshToken);
+        const social = await import('./social-auth');
+
+        let data;
+        if (provider === 'linkedin') {
+            // LinkedIn is driven by the backend: the browser returns a
+            // one-time reference, and only this call turns it into tokens.
+            // See services/social-auth.ts for why it cannot run on device.
+            const code = await social.linkedinOneTimeCode(
+                `${API_URL}/auth/linkedin/start?userType=${encodeURIComponent(userType)}`,
+            );
+            data = (await api.post('/auth/linkedin/exchange', { code })).data;
+        } else {
+            const token = await social.getProviderToken(provider);
+            data = (await api.post(`/auth/social/${provider}`, { token, userType })).data;
+        }
+
+        if (data.token) {
+            await SecureStore.setItemAsync('jwt_token', data.token);
+            if (data.refreshToken) {
+                await SecureStore.setItemAsync('refresh_token', data.refreshToken);
             }
             await SecureStore.setItemAsync('user_data', JSON.stringify({
-                userId: response.data.userId,
-                email: response.data.email,
-                name: response.data.name,
-                role: response.data.role,
-                onboardingComplete: response.data.onboardingComplete,
+                userId: data.userId,
+                email: data.email,
+                name: data.name,
+                role: data.role,
+                onboardingComplete: data.onboardingComplete,
             }));
         }
-        return response.data;
+        return data;
     },
 
     loginWithGoogle: () => authService.socialLogin('google'),
@@ -263,6 +277,46 @@ export const authService = {
     getCurrentUser: async () => {
         const userData = await SecureStore.getItemAsync('user_data');
         return userData ? JSON.parse(userData) : null;
+    },
+
+    /**
+     * Ask the server whether the stored session still belongs to a real
+     * account, and clear it if not.
+     *
+     * The stored token is believed for 90 days, but the account behind it
+     * can disappear — deleted from the dashboard, removed in the database,
+     * disabled. Routing on `user_data` alone then strands the app inside a
+     * signed-in screen it cannot leave, which is exactly what happens on
+     * the onboarding steps: every save fails and there is nowhere to go.
+     *
+     * A failed check signs the session out rather than guessing. A check
+     * that could not be made at all — no network, backend down — leaves it
+     * alone: being signed out because a train went into a tunnel is worse
+     * than a stale session that the next successful call will correct.
+     */
+    verifySession: async (): Promise<boolean> => {
+        const token = await SecureStore.getItemAsync('jwt_token');
+        const user = await authService.getCurrentUser();
+        if (!token || !user?.userId) return false;
+
+        const isTrainer = String(user.role || user.userType || '').toUpperCase().includes('TRAINER');
+        try {
+            await api.get(isTrainer ? '/trainers/me' : '/students/me');
+            return true;
+        } catch (error: any) {
+            const status = error?.response?.status;
+            // No status at all means the request never reached the server.
+            if (!status) return true;
+            // 400 counts here: /me takes no input, so the only way it can
+            // refuse is "no such account" — GlobalExceptionHandler maps
+            // that RuntimeException to 400 rather than 404.
+            if (status === 400 || status === 401 || status === 403 || status === 404) {
+                await authService.logout();
+                return false;
+            }
+            // A 5xx is the server's problem, not a verdict on this account.
+            return true;
+        }
     },
 
     isLoggedIn: async () => {

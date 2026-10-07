@@ -38,6 +38,7 @@ public class AdminService {
     private final CourseService courseService;
     private final AdminGroupFormationService groupFormationService;
     private final PasswordEncoder passwordEncoder;
+    private final PushNotificationService pushNotificationService;
 
     /**
      * Get dashboard overview statistics
@@ -450,6 +451,7 @@ public class AdminService {
     @Transactional
     public void sendAdminNotification(SendNotificationRequest req) {
         String type = req.getRecipientType();
+        List<String> recipients = new java.util.ArrayList<>();
 
         if ("SPECIFIC".equalsIgnoreCase(type)) {
             // Fail loudly with a usable message instead of letting a null
@@ -461,20 +463,50 @@ public class AdminService {
             saveNotification(req.getTargetUserId(),
                     req.getTargetUserType() != null ? req.getTargetUserType().toLowerCase() : "student",
                     req.getTitle(), req.getMessage(), req.getPriority());
+            recipients.add(req.getTargetUserId());
+            pushToAll(recipients, req);
             return;
         }
 
         if ("ALL".equalsIgnoreCase(type) || "STUDENTS".equalsIgnoreCase(type)) {
-            studentRepository.findAll().forEach(s ->
-                    saveNotification(s.getStudentId(), "student",
-                            req.getTitle(), req.getMessage(), req.getPriority()));
+            studentRepository.findAll().forEach(s -> {
+                saveNotification(s.getStudentId(), "student",
+                        req.getTitle(), req.getMessage(), req.getPriority());
+                recipients.add(s.getStudentId());
+            });
         }
 
         if ("ALL".equalsIgnoreCase(type) || "TRAINERS".equalsIgnoreCase(type)) {
-            trainerRepository.findAll().forEach(t ->
-                    saveNotification(t.getTrainerId(), "trainer",
-                            req.getTitle(), req.getMessage(), req.getPriority()));
+            trainerRepository.findAll().forEach(t -> {
+                saveNotification(t.getTrainerId(), "trainer",
+                        req.getTitle(), req.getMessage(), req.getPriority());
+                recipients.add(t.getTrainerId());
+            });
         }
+
+        pushToAll(recipients, req);
+    }
+
+    /**
+     * Also deliver the notification to the recipients' devices.
+     *
+     * Saving the row only fills the in-app list; without this an admin
+     * broadcast never reaches a phone, which is how it behaved until now.
+     * The other notification paths go through NotificationService, which
+     * has always pushed — this one bypassed it and wrote straight to the
+     * repository.
+     *
+     * One bulk call rather than one per recipient: sendToUsers is @Async,
+     * so a broadcast to every student becomes a single background task
+     * instead of a thread per user.
+     */
+    private void pushToAll(List<String> recipients, SendNotificationRequest req) {
+        if (recipients.isEmpty()) return;
+        // `type` is what the app's notification-tap handler switches on;
+        // anything non-null routes to the notifications tab.
+        Map<String, Object> data = Map.of("type", "ADMIN_BROADCAST");
+        pushNotificationService.sendToUsers(
+                recipients, req.getTitle(), req.getMessage(), data);
     }
 
     private void saveNotification(String userId, String userType,

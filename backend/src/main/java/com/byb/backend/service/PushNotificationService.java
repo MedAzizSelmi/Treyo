@@ -57,7 +57,13 @@ public class PushNotificationService {
     public void sendToUser(String userId, String title, String body, Map<String, Object> data) {
         if (userId == null) return;
         List<DeviceToken> tokens = deviceTokenRepository.findByUserId(userId);
-        if (tokens.isEmpty()) return;
+        if (tokens.isEmpty()) {
+            // Worth saying out loud: "no devices" and "push was refused"
+            // look identical from the outside, and the notification still
+            // appears in the in-app list either way.
+            log.info("No device tokens for user {} — nothing to push", userId);
+            return;
+        }
 
         List<Map<String, Object>> messages = new ArrayList<>();
         for (DeviceToken t : tokens) {
@@ -99,15 +105,67 @@ public class PushNotificationService {
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() >= 400) {
                 log.warn("Expo push failed: {} {}", res.statusCode(), res.body());
-            } else if (log.isDebugEnabled()) {
-                log.debug("Expo push ok: {}", res.body());
+                return;
             }
-            // If Expo tells us a token is "DeviceNotRegistered", we
-            // should drop it. Parsing that response is left as a TODO —
-            // worst case the user gets one wasted send per invalid token
-            // until they re-register on next app open.
+            inspectTickets(res.body(), messages);
         } catch (Exception e) {
             log.warn("Push send error: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Read what Expo actually said about each message.
+     *
+     * Expo answers 200 even when it could not deliver anything: the
+     * verdict is per-message, inside the body, as
+     * {@code {"data":[{"status":"error","message":…,"details":{"error":…}}]}}.
+     * Checking only the HTTP status therefore reports success for a push
+     * that silently went nowhere — including the common case of an
+     * Android build with no FCM credentials, where every message fails
+     * and nothing at all is logged.
+     *
+     * A token Expo reports as DeviceNotRegistered is removed: the app was
+     * uninstalled, or its data cleared, and the row would otherwise sit
+     * there failing on every send until that user signed in again.
+     */
+    @SuppressWarnings("unchecked")
+    private void inspectTickets(String body, List<Map<String, Object>> sent) {
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(body, Map.class);
+            Object dataNode = parsed.get("data");
+            if (!(dataNode instanceof List<?> tickets)) {
+                log.warn("Unexpected Expo push response: {}", body);
+                return;
+            }
+            for (int i = 0; i < tickets.size(); i++) {
+                if (!(tickets.get(i) instanceof Map<?, ?> ticket)) continue;
+                if (!"error".equals(ticket.get("status"))) continue;
+
+                String token = i < sent.size() ? String.valueOf(sent.get(i).get("to")) : "?";
+                Object details = ticket.get("details");
+                String code = details instanceof Map<?, ?> d
+                        ? String.valueOf(d.get("error")) : "unknown";
+
+                log.warn("Expo push rejected for {}: {} ({})",
+                        maskToken(token), ticket.get("message"), code);
+
+                if ("DeviceNotRegistered".equals(code)) {
+                    try {
+                        deviceTokenRepository.deleteByToken(token);
+                        log.info("Dropped stale device token {}", maskToken(token));
+                    } catch (Exception e) {
+                        log.warn("Could not drop stale token: {}", e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not read Expo push response: {} — body was {}", e.getMessage(), body);
+        }
+    }
+
+    /** Enough of the token to tell devices apart in a log, no more. */
+    private String maskToken(String token) {
+        if (token == null || token.length() < 12) return "…";
+        return "…" + token.substring(token.length() - 8);
     }
 }

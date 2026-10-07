@@ -155,13 +155,28 @@ cors.allow-credentials=true
 # apple.client-ids: the app's bundle identifier (and the Services ID if
 #   the web flow is used).
 #
-# LinkedIn needs nothing here: its access token is presented to LinkedIn
-# itself, which decides whether it is valid.
-#
 # Leave empty to disable a provider — the endpoint then answers 401 with
 # "not configured" and the app keeps email sign-in.
 social.google.client-ids=
 social.apple.client-ids=
+
+# LinkedIn runs server-side instead (GET /api/auth/linkedin/start), for
+# two reasons: LinkedIn refuses custom-scheme redirect URLs, so the return
+# must land on an https address we control; and its token exchange needs
+# the client secret, which a mobile app cannot keep. Both values below
+# stay on the server — neither belongs in app.json.
+#
+# redirect-uri must match an "Authorized redirect URL" registered on the
+# LinkedIn app character for character, including the scheme and any
+# trailing path. While developing against a tunnel, register that address
+# too and point this at it.
+#
+# In the LinkedIn developer portal the app needs a Company Page and the
+# "Sign In with LinkedIn using OpenID Connect" product, which is what
+# grants the openid/profile/email scopes.
+social.linkedin.client-id=
+social.linkedin.client-secret=
+social.linkedin.redirect-uri=https://your-domain.example/api/auth/linkedin/callback
 
 # ===================================================================
 # AFFINDA (CV parsing during onboarding)
@@ -185,10 +200,14 @@ affinda.api.base-url=https://api.affinda.com/v2
 # performance drag and a place personal data accumulates in plain text.
 # Spring Security at DEBUG similarly logs authentication internals.
 logging.level.root=INFO
-logging.level.com.byb.match=INFO
+# The application package is com.byb.backend. An earlier com.byb.match
+# here matched nothing, so this level silently had no effect.
+logging.level.com.byb.backend=INFO
 logging.level.org.springframework.security=WARN
 logging.level.org.hibernate.SQL=WARN
-logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+# %msg alone drops the logger name, which makes it impossible to tell
+# which class wrote a line. %logger{0} adds just the simple class name.
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{0} - %msg%n
 
 # ===================================================================
 # API DOCUMENTATION (Swagger)

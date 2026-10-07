@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1033162839044",
+    "project_id": "treyo-a72d4",
+    "storage_bucket": "treyo-a72d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033162839044:android:6559ef9f74f771bd975151",
+        "android_client_info": {
+          "package_name": "com.aziz001.treyomobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAuLhr7IWiJ8K1cdPdFv_CxuN-Hk61BhgQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
