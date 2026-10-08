@@ -194,6 +194,58 @@ public class MessageController {
         messageService.sendTypingIndicator(caller.getUserId(), receiverId);
     }
 
+    // ── Group chat ──────────────────────────────────────────────────
+
+    /**
+     * Every message in a group's chat.
+     *
+     * Membership is enforced in the service, which admits enrolled
+     * students, the group's trainer and administrators, and refuses
+     * everyone else.
+     *
+     * {@code viewerId} stays in the signature because the dashboard and
+     * the app both send it, but it is no longer what the check runs on —
+     * the caller's own id is used instead, so passing somebody else's is
+     * simply ineffective rather than a way in.
+     */
+    @GetMapping("/group/{groupId}")
+    @Operation(summary = "Get all messages in a group chat")
+    public ResponseEntity<?> getGroupMessages(
+            @PathVariable String groupId,
+            @RequestParam(required = false) String viewerId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+        return ResponseEntity.ok(
+                messageService.getGroupMessages(groupId, caller.getUserId()));
+    }
+
+    /**
+     * Post into a group's chat. The service rejects non-members and
+     * empty content, and returns the saved message so the client can
+     * settle its optimistic bubble.
+     *
+     * As with the direct-message path, the sender is the caller — a
+     * senderId in the body is ignored rather than trusted.
+     */
+    @PostMapping("/group/{groupId}")
+    @Operation(summary = "Send a message to a group chat")
+    public ResponseEntity<?> sendGroupMessage(
+            @PathVariable String groupId,
+            @RequestBody Map<String, String> body) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+
+        String content = body == null ? null : body.get("content");
+        if (isBlank(content)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Message content is required"));
+        }
+        String messageType = body.getOrDefault("messageType", "text");
+        String attachmentUrl = body.get("attachmentUrl");
+
+        return ResponseEntity.ok(messageService.sendGroupMessage(
+                caller.getUserId(), groupId, content, messageType, attachmentUrl));
+    }
+
     // ── helpers ─────────────────────────────────────────────────────
 
     private static boolean isBlank(String s) {
