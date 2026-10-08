@@ -468,8 +468,8 @@
         "updatePassword": "Mettre à jour",
         "twoFactor": "DOUBLE AUTHENTIFICATION",
         "authenticatorApp": "Application d'authentification",
-        "authenticatorOn": "Un code vous sera demandé à la prochaine connexion (quand disponible)",
-        "authenticatorOff": "Ajoutez une couche de sécurité avec des codes TOTP",
+        "authenticatorOn": "Un code vous sera demandé à chaque connexion",
+        "authenticatorOff": "Ajoutez une deuxième étape avec une application d'authentification",
         "activeSessions": "SESSIONS ACTIVES",
         "thisDevice": "Cet appareil",
         "activeNow": "Actif maintenant",
@@ -490,10 +490,7 @@
         "updated": "Mot de passe mis à jour",
         "updatedBody": "Votre mot de passe a été changé avec succès.",
         "updateFailed": "Échec de la mise à jour",
-        "updateFailedBody": "Impossible de changer le mot de passe. Réessayez.",
-        "twoFaPromptTitle": "Double authentification",
-        "twoFaPromptBody": "La configuration complète de la 2FA avec applications d'authentification arrive bientôt. Votre préférence sera mémorisée.",
-        "enableWhenAvailable": "Activer dès que possible"
+        "updateFailedBody": "Impossible de changer le mot de passe. Réessayez."
     },
     "feed": {
         "title": "Actualité du jour",

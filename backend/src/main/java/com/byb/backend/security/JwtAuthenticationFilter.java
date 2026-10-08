@@ -47,8 +47,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // If token is valid and user is not authenticated yet
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // Validate token
-                if (!jwtService.isTokenExpired(jwt)) {
+                // Only an access token authenticates a request.
+                //
+                // Refresh tokens and 2FA challenge tokens carry userId and
+                // role exactly like an access token does, so without this
+                // check either one would be accepted here — a refresh
+                // token would work as a session, and a 2FA challenge would
+                // grant access before the second factor was ever supplied,
+                // making it decorative. Access tokens carry no type claim.
+                String type = jwtService.extractType(jwt);
+                boolean isAccessToken = type == null || "access".equals(type);
+
+                if (isAccessToken && !jwtService.isTokenExpired(jwt)) {
 
                     // Extract role and userId
                     String role = jwtService.extractRole(jwt);

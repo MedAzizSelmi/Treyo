@@ -33,6 +33,17 @@ export default function LoginScreen() {
             const response = await authService.login(email, password);
 
             // Register this device's Expo push token under the new user
+            // 2FA: the password was right but no session was issued, only
+            // a challenge. Nothing has been stored, so the only way on is
+            // through the code screen.
+            if (response?.twoFactorRequired) {
+                router.push({
+                    pathname: '/two-factor-verify' as any,
+                    params: { challengeToken: response.challengeToken },
+                });
+                return;
+            }
+
             // so the OS can deliver notifications even when the app is
             // closed. Fire-and-forget — push is best-effort.
             if (response?.userId) {
@@ -120,6 +131,15 @@ export default function LoginScreen() {
                     response = await authService.loginWithLinkedIn();
                     break;
             }
+            // 2FA applies to provider sign-in too — see the email path.
+            if (response?.twoFactorRequired) {
+                router.push({
+                    pathname: '/two-factor-verify' as any,
+                    params: { challengeToken: response.challengeToken },
+                });
+                return;
+            }
+
             // Same push token registration as the email path.
             if (response?.userId) {
                 registerForPushNotifications(response.userId, response.role).catch(() => {});

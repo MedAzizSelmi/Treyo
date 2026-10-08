@@ -51,6 +51,15 @@ export default function SignupScreen() {
         setSocialLoading(true);
         try {
             const response = await authService.socialLogin(provider, userType as 'STUDENT' | 'TRAINER');
+            // An existing account with 2FA on still owes a code, even
+            // when the provider has vouched for the address.
+            if (response?.twoFactorRequired) {
+                router.push({
+                    pathname: '/two-factor-verify' as any,
+                    params: { challengeToken: response.challengeToken },
+                });
+                return;
+            }
             if (response?.userId) {
                 registerForPushNotifications(response.userId, response.role).catch(() => {});
             }

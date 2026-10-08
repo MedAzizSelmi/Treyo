@@ -35,6 +35,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailService emailService;
+    private final TwoFactorService twoFactorService;
 
     /** Base URL used to build the verification / reset links in emails.
      *  In production this should point at a website that deep-links into
@@ -98,6 +99,18 @@ public class AuthService {
             // A provider-verified address verifies the account too: it is
             // the same proof the emailed link was asking for.
             student.setIsVerified(true);
+            studentRepository.save(student);
+
+            // The second factor applies here as well. Google having
+            // vouched for the address says nothing about whether this
+            // person holds the authenticator, and letting a provider
+            // bypass it would turn "sign in with Google" into a way
+            // around 2FA for anyone who got into the Google account.
+            if (Boolean.TRUE.equals(student.getTwoFactorEnabled())) {
+                return twoFactorChallenge(
+                        student.getEmail(), student.getStudentId(), Role.STUDENT);
+            }
+
             student.setLastLoginAt(LocalDateTime.now());
             studentRepository.save(student);
             return studentResponse(student);
@@ -119,6 +132,14 @@ public class AuthService {
             if ("REJECTED".equalsIgnoreCase(approval)) {
                 throw new RuntimeException("TRAINER_REJECTED");
             }
+
+            // Second factor applies to provider sign-in too; see the
+            // student branch above for why.
+            if (Boolean.TRUE.equals(trainer.getTwoFactorEnabled())) {
+                return twoFactorChallenge(
+                        trainer.getEmail(), trainer.getTrainerId(), Role.TRAINER);
+            }
+
             trainer.setLastLoginAt(LocalDateTime.now());
             trainerRepository.save(trainer);
             return trainerResponse(trainer);
@@ -182,6 +203,62 @@ public class AuthService {
                 .role(Role.TRAINER)
                 .onboardingComplete(trainer.isProfileComplete())
                 .build();
+    }
+
+    /**
+     * The answer to a correct password on an account with 2FA enabled.
+     *
+     * Carries no access or refresh token on purpose: everything the
+     * client needs to continue is the challenge, and anything else here
+     * would be a way around the second factor.
+     */
+    private AuthResponse twoFactorChallenge(String email, String userId, Role role) {
+        return AuthResponse.builder()
+                .twoFactorRequired(true)
+                .challengeToken(jwtService.generateTwoFactorChallenge(email, userId, role.name()))
+                .email(email)
+                .role(role)
+                .build();
+    }
+
+    /**
+     * Second half of a two-factor sign-in: exchange the challenge and a
+     * code for real tokens.
+     *
+     * The challenge proves the password was right, and is checked for
+     * both its signature and its type — a refresh or access token
+     * presented here is refused, so this cannot be used as a way to mint
+     * fresh credentials from an existing session.
+     */
+    @Transactional
+    public AuthResponse completeTwoFactor(String challengeToken, String code) {
+        if (challengeToken == null || !jwtService.isValidTwoFactorChallenge(challengeToken)) {
+            throw new RuntimeException("CHALLENGE_EXPIRED");
+        }
+        String email = jwtService.extractUsername(challengeToken);
+        if (email == null || !twoFactorService.verifyChallenge(email, code)) {
+            throw new RuntimeException("INVALID_CODE");
+        }
+
+        var studentOpt = studentRepository.findByEmail(email);
+        if (studentOpt.isPresent()) {
+            Student student = studentOpt.get();
+            if (!Boolean.TRUE.equals(student.getIsActive())) {
+                throw new RuntimeException("ACCOUNT_DISABLED");
+            }
+            student.setLastLoginAt(LocalDateTime.now());
+            studentRepository.save(student);
+            return studentResponse(student);
+        }
+
+        Trainer trainer = trainerRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("ACCOUNT_NOT_FOUND"));
+        if (!Boolean.TRUE.equals(trainer.getIsActive())) {
+            throw new RuntimeException("ACCOUNT_DISABLED");
+        }
+        trainer.setLastLoginAt(LocalDateTime.now());
+        trainerRepository.save(trainer);
+        return trainerResponse(trainer);
     }
 
     @Transactional
@@ -287,6 +364,16 @@ public class AuthService {
                 throw new RuntimeException("EMAIL_NOT_VERIFIED");
             }
 
+            // Second factor, if this account enrolled one. No access or
+            // refresh token is minted here — only a short-lived challenge
+            // the caller exchanges at /api/auth/2fa/verify once they have
+            // supplied a code. lastLoginAt is left alone too: the sign-in
+            // has not happened yet.
+            if (Boolean.TRUE.equals(student.getTwoFactorEnabled())) {
+                return twoFactorChallenge(
+                        student.getEmail(), student.getStudentId(), Role.STUDENT);
+            }
+
             // Update last login
             student.setLastLoginAt(LocalDateTime.now());
             studentRepository.save(student);
@@ -344,6 +431,12 @@ public class AuthService {
             }
             if ("REJECTED".equalsIgnoreCase(approval)) {
                 throw new RuntimeException("TRAINER_REJECTED");
+            }
+
+            // Second factor, as in the student branch above.
+            if (Boolean.TRUE.equals(trainer.getTwoFactorEnabled())) {
+                return twoFactorChallenge(
+                        trainer.getEmail(), trainer.getTrainerId(), Role.TRAINER);
             }
 
             // Update last login

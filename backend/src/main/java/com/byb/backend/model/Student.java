@@ -96,6 +96,19 @@ public class Student extends BaseEntity {
     @Column(name = "is_verified")
     private Boolean isVerified = false;
 
+    // ── Two-factor authentication (TOTP) ──
+    // The secret is a credential in its own right: anyone holding it can
+    // mint valid codes, so it leaves the server only during setup, before
+    // twoFactorEnabled is true. Recovery codes are stored hashed.
+    @Column(name = "two_factor_enabled")
+    private Boolean twoFactorEnabled = false;
+
+    @Column(name = "two_factor_secret", length = 64)
+    private String twoFactorSecret;
+
+    @Column(name = "two_factor_recovery_codes", columnDefinition = "TEXT")
+    private String twoFactorRecoveryCodes;
+
     // Transient field for role
     @Transient
     public Role getRole() {

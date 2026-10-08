@@ -75,6 +75,40 @@ public class AuthController {
     }
 
     /**
+     * Second half of a two-factor sign-in.
+     *
+     * Public, like /login: the caller holds a challenge token rather
+     * than a session, and the challenge is only worth anything together
+     * with a code. Accepts a TOTP code or one unused recovery code.
+     */
+    @PostMapping("/2fa/verify")
+    @Operation(summary = "Exchange a 2FA challenge and code for tokens")
+    public ResponseEntity<?> verifyTwoFactor(@RequestBody Map<String, String> body) {
+        String challengeToken = body == null ? null : body.get("challengeToken");
+        String code = body == null ? null : body.get("code");
+        if (challengeToken == null || code == null || code.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "CHALLENGE_AND_CODE_REQUIRED",
+                    "message", "Enter the code from your authenticator app."));
+        }
+        try {
+            return ResponseEntity.ok(authService.completeTwoFactor(challengeToken, code));
+        } catch (RuntimeException e) {
+            String marker = String.valueOf(e.getMessage());
+            // The app routes on these markers; the message is what the
+            // user reads. Both are deliberately the same for a wrong
+            // code and an unknown account, so neither confirms the
+            // other's existence.
+            String message = "CHALLENGE_EXPIRED".equals(marker)
+                    ? "That sign-in attempt timed out. Please sign in again."
+                    : "That code is not right. Check your app and try again.";
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", marker,
+                    "message", message));
+        }
+    }
+
+    /**
      * Exchange a refresh token for a new access token.
      *
      * Access tokens last one hour; without this endpoint a user would be

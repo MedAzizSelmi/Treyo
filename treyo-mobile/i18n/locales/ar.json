@@ -468,8 +468,8 @@
         "updatePassword": "تحديث كلمة المرور",
         "twoFactor": "المصادقة الثنائية",
         "authenticatorApp": "تطبيق المصادقة",
-        "authenticatorOn": "سيُطلب منك رمز عند الدخول التالي (عند توفّر الميزة)",
-        "authenticatorOff": "أضف طبقة أمان إضافية برموز TOTP",
+        "authenticatorOn": "سيُطلب منك رمز في كل مرة تسجّل فيها الدخول",
+        "authenticatorOff": "أضف خطوة ثانية باستخدام تطبيق مصادقة",
         "activeSessions": "الجلسات النشطة",
         "thisDevice": "هذا الجهاز",
         "activeNow": "نشط الآن",
@@ -490,10 +490,7 @@
         "updated": "تم تحديث كلمة المرور",
         "updatedBody": "تم تغيير كلمة المرور بنجاح.",
         "updateFailed": "فشل تحديث كلمة المرور",
-        "updateFailedBody": "تعذّر تغيير كلمة المرور. حاول مجددًا.",
-        "twoFaPromptTitle": "المصادقة الثنائية",
-        "twoFaPromptBody": "سيتم قريبًا توفير الإعداد الكامل للمصادقة الثنائية عبر تطبيقات مثل Google Authenticator و Authy. سيتم تذكّر تفضيلك.",
-        "enableWhenAvailable": "تفعيل عند التوفر"
+        "updateFailedBody": "تعذّر تغيير كلمة المرور. حاول مجددًا."
     },
     "feed": {
         "title": "آخر الأخبار",

@@ -468,8 +468,8 @@
         "updatePassword": "Actualizar contraseña",
         "twoFactor": "AUTENTICACIÓN DE DOS FACTORES",
         "authenticatorApp": "Aplicación de autenticación",
-        "authenticatorOn": "Se te pedirá un código en el próximo inicio (cuando esté disponible)",
-        "authenticatorOff": "Añade una capa extra de seguridad con códigos TOTP",
+        "authenticatorOn": "Se te pedirá un código cada vez que inicies sesión",
+        "authenticatorOff": "Añade un segundo paso con una aplicación de autenticación",
         "activeSessions": "SESIONES ACTIVAS",
         "thisDevice": "Este dispositivo",
         "activeNow": "Activo ahora",
@@ -490,10 +490,7 @@
         "updated": "Contraseña actualizada",
         "updatedBody": "Tu contraseña se cambió correctamente.",
         "updateFailed": "Error al actualizar",
-        "updateFailedBody": "No se pudo cambiar la contraseña. Inténtalo de nuevo.",
-        "twoFaPromptTitle": "Autenticación de dos factores",
-        "twoFaPromptBody": "La configuración completa de 2FA con aplicaciones de autenticación llegará pronto. Tu preferencia se recordará.",
-        "enableWhenAvailable": "Activar cuando esté disponible"
+        "updateFailedBody": "No se pudo cambiar la contraseña. Inténtalo de nuevo."
     },
     "feed": {
         "title": "Feed del día",

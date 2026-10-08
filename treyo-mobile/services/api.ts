@@ -228,6 +228,37 @@ export const authService = {
     loginWithApple: () => authService.socialLogin('apple'),
     loginWithLinkedIn: () => authService.socialLogin('linkedin'),
 
+    /**
+     * Second half of a two-factor sign-in.
+     *
+     * When an account has 2FA on, /auth/login answers with
+     * `twoFactorRequired` and a short-lived `challengeToken` instead of
+     * credentials — login() above stores nothing, because there is no
+     * token in that response to store. This exchanges the challenge and
+     * a code for the real session.
+     *
+     * `code` is either the 6 digits from the authenticator app or one
+     * recovery code; the backend accepts both.
+     */
+    verifyTwoFactor: async (challengeToken: string, code: string) => {
+        const response = await api.post('/auth/2fa/verify', { challengeToken, code });
+        const data = response.data;
+        if (data.token) {
+            await SecureStore.setItemAsync('jwt_token', data.token);
+            if (data.refreshToken) {
+                await SecureStore.setItemAsync('refresh_token', data.refreshToken);
+            }
+            await SecureStore.setItemAsync('user_data', JSON.stringify({
+                userId: data.userId,
+                email: data.email,
+                name: data.name,
+                role: data.role,
+                onboardingComplete: data.onboardingComplete,
+            }));
+        }
+        return data;
+    },
+
     register: async (data: { name: string; email: string; password: string; userType: string }) => {
         const endpoint = data.userType === 'STUDENT' ? '/auth/register/student' : '/auth/register/trainer';
         const response = await api.post(endpoint, { name: data.name, email: data.email, password: data.password });
@@ -800,6 +831,43 @@ export const searchLogService = {
             // Network / 500 — drop silently. Search history UX on the
             // device still works; only the ML signal is lost.
         }
+    },
+};
+
+// ══════════════════════════════════════════════
+// Two-Factor Authentication (TOTP)
+// ══════════════════════════════════════════════
+export const twoFactorService = {
+    /** Whether 2FA is on, and how many recovery codes are left. */
+    status: async (): Promise<{ enabled: boolean; recoveryCodesRemaining: number }> => {
+        const response = await api.get('/account/2fa/status');
+        return response.data;
+    },
+
+    /**
+     * Start setup. Returns the secret and the otpauth:// URI to render
+     * as a QR code. This is the only time the secret is ever sent — once
+     * 2FA is on, the backend will not hand it out again.
+     */
+    setup: async (): Promise<{ secret: string; otpauthUri: string }> => {
+        const response = await api.post('/account/2fa/setup', {});
+        return response.data;
+    },
+
+    /**
+     * Finish setup by proving the authenticator app works. Returns the
+     * recovery codes, which are shown once and never again — only their
+     * hashes are stored.
+     */
+    enable: async (code: string): Promise<{ enabled: boolean; recoveryCodes: string[] }> => {
+        const response = await api.post('/account/2fa/enable', { code });
+        return response.data;
+    },
+
+    /** Turn it off. Needs the password and a current code, not just a session. */
+    disable: async (password: string, code: string) => {
+        const response = await api.post('/account/2fa/disable', { password, code });
+        return response.data;
     },
 };
 

@@ -4,11 +4,10 @@ import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { ScreenBackground } from '../components/ScreenBackground';
-import { authService } from '../services/api';
-
-const TWO_FA_KEY = 'two_fa_enabled';
+import { authService, twoFactorService } from '../services/api';
 
 export default function SecuritySettingsScreen() {
     const router = useRouter();
@@ -21,11 +20,31 @@ export default function SecuritySettingsScreen() {
     const [showConfirm, setShowConfirm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // 2FA state comes from the server, not local storage. It used to be
+    // kept in AsyncStorage, which meant the switch showed whatever this
+    // device last remembered — including "on" for an account where it
+    // was never actually enabled.
     const [twoFaOn, setTwoFaOn] = useState(false);
+    const [recoveryLeft, setRecoveryLeft] = useState(0);
+    const [twoFaLoading, setTwoFaLoading] = useState(true);
 
-    useEffect(() => {
-        AsyncStorage.getItem(TWO_FA_KEY).then(v => setTwoFaOn(v === 'true'));
+    const loadTwoFa = useCallback(async () => {
+        try {
+            const status = await twoFactorService.status();
+            setTwoFaOn(!!status.enabled);
+            setRecoveryLeft(status.recoveryCodesRemaining ?? 0);
+        } catch (_) {
+            // Leave the switch off rather than guessing; a failed read
+            // must not imply the account is protected when it may not be.
+            setTwoFaOn(false);
+        } finally {
+            setTwoFaLoading(false);
+        }
     }, []);
+
+    // Re-read on focus: coming back from the setup screen is exactly
+    // when this value has just changed.
+    useFocusEffect(useCallback(() => { loadTwoFa(); }, [loadTwoFa]));
 
     /** Visual strength from 0 (none) to 4 (very strong). */
     const passwordStrength = (() => {
@@ -69,29 +88,28 @@ export default function SecuritySettingsScreen() {
         }
     };
 
+    /**
+     * Switching on hands off to the setup screen, which is where the
+     * secret is shown and a code proves the app works. Nothing is
+     * enabled here, so flicking the switch and backing out changes
+     * nothing about how the account signs in.
+     */
     const handleToggle2FA = async (value: boolean) => {
         if (value) {
-            // Real 2FA needs TOTP/SMS infrastructure on the backend (not yet built).
-            // Persist the user's intent locally so the toggle "remembers" the choice
-            // until the real flow lands.
-            Alert.alert(
-                t('security.twoFaPromptTitle'),
-                t('security.twoFaPromptBody'),
-                [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    {
-                        text: t('security.enableWhenAvailable'),
-                        onPress: async () => {
-                            setTwoFaOn(true);
-                            await AsyncStorage.setItem(TWO_FA_KEY, 'true');
-                        }
-                    }
-                ]
-            );
-        } else {
-            setTwoFaOn(false);
-            await AsyncStorage.setItem(TWO_FA_KEY, 'false');
+            router.push('/two-factor-setup' as any);
+            return;
         }
+        promptDisable();
+    };
+
+    /**
+     * Switching off asks for the password and a current code again. A
+     * session alone is not enough: stripping the second factor is the
+     * first thing someone holding an unlocked phone would want to do.
+     * Two fields means its own screen, not an alert.
+     */
+    const promptDisable = () => {
+        router.push('/two-factor-disable' as any);
     };
 
     return (
@@ -177,14 +195,26 @@ export default function SecuritySettingsScreen() {
                             <Text style={styles.twoFaSubtitle}>
                                 {twoFaOn ? t('security.authenticatorOn') : t('security.authenticatorOff')}
                             </Text>
+                            {/* Worth surfacing: these are spent one per use,
+                                and running out while the phone is lost is
+                                how people lock themselves out for good. */}
+                            {twoFaOn && (
+                                <Text style={styles.recoveryNote}>
+                                    {recoveryLeft} recovery {recoveryLeft === 1 ? 'code' : 'codes'} left
+                                </Text>
+                            )}
                         </View>
-                        <Switch
-                            value={twoFaOn}
-                            onValueChange={handleToggle2FA}
-                            trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(124,206,6,0.5)' }}
-                            thumbColor={twoFaOn ? '#7cce06' : '#ffffff'}
-                            ios_backgroundColor="rgba(255,255,255,0.15)"
-                        />
+                        {twoFaLoading ? (
+                            <ActivityIndicator color="#7cce06" />
+                        ) : (
+                            <Switch
+                                value={twoFaOn}
+                                onValueChange={handleToggle2FA}
+                                trackColor={{ false: 'rgba(255,255,255,0.15)', true: 'rgba(124,206,6,0.5)' }}
+                                thumbColor={twoFaOn ? '#7cce06' : '#ffffff'}
+                                ios_backgroundColor="rgba(255,255,255,0.15)"
+                            />
+                        )}
                     </View>
                 </View>
 
@@ -295,6 +325,7 @@ const styles = StyleSheet.create({
     submitBtnDisabled: { opacity: 0.6 },
     submitText: { fontSize: 14, fontWeight: '700', color: '#000' },
 
+    recoveryNote: { color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 3 },
     twoFaRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
     twoFaIconWrap: {
         width: 40, height: 40, borderRadius: 12,

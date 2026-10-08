@@ -100,6 +100,18 @@ public class Trainer extends BaseEntity {
     @Column(name = "is_verified")
     private Boolean isVerified = false;
 
+    // ── Two-factor authentication (TOTP) ──
+    // See Student for why the secret never leaves once enabled, and why
+    // the recovery codes are hashed rather than encrypted.
+    @Column(name = "two_factor_enabled")
+    private Boolean twoFactorEnabled = false;
+
+    @Column(name = "two_factor_secret", length = 64)
+    private String twoFactorSecret;
+
+    @Column(name = "two_factor_recovery_codes", columnDefinition = "TEXT")
+    private String twoFactorRecoveryCodes;
+
     @Column(name = "is_available")
     private Boolean isAvailable = true;
 

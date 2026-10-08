@@ -468,8 +468,8 @@
         "updatePassword": "Update Password",
         "twoFactor": "TWO-FACTOR AUTHENTICATION",
         "authenticatorApp": "Authenticator app",
-        "authenticatorOn": "You'll be prompted for a code at next sign-in (when available)",
-        "authenticatorOff": "Add an extra layer of security with TOTP codes",
+        "authenticatorOn": "You'll be asked for a code every time you sign in",
+        "authenticatorOff": "Add a second step with an authenticator app",
         "activeSessions": "ACTIVE SESSIONS",
         "thisDevice": "This device",
         "activeNow": "Active now",
@@ -490,10 +490,7 @@
         "updated": "Password updated",
         "updatedBody": "Your password has been changed successfully.",
         "updateFailed": "Failed to update password",
-        "updateFailedBody": "Could not change password. Please try again.",
-        "twoFaPromptTitle": "Two-Factor Authentication",
-        "twoFaPromptBody": "Full 2FA setup with authenticator apps (Google Authenticator, Authy) is rolling out soon. Your preference will be remembered for activation.",
-        "enableWhenAvailable": "Enable when available"
+        "updateFailedBody": "Could not change password. Please try again."
     },
     "feed": {
         "title": "Daily Feed",

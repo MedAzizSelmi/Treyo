@@ -76,6 +76,41 @@ public class JwtService {
         return createToken(new HashMap<>(), email, refreshExpiration);
     }
 
+    /** Five minutes: long enough to read a code off a phone, no longer. */
+    private static final long TWO_FACTOR_CHALLENGE_MS = 5 * 60 * 1000L;
+
+    /**
+     * Issued when a password was correct but a second factor is still
+     * owed. It stands for "this person proved the first factor" and
+     * nothing more.
+     *
+     * Marked {@code type: 2fa_challenge} so JwtAuthenticationFilter
+     * refuses it as an access token — without that marker it would carry
+     * userId and role like any other token and would simply work as one,
+     * which would make the second factor decorative.
+     */
+    public String generateTwoFactorChallenge(String email, String userId, String role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("role", role);
+        claims.put("type", "2fa_challenge");
+        return createToken(claims, email, TWO_FACTOR_CHALLENGE_MS);
+    }
+
+    /** The {@code type} claim, or null on an ordinary access token. */
+    public String extractType(String token) {
+        return extractClaim(token, claims -> claims.get("type", String.class));
+    }
+
+    /** True only for an unexpired token minted by the method above. */
+    public boolean isValidTwoFactorChallenge(String token) {
+        try {
+            return !isTokenExpired(token) && "2fa_challenge".equals(extractType(token));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String createToken(Map<String, Object> claims, String subject, Long expiration) {
         return Jwts.builder()
                 .setClaims(claims)
