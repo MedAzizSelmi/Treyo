@@ -110,22 +110,13 @@ export default function HelpSupportScreen() {
                     colors={colors}
                 />
 
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('help.resources')}</Text>
+                {/* A "Resources" section offered a User Guide and Video
+                    Tutorials, both wired to console.log. Neither exists:
+                    they are content, not screens, and there was nothing
+                    for the rows to open. Removed rather than left looking
+                    tappable — restore them the day the content does
+                    exist, pointing at its URL. */}
 
-                <ResourceItem
-                    icon="book-outline"
-                    title={t('help.userGuide')}
-                    description={t('help.userGuideDesc')}
-                    onPress={() => console.log('User Guide')}
-                    colors={colors}
-                />
-                <ResourceItem
-                    icon="videocam-outline"
-                    title={t('help.videoTutorials')}
-                    description={t('help.videoTutorialsDesc')}
-                    onPress={() => console.log('Videos')}
-                    colors={colors}
-                />
                 {/* Privacy Policy and Terms of Service intentionally live
                     only under Settings > Support & Legal — they were
                     duplicated here, which meant two entry points to the
@@ -165,18 +156,6 @@ function FAQItem({ question, answer, expanded, onPress, colors }: any) {
     );
 }
 
-function ResourceItem({ icon, title, description, onPress, colors }: any) {
-    return (
-        <TouchableOpacity style={[styles.resourceItem, { borderBottomColor: colors.border }]} onPress={onPress}>
-            <Ionicons name={icon} size={24} color="#7cce06" />
-            <View style={styles.resourceInfo}>
-                <Text style={[styles.resourceTitle, { color: colors.text }]}>{title}</Text>
-                <Text style={[styles.resourceDescription, { color: colors.textSecondary }]}>{description}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-        </TouchableOpacity>
-    );
-}
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
@@ -194,8 +173,4 @@ const styles = StyleSheet.create({
     faqHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
     faqQuestion: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
     faqAnswer: { fontSize: 13, lineHeight: 20 },
-    resourceItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },
-    resourceInfo: { flex: 1, marginLeft: 12 },
-    resourceTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-    resourceDescription: { fontSize: 13 },
 });
