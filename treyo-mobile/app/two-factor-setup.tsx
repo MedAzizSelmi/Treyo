@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
@@ -26,6 +27,7 @@ import { twoFactorService } from '../services/api';
  */
 export default function TwoFactorSetupScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
 
     const [step, setStep] = useState<'loading' | 'scan' | 'codes'>('loading');
     const [secret, setSecret] = useState('');
@@ -44,8 +46,8 @@ export default function TwoFactorSetupScreen() {
                 setStep('scan');
             } catch (e: any) {
                 Alert.alert(
-                    'Setup unavailable',
-                    e?.response?.data?.message || 'Could not start two-factor setup.',
+                    t('twoFactor.setupUnavailable'),
+                    e?.response?.data?.message || t('twoFactor.setupUnavailableBody'),
                     [{ text: 'OK', onPress: () => router.back() }],
                 );
             }
@@ -55,7 +57,7 @@ export default function TwoFactorSetupScreen() {
     const verify = async () => {
         const cleaned = code.replace(/\D/g, '');
         if (cleaned.length !== 6) {
-            setError('Enter the 6-digit code from your app.');
+            setError(t('twoFactor.enterSixDigits'));
             return;
         }
         setSubmitting(true);
@@ -65,7 +67,7 @@ export default function TwoFactorSetupScreen() {
             setRecoveryCodes(data.recoveryCodes || []);
             setStep('codes');
         } catch (e: any) {
-            setError(e?.response?.data?.message || 'That code is not right.');
+            setError(e?.response?.data?.message || t('twoFactor.wrongCode'));
         } finally {
             setSubmitting(false);
         }
@@ -73,7 +75,7 @@ export default function TwoFactorSetupScreen() {
 
     const copySecret = async () => {
         await Clipboard.setStringAsync(secret);
-        Alert.alert('Copied', 'Setup key copied to the clipboard.');
+        Alert.alert(t('twoFactor.copied'), t('twoFactor.copiedBody'));
     };
 
     const shareCodes = async () => {
@@ -81,7 +83,7 @@ export default function TwoFactorSetupScreen() {
         // that is not this phone, since the phone is what they recover.
         try {
             await Share.share({
-                message: `Treyo recovery codes — keep these somewhere safe.\n\n${recoveryCodes.join('\n')}`,
+                message: `${t('twoFactor.recoveryShareText')}\n\n${recoveryCodes.join('\n')}`,
             });
         } catch (_) {}
     };
@@ -108,16 +110,13 @@ export default function TwoFactorSetupScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>
-                        {step === 'codes' ? 'Save your recovery codes' : 'Two-factor authentication'}
+                        {step === 'codes' ? t('twoFactor.recoveryTitle') : t('twoFactor.title')}
                     </Text>
                 </View>
 
                 {step === 'scan' && (
                     <>
-                        <Text style={styles.lead}>
-                            Scan this with Google Authenticator, Authy, or any
-                            authenticator app. Then enter the 6-digit code it shows.
-                        </Text>
+                        <Text style={styles.lead}>{t('twoFactor.scanLead')}</Text>
 
                         <View style={styles.qrCard}>
                             {/* White plate behind the QR on purpose: scanners
@@ -128,14 +127,12 @@ export default function TwoFactorSetupScreen() {
                             )}
                         </View>
 
-                        <Text style={styles.orLabel}>Can't scan it?</Text>
+                        <Text style={styles.orLabel}>{t('twoFactor.cantScan')}</Text>
                         <TouchableOpacity style={styles.secretRow} onPress={copySecret}>
                             <Text style={styles.secretText} selectable>{secret}</Text>
                             <Ionicons name="copy-outline" size={18} color="#7cce06" />
                         </TouchableOpacity>
-                        <Text style={styles.hint}>
-                            Enter that key manually in your app, then come back here.
-                        </Text>
+                        <Text style={styles.hint}>{t('twoFactor.manualHint')}</Text>
 
                         <TextInput
                             style={styles.codeInput}
@@ -157,7 +154,7 @@ export default function TwoFactorSetupScreen() {
                         >
                             {submitting
                                 ? <ActivityIndicator color="#02000e" />
-                                : <Text style={styles.primaryBtnText}>Turn on</Text>}
+                                : <Text style={styles.primaryBtnText}>{t('twoFactor.turnOn')}</Text>}
                         </TouchableOpacity>
                     </>
                 )}
@@ -166,10 +163,7 @@ export default function TwoFactorSetupScreen() {
                     <>
                         <View style={styles.warnCard}>
                             <Ionicons name="warning-outline" size={20} color="#ffcc33" />
-                            <Text style={styles.warnText}>
-                                This is the only time these are shown. Save them now —
-                                each one signs you in once if you lose your phone.
-                            </Text>
+                            <Text style={styles.warnText}>{t('twoFactor.recoveryWarning')}</Text>
                         </View>
 
                         <View style={styles.codesCard}>
@@ -180,14 +174,14 @@ export default function TwoFactorSetupScreen() {
 
                         <TouchableOpacity style={styles.secondaryBtn} onPress={shareCodes}>
                             <Ionicons name="share-outline" size={18} color="#7cce06" />
-                            <Text style={styles.secondaryBtnText}>Save or share</Text>
+                            <Text style={styles.secondaryBtnText}>{t('twoFactor.saveOrShare')}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.primaryBtn}
                             onPress={() => router.back()}
                         >
-                            <Text style={styles.primaryBtnText}>I've saved them</Text>
+                            <Text style={styles.primaryBtnText}>{t('twoFactor.savedThem')}</Text>
                         </TouchableOpacity>
                     </>
                 )}

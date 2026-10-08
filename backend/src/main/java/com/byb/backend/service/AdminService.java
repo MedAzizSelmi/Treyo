@@ -541,7 +541,7 @@ public class AdminService {
                 .isActive(student.getIsActive())
                 .isVerified(true) // Students are auto-verified
                 .registeredAt(student.getCreatedAt())
-                .lastLoginAt(null) // TODO: Track last login
+                .lastLoginAt(student.getLastLoginAt())
                 .primaryDomains(student.getPrimaryDomains() != null ?
                         student.getPrimaryDomains() : new String[]{})
                 .specificInterests(student.getSpecificInterests() != null ?
@@ -566,7 +566,7 @@ public class AdminService {
                 .isActive(trainer.getIsActive())
                 .isVerified(trainer.getIsVerified())
                 .registeredAt(trainer.getCreatedAt())
-                .lastLoginAt(null) // TODO: Track last login
+                .lastLoginAt(trainer.getLastLoginAt())
                 .specializations(trainer.getSpecializations() != null ?
                         trainer.getSpecializations() : new String[]{})
                 .skills(trainer.getSkills() != null ?
@@ -577,7 +577,7 @@ public class AdminService {
                 .rating(trainer.getAverageRating() != null && trainer.getAverageRating().signum() > 0
                         ? trainer.getAverageRating().doubleValue()
                         : null)
-                .profileComplete(null) // TODO: Check profile completeness
+                .profileComplete(trainer.isProfileComplete())
                 .verificationStatus(trainer.getApprovalStatus() == null
                         ? "PENDING"
                         : trainer.getApprovalStatus())
@@ -633,7 +633,7 @@ public class AdminService {
                 .currentGroups(currentGroups)
                 .requestedCount((int) requestedCount)
                 .createdAt(course.getCreatedAt())
-                .publishedAt(null) // TODO: Add publishedAt field to Course
+                .publishedAt(course.getPublishedAt())
                 .lastModifiedAt(course.getUpdatedAt())
                 .build();
     }

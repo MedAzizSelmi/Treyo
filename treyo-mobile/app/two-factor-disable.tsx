@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { twoFactorService } from '../services/api';
@@ -21,6 +22,7 @@ import { twoFactorService } from '../services/api';
  */
 export default function TwoFactorDisableScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -29,7 +31,7 @@ export default function TwoFactorDisableScreen() {
 
     const submit = async () => {
         if (!password || !code.trim()) {
-            setError('Enter your password and a current code.');
+            setError(t('twoFactor.needBoth'));
             return;
         }
         setSubmitting(true);
@@ -37,12 +39,12 @@ export default function TwoFactorDisableScreen() {
         try {
             await twoFactorService.disable(password, code.trim());
             Alert.alert(
-                'Two-factor authentication off',
-                'Your account now signs in with a password only.',
+                t('twoFactor.disabledTitle'),
+                t('twoFactor.disabledBody'),
                 [{ text: 'OK', onPress: () => router.back() }],
             );
         } catch (e: any) {
-            setError(e?.response?.data?.message || 'Could not switch this off.');
+            setError(e?.response?.data?.message || t('twoFactor.disableFailed'));
         } finally {
             setSubmitting(false);
         }
@@ -59,24 +61,21 @@ export default function TwoFactorDisableScreen() {
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Turn off two-factor</Text>
+                    <Text style={styles.headerTitle}>{t('twoFactor.disableTitle')}</Text>
                 </View>
 
                 <View style={styles.warnCard}>
                     <Ionicons name="alert-circle-outline" size={20} color="#ffcc33" />
-                    <Text style={styles.warnText}>
-                        Your account will be protected by its password alone.
-                        Your recovery codes stop working too.
-                    </Text>
+                    <Text style={styles.warnText}>{t('twoFactor.disableWarning')}</Text>
                 </View>
 
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>{t('twoFactor.password')}</Text>
                 <View style={styles.inputRow}>
                     <TextInput
                         style={styles.input}
                         value={password}
                         onChangeText={(t) => { setPassword(t); setError(''); }}
-                        placeholder="Your password"
+                        placeholder={t('twoFactor.passwordPlaceholder')}
                         placeholderTextColor="rgba(255,255,255,0.3)"
                         secureTextEntry={!showPassword}
                         autoCapitalize="none"
@@ -90,7 +89,7 @@ export default function TwoFactorDisableScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <Text style={styles.label}>Authenticator or recovery code</Text>
+                <Text style={styles.label}>{t('twoFactor.codeOrRecovery')}</Text>
                 <TextInput
                     style={[styles.input, styles.codeInput]}
                     value={code}
@@ -111,7 +110,7 @@ export default function TwoFactorDisableScreen() {
                 >
                     {submitting
                         ? <ActivityIndicator color="#ffffff" />
-                        : <Text style={styles.dangerBtnText}>Turn off</Text>}
+                        : <Text style={styles.dangerBtnText}>{t('twoFactor.turnOff')}</Text>}
                 </TouchableOpacity>
             </ScrollView>
         </ScreenBackground>

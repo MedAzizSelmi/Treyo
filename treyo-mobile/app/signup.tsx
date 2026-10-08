@@ -27,19 +27,6 @@ export default function SignupScreen() {
     const [socialLoading, setSocialLoading] = useState(false);
 
     /**
-     * Social signup stub.
-     *
-     * The Google / Apple / LinkedIn flows aren't wired to real OAuth
-     * yet — the underlying methods (registerWith…) don't exist on
-     * authService. This handler keeps the UI matching login (so the
-     * visual flow is identical) and shows a clear "coming soon"
-     * message until we do the EAS production build + per-provider
-     * console setup.
-     *
-     * When OAuth lands, replace the Alert with calls like
-     * authService.registerWithGoogle(userType) etc.
-     */
-    /**
      * Sign up with a provider. The role picked on this screen is passed
      * along, because it is the only moment the user states which one they
      * are — it is ignored by the backend if the account already exists.
@@ -275,9 +262,10 @@ export default function SignupScreen() {
                         </TouchableOpacity>
 
                         {/* Social signup — same layout as the login screen
-                            so the two flows feel symmetric. Buttons are
-                            stubbed until the EAS production build and
-                            per-provider OAuth setup land. */}
+                            so the two flows feel symmetric. Google and
+                            LinkedIn are live; Apple needs a paid developer
+                            account and is hidden until then by
+                            isProviderConfigured. */}
                         <View style={styles.socialSection}>
                             <View style={styles.socialDivider}>
                                 <View style={styles.socialDividerLine} />

@@ -1,15 +1,18 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../contexts/ThemeContext';
 import { ScreenBackground } from '../components/ScreenBackground';
-import { LEGAL_CONTACT_EMAIL } from '../constants/legal';
+import { LEGAL_CONTACT_EMAIL, SUPPORT_WHATSAPP_NUMBER, SUPPORT_WHATSAPP_DISPLAY } from '../constants/legal';
 
 export default function HelpSupportScreen() {
     const { colors } = useTheme();
     const router = useRouter();
     const { t } = useTranslation();
+    // Only one answer open at a time, so the section stays scannable.
+    const [openFAQ, setOpenFAQ] = useState<string | null>(null);
 
     const handleContactSupport = () => {
         // Sourced from constants/legal.ts so the support address and the
@@ -18,12 +21,22 @@ export default function HelpSupportScreen() {
     };
 
     const handleWhatsApp = () => {
-        Linking.openURL('https://wa.me/21612345678');
+        // Sourced from constants/legal.ts, same as the support address.
+        // This was hardcoded to wa.me/21612345678 — a placeholder that
+        // shipped, so anyone tapping it reached nobody.
+        Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`);
     };
 
-    const handleFAQ = (question: string) => {
-        // TODO: Navigate to specific FAQ or expand inline
-        console.log('FAQ:', question);
+    /**
+     * Expand an answer in place.
+     *
+     * Previously a console.log behind a TODO, so every FAQ row looked
+     * tappable and did nothing. Inline rather than a screen per question:
+     * the answers are a paragraph each, and a navigation push for one
+     * paragraph is worse than opening it where it already is.
+     */
+    const toggleFAQ = (question: string) => {
+        setOpenFAQ((current) => (current === question ? null : question));
     };
 
     return (
@@ -56,7 +69,12 @@ export default function HelpSupportScreen() {
                     </View>
                     <View style={styles.contactInfo}>
                         <Text style={[styles.contactTitle, { color: colors.text }]}>{t('help.whatsapp')}</Text>
-                        <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>+216 12 345 678</Text>
+                        {/* The displayed number was hardcoded to the same
+                            placeholder as the link. Both now come from
+                            constants/legal.ts, so they cannot disagree. */}
+                        <Text style={[styles.contactDescription, { color: colors.textSecondary }]}>
+                            {SUPPORT_WHATSAPP_DISPLAY}
+                        </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
                 </TouchableOpacity>
@@ -66,25 +84,29 @@ export default function HelpSupportScreen() {
                 <FAQItem
                     question={t('help.faqEnrollQ')}
                     answer={t('help.faqEnrollA')}
-                    onPress={() => handleFAQ('enroll')}
+                    expanded={openFAQ === 'enroll'}
+                    onPress={() => toggleFAQ('enroll')}
                     colors={colors}
                 />
                 <FAQItem
                     question={t('help.faqContactQ')}
                     answer={t('help.faqContactA')}
-                    onPress={() => handleFAQ('contact')}
+                    expanded={openFAQ === 'contact'}
+                    onPress={() => toggleFAQ('contact')}
                     colors={colors}
                 />
                 <FAQItem
                     question={t('help.faqRefundQ')}
                     answer={t('help.faqRefundA')}
-                    onPress={() => handleFAQ('refund')}
+                    expanded={openFAQ === 'refund'}
+                    onPress={() => toggleFAQ('refund')}
                     colors={colors}
                 />
                 <FAQItem
                     question={t('help.faqCertsQ')}
                     answer={t('help.faqCertsA')}
-                    onPress={() => handleFAQ('certificates')}
+                    expanded={openFAQ === 'certificates'}
+                    onPress={() => toggleFAQ('certificates')}
                     colors={colors}
                 />
 
@@ -113,11 +135,32 @@ export default function HelpSupportScreen() {
     );
 }
 
-function FAQItem({ question, answer, onPress, colors }: any) {
+/**
+ * One question, with its answer folded away until asked for.
+ *
+ * Both were rendered at once before, which made the row's tap target
+ * meaningless — there was nothing left to reveal — and turned the
+ * section into a wall of text to scroll past. The chevron now says
+ * which rows have more behind them.
+ */
+function FAQItem({ question, answer, expanded, onPress, colors }: any) {
     return (
-        <TouchableOpacity style={[styles.faqItem, { backgroundColor: colors.backgroundSecondary }]} onPress={onPress}>
-            <Text style={[styles.faqQuestion, { color: colors.text }]}>{question}</Text>
-            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>{answer}</Text>
+        <TouchableOpacity
+            style={[styles.faqItem, { backgroundColor: colors.backgroundSecondary }]}
+            onPress={onPress}
+            activeOpacity={0.7}
+        >
+            <View style={styles.faqHeader}>
+                <Text style={[styles.faqQuestion, { color: colors.text }]}>{question}</Text>
+                <Ionicons
+                    name={expanded ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={colors.textTertiary}
+                />
+            </View>
+            {expanded && (
+                <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>{answer}</Text>
+            )}
         </TouchableOpacity>
     );
 }
@@ -148,6 +191,7 @@ const styles = StyleSheet.create({
     contactTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
     contactDescription: { fontSize: 13 },
     faqItem: { borderRadius: 12, padding: 16, marginBottom: 12 },
+    faqHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
     faqQuestion: { fontSize: 15, fontWeight: '600', marginBottom: 8 },
     faqAnswer: { fontSize: 13, lineHeight: 20 },
     resourceItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },

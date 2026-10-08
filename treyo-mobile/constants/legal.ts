@@ -25,6 +25,17 @@ export const LEGAL_LAST_UPDATED = 'October 2026';
  */
 export const LEGAL_CONTACT_EMAIL = 'direction@leanconsulting.com.tn';
 
+/**
+ * Support number, in the digits-only form wa.me expects: country code,
+ * no plus, no spaces. Displayed as +216 20 348 898.
+ *
+ * Here beside the support address rather than inline in the help screen,
+ * which is how it came to be a placeholder nobody noticed: the screen
+ * shipped pointing at wa.me/21612345678.
+ */
+export const SUPPORT_WHATSAPP_NUMBER = '21620348898';
+export const SUPPORT_WHATSAPP_DISPLAY = '+216 20 348 898';
+
 export const LEGAL_ENTITY_NAME = 'LeanConsulting';
 
 export const LEGAL_ENTITY_COUNTRY = 'Tunisia';

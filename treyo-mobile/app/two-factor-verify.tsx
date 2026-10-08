@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService } from '../services/api';
@@ -22,6 +23,7 @@ import { registerForPushNotifications } from '../services/push';
  */
 export default function TwoFactorVerifyScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const { challengeToken } = useLocalSearchParams<{ challengeToken: string }>();
 
     const [code, setCode] = useState('');
@@ -33,12 +35,12 @@ export default function TwoFactorVerifyScreen() {
         const value = useRecovery ? code.trim() : code.replace(/\D/g, '');
         if (!value || (!useRecovery && value.length !== 6)) {
             setError(useRecovery
-                ? 'Enter one of your recovery codes.'
-                : 'Enter the 6-digit code from your app.');
+                ? t('twoFactor.enterRecovery')
+                : t('twoFactor.enterSixDigits'));
             return;
         }
         if (!challengeToken) {
-            setError('This sign-in attempt expired. Please sign in again.');
+            setError(t('twoFactor.challengeExpired'));
             return;
         }
 
@@ -64,11 +66,11 @@ export default function TwoFactorVerifyScreen() {
             if (marker === 'CHALLENGE_EXPIRED') {
                 // The challenge is good for five minutes. Past that there
                 // is nothing to retry — the password has to be re-entered.
-                setError('That took too long. Please sign in again.');
+                setError(t('twoFactor.challengeExpired'));
                 setTimeout(() => router.replace('/login' as any), 1600);
                 return;
             }
-            setError(e?.response?.data?.message || 'That code is not right.');
+            setError(e?.response?.data?.message || t('twoFactor.wrongCode'));
         } finally {
             setSubmitting(false);
         }
@@ -92,11 +94,11 @@ export default function TwoFactorVerifyScreen() {
                         <Ionicons name="shield-checkmark-outline" size={34} color="#7cce06" />
                     </View>
 
-                    <Text style={styles.title}>Two-factor authentication</Text>
+                    <Text style={styles.title}>{t('twoFactor.title')}</Text>
                     <Text style={styles.subtitle}>
                         {useRecovery
-                            ? 'Enter one of the recovery codes you saved when you turned this on.'
-                            : 'Enter the 6-digit code from your authenticator app.'}
+                            ? t('twoFactor.verifyRecoveryLead')
+                            : t('twoFactor.verifyLead')}
                     </Text>
 
                     <TextInput
@@ -121,7 +123,7 @@ export default function TwoFactorVerifyScreen() {
                     >
                         {submitting
                             ? <ActivityIndicator color="#02000e" />
-                            : <Text style={styles.primaryBtnText}>Verify</Text>}
+                            : <Text style={styles.primaryBtnText}>{t('twoFactor.verify')}</Text>}
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -130,8 +132,8 @@ export default function TwoFactorVerifyScreen() {
                     >
                         <Text style={styles.switchModeText}>
                             {useRecovery
-                                ? 'Use my authenticator app instead'
-                                : "I can't access my authenticator app"}
+                                ? t('twoFactor.useAuthenticator')
+                                : t('twoFactor.useRecovery')}
                         </Text>
                     </TouchableOpacity>
                 </View>
