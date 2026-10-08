@@ -250,7 +250,17 @@ public class PaymentService {
                     paymentRef, e.getMessage());
             return null;
         }
-        log.info("ClicToPay getOrderStatusExtended.do orderId={} response={}", paymentRef, response);
+        // Only the fields that explain an outcome. The full response was
+        // logged verbatim, which put cardAuthInfo — including the
+        // cardholder's name — into the application log on every payment
+        // check: personal data accumulating in plain text, retained for
+        // as long as logs are, and mentioned nowhere in the privacy
+        // policy. The whole body is still available at DEBUG for a
+        // developer chasing a specific failure.
+        log.info("ClicToPay getOrderStatusExtended.do orderId={} orderStatus={} errorCode={} actionCode={}",
+                paymentRef, response.get("orderStatus"), response.get("errorCode"),
+                response.get("actionCode"));
+        log.debug("ClicToPay getOrderStatusExtended.do orderId={} response={}", paymentRef, response);
 
         String errorCode = str(response.get("errorCode"));
         if (errorCode != null && !"0".equals(errorCode)) {
@@ -272,7 +282,47 @@ public class PaymentService {
         out.put("actionCode", response.get("actionCode"));
         out.put("actionCodeDescription", str(response.get("actionCodeDescription")));
         out.put("gatewayOrderId", paymentRef);
+        addCardDisplay(response, out);
         return out;
+    }
+
+    /**
+     * The two things we may keep about the card: its brand, and its last
+     * four digits.
+     *
+     * ClicToPay's anti-fraud terms are stricter than PCI-DSS here —
+     * "ne stockez jamais les données de carte bancaire (numéro, CVV,
+     * date d'expiration)" — so the expiry is deliberately not read, even
+     * though the gateway returns it and PCI-DSS would allow storing it
+     * beside a masked pan. The cardholder name is skipped for the same
+     * reason plus one more: it is personal data we have no use for.
+     *
+     * Everything here is optional. A gateway response without card
+     * details is normal (a refused payment never had a card attached),
+     * and the screen shows the method as unknown rather than guessing.
+     */
+    @SuppressWarnings("unchecked")
+    private void addCardDisplay(Map<String, Object> response, Map<String, Object> out) {
+        Object node = response.get("cardAuthInfo");
+        if (!(node instanceof Map<?, ?> cardInfo)) return;
+
+        // The gateway masks the pan itself — something like
+        // "411111**1111" — so the last four are all that is taken, and
+        // the full value never lands anywhere.
+        String maskedPan = str(((Map<String, Object>) cardInfo).get("maskedPan"));
+        if (maskedPan != null && maskedPan.length() >= 4) {
+            String digits = maskedPan.replaceAll("[^0-9]", "");
+            if (digits.length() >= 4) {
+                out.put("cardLast4", digits.substring(digits.length() - 4));
+            }
+        }
+
+        // Named differently across gateway versions; both are the brand.
+        String brand = str(((Map<String, Object>) cardInfo).get("paymentSystem"));
+        if (brand == null) brand = str(response.get("paymentSystem"));
+        if (brand != null && !brand.isBlank()) {
+            out.put("cardBrand", brand.toUpperCase());
+        }
     }
 
     /**

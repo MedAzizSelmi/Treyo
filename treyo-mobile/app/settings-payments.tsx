@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
@@ -45,6 +45,40 @@ export default function PaymentsScreen() {
     const currency = items.find(e => e.courseCurrency)?.courseCurrency ?? 'TND';
     const money = (n: number) => `${n.toFixed(2)} ${currency}`;
 
+    /**
+     * A receipt is dated by when the money moved, so paidAt wins and
+     * enrolledAt is the fallback for free courses, which never have one.
+     */
+    const dateOf = (e: any) => {
+        const when = e.paidAt || e.enrolledAt;
+        return when ? new Date(when).toLocaleDateString(i18n.language || undefined) : '';
+    };
+
+    /**
+     * The payment's status, not the enrolment's.
+     *
+     * This row used to show enrollmentStatus, so a refunded payment still
+     * read "confirmed" — the enrolment was, the payment was not. Only
+     * states other than a plain "paid" are worth the pixels.
+     */
+    const statusLabel = (e: any) => {
+        const status = String(e.paymentStatus || '').toLowerCase();
+        if (!status || status === 'paid' || status === 'unpaid') return '';
+        return t(`payments.status.${status}`, { defaultValue: status });
+    };
+
+    /**
+     * "VISA ••••1234", from the only two card fields the server keeps.
+     * Null for free enrolments, and for payments taken before these were
+     * captured — in which case nothing is shown rather than a guess.
+     */
+    const methodOf = (e: any) => {
+        const brand = e.cardBrand ? String(e.cardBrand) : '';
+        const last4 = e.cardLast4 ? String(e.cardLast4) : '';
+        if (!brand && !last4) return '';
+        return `${brand}${brand && last4 ? ' ' : ''}${last4 ? `••••${last4}` : ''}`.trim();
+    };
+
     const totalSpent = items.reduce((sum, e) => sum + amountOf(e), 0);
     const paidCount = items.filter(e => amountOf(e) > 0).length;
 
@@ -80,22 +114,16 @@ export default function PaymentsScreen() {
                     </View>
                 </View>
 
-                {/* Payment methods (placeholder section) */}
-                <Text style={styles.sectionLabel}>{t('payments.paymentMethods')}</Text>
-                <View style={styles.card}>
-                    <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <TouchableOpacity style={styles.methodRow} activeOpacity={0.7}
-                        onPress={() => Alert.alert('Payment methods', 'This will be available once payment processing is enabled.')}>
-                        <View style={styles.methodIconWrap}>
-                            <Ionicons name="add" size={20} color="#7cce06" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.methodTitle}>{t('payments.addMethod')}</Text>
-                            <Text style={styles.methodSubtitle}>{t('payments.addMethodBody')}</Text>
-                        </View>
-                        <Text style={styles.soonBadge}>{t('payments.soon')}</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* There is deliberately no "add a payment method" here.
+                    It used to offer one, badged "Soon", opening an alert
+                    saying it would arrive with payment processing — but
+                    saving a card is not something this app can ever do.
+                    Cards are typed on ClicToPay's hosted page and never
+                    reach our servers, and their anti-fraud terms forbid
+                    storing the number, the CVV or the expiry date. A
+                    card on file would need the gateway's own tokenisation
+                    feature, contracted separately. Promising it on a
+                    settings screen was promising the wrong thing. */}
 
                 {/* Transactions */}
                 <Text style={styles.sectionLabel}>{t('payments.transactions')}</Text>
@@ -126,10 +154,29 @@ export default function PaymentsScreen() {
                                     <Text style={styles.txnTitle} numberOfLines={1}>
                                         {e.courseTitle || e.courseName || t('home.course')}
                                     </Text>
+                                    {/* paidAt, not enrolledAt: this is a
+                                        receipt, so the date that matters is
+                                        when the money moved. Free courses
+                                        have no paidAt and fall back. */}
                                     <Text style={styles.txnDate}>
-                                        {e.enrolledAt ? new Date(e.enrolledAt).toLocaleDateString(i18n.language || undefined) : ''}
-                                        {e.enrollmentStatus ? ` · ${e.enrollmentStatus}` : ''}
+                                        {dateOf(e)}
+                                        {statusLabel(e) ? ` · ${statusLabel(e)}` : ''}
                                     </Text>
+                                    {/* Brand and last four are all we hold —
+                                        see the note above on why. Absent for
+                                        free enrolments and for payments made
+                                        before this was captured. */}
+                                    {!free && methodOf(e) && (
+                                        <Text style={styles.txnMethod}>{methodOf(e)}</Text>
+                                    )}
+                                    {/* The reference a learner needs to quote
+                                        to support, and the one piece of
+                                        evidence a chargeback turns on. */}
+                                    {!!e.paymentRef && (
+                                        <Text style={styles.txnRef} selectable numberOfLines={1}>
+                                            {t('payments.reference')}: {e.paymentRef}
+                                        </Text>
+                                    )}
                                 </View>
                                 <Text style={[styles.txnPrice, free && { color: '#aaaaaa' }]}>
                                     {free ? t('payments.free') : money(price)}
@@ -178,22 +225,6 @@ const styles = StyleSheet.create({
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     },
 
-    methodRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
-    methodIconWrap: {
-        width: 38, height: 38, borderRadius: 12,
-        backgroundColor: 'rgba(124,206,6,0.12)',
-        borderWidth: 1, borderColor: 'rgba(124,206,6,0.25)',
-        borderStyle: 'dashed',
-        justifyContent: 'center', alignItems: 'center',
-    },
-    methodTitle: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
-    methodSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-    soonBadge: {
-        fontSize: 10, fontWeight: '700', color: '#FFA500',
-        backgroundColor: 'rgba(255,165,0,0.12)',
-        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-    },
-
     txnCard: {
         flexDirection: 'row', alignItems: 'center', gap: 12,
         borderRadius: 14, overflow: 'hidden',
@@ -208,6 +239,8 @@ const styles = StyleSheet.create({
     },
     txnTitle: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
     txnDate: { fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 },
+    txnMethod: { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3, letterSpacing: 0.4 },
+    txnRef: { fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 },
     txnPrice: { fontSize: 15, fontWeight: '700', color: '#7cce06' },
 
     emptyState: { alignItems: 'center', paddingTop: 40, paddingBottom: 20, paddingHorizontal: 24 },

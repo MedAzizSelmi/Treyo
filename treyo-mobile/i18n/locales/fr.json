@@ -448,14 +448,15 @@
         "totalSpent": "Total dépensé",
         "paidCourses": "Cours payants",
         "totalCourses": "Total des cours",
-        "paymentMethods": "MOYENS DE PAIEMENT",
-        "addMethod": "Ajouter un moyen de paiement",
-        "addMethodBody": "Carte, PayPal ou virement bancaire",
-        "soon": "Bientôt",
         "transactions": "TRANSACTIONS",
         "noTransactions": "Aucune transaction",
         "noTransactionsBody": "Vos reçus apparaîtront ici dès votre première inscription payante.",
-        "free": "Gratuit"
+        "free": "Gratuit",
+        "reference": "Réf",
+        "status": {
+            "refunded": "Remboursé",
+            "partial": "Partiellement payé"
+        }
     },
     "security": {
         "title": "Confidentialité",

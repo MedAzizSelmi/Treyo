@@ -448,14 +448,15 @@
         "totalSpent": "إجمالي المنفق",
         "paidCourses": "الدورات المدفوعة",
         "totalCourses": "إجمالي الدورات",
-        "paymentMethods": "طرق الدفع",
-        "addMethod": "إضافة طريقة دفع",
-        "addMethodBody": "بطاقة، PayPal، أو تحويل بنكي",
-        "soon": "قريبًا",
         "transactions": "المعاملات",
         "noTransactions": "لا توجد معاملات بعد",
         "noTransactionsBody": "عند تسجيلك في دورة مدفوعة، ستظهر إيصالاتك هنا.",
-        "free": "مجاني"
+        "free": "مجاني",
+        "reference": "المرجع",
+        "status": {
+            "refunded": "تم الاسترداد",
+            "partial": "مدفوع جزئيًا"
+        }
     },
     "security": {
         "title": "الخصوصية",

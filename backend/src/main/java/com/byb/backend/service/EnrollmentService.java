@@ -67,6 +67,8 @@ public class EnrollmentService {
         // confirmation by sending any random paymentRef.
         BigDecimal amountPaid = BigDecimal.ZERO;
         LocalDateTime paidAt = null;
+        String cardBrand = null;
+        String cardLast4 = null;
         if (isPaidCourse) {
             if (paymentRef == null || paymentRef.isBlank()) {
                 throw new RuntimeException("Payment required: paymentRef is missing");
@@ -97,6 +99,11 @@ public class EnrollmentService {
                         .setScale(3, RoundingMode.HALF_UP);
             }
             paidAt = LocalDateTime.now();
+            // Brand and last four only, for the payment history screen.
+            // Absent on a gateway response without card details, which is
+            // normal and left as null rather than guessed at.
+            cardBrand = str(payment.get("cardBrand"));
+            cardLast4 = str(payment.get("cardLast4"));
         }
 
         // Create enrollment
@@ -108,6 +115,8 @@ public class EnrollmentService {
         enrollment.setEnrollmentStatus("confirmed");
         enrollment.setPaymentStatus(isPaidCourse ? "paid" : "unpaid");
         enrollment.setAmountPaid(amountPaid);
+        enrollment.setCardBrand(cardBrand);
+        enrollment.setCardLast4(cardLast4);
         enrollment.setPaymentRef(paymentRef);
         enrollment.setPaidAt(paidAt);
         enrollment.setEnrolledAt(LocalDateTime.now());
@@ -189,4 +198,12 @@ public class EnrollmentService {
 
         return enrollmentRepository.save(enrollment);
     }
+
+    /** Null-safe read of an optional string from the gateway's reply. */
+    private static String str(Object value) {
+        if (value == null) return null;
+        String s = String.valueOf(value).trim();
+        return s.isEmpty() || "null".equals(s) ? null : s;
+    }
+
 }

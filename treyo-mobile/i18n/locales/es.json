@@ -448,14 +448,15 @@
         "totalSpent": "Total gastado",
         "paidCourses": "Cursos pagados",
         "totalCourses": "Total de cursos",
-        "paymentMethods": "MÉTODOS DE PAGO",
-        "addMethod": "Añadir método de pago",
-        "addMethodBody": "Tarjeta, PayPal o transferencia",
-        "soon": "Pronto",
         "transactions": "TRANSACCIONES",
         "noTransactions": "Sin transacciones",
         "noTransactionsBody": "Cuando te inscribas en un curso pagado, los recibos aparecerán aquí.",
-        "free": "Gratis"
+        "free": "Gratis",
+        "reference": "Ref",
+        "status": {
+            "refunded": "Reembolsado",
+            "partial": "Pago parcial"
+        }
     },
     "security": {
         "title": "Privacidad",

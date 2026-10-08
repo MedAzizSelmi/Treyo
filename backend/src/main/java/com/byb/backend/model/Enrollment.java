@@ -65,6 +65,21 @@ public class Enrollment extends BaseEntity {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    /**
+     * What the learner paid with, for display only.
+     *
+     * Brand and last four digits, nothing else. ClicToPay's anti-fraud
+     * terms forbid storing the card number, the CVV and the expiry date,
+     * and the card itself is typed on their hosted page and never
+     * reaches this server. NULL where the gateway returned no card
+     * details, or for a free enrolment.
+     */
+    @Column(name = "card_brand", length = 20)
+    private String cardBrand;
+
+    @Column(name = "card_last4", length = 4)
+    private String cardLast4;
+
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 

@@ -448,14 +448,15 @@
         "totalSpent": "Total spent",
         "paidCourses": "Paid courses",
         "totalCourses": "Total courses",
-        "paymentMethods": "PAYMENT METHODS",
-        "addMethod": "Add a payment method",
-        "addMethodBody": "Card, PayPal, or bank transfer",
-        "soon": "Soon",
         "transactions": "TRANSACTIONS",
         "noTransactions": "No transactions yet",
         "noTransactionsBody": "When you enroll in a paid course, your receipts will appear here.",
-        "free": "Free"
+        "free": "Free",
+        "reference": "Ref",
+        "status": {
+            "refunded": "Refunded",
+            "partial": "Partially paid"
+        }
     },
     "security": {
         "title": "Privacy",
