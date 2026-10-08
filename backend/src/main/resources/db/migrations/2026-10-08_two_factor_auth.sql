@@ -23,14 +23,34 @@
 --   random codes, not guessable passwords, so there is nothing for a slow
 --   hash to defend against, and a login must check up to ten of them.
 --
+-- Written so it corrects the schema whether the columns are absent or
+-- were already created by Hibernate. This project runs ddl-auto=update,
+-- which adds a Boolean field as a NULLABLE column with no default, so
+-- "ADD COLUMN IF NOT EXISTS ... NOT NULL DEFAULT FALSE" on its own would
+-- skip the whole statement and leave that wrong. The default and the
+-- NOT NULL are therefore applied separately, after backfilling any NULLs
+-- that are already there.
+--
 -- Safe to re-run.
 
 ALTER TABLE students
-    ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN,
     ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(64),
     ADD COLUMN IF NOT EXISTS two_factor_recovery_codes TEXT;
 
+UPDATE students SET two_factor_enabled = FALSE WHERE two_factor_enabled IS NULL;
+
+ALTER TABLE students
+    ALTER COLUMN two_factor_enabled SET DEFAULT FALSE,
+    ALTER COLUMN two_factor_enabled SET NOT NULL;
+
 ALTER TABLE trainers
-    ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN,
     ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(64),
     ADD COLUMN IF NOT EXISTS two_factor_recovery_codes TEXT;
+
+UPDATE trainers SET two_factor_enabled = FALSE WHERE two_factor_enabled IS NULL;
+
+ALTER TABLE trainers
+    ALTER COLUMN two_factor_enabled SET DEFAULT FALSE,
+    ALTER COLUMN two_factor_enabled SET NOT NULL;
