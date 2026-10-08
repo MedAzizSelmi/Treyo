@@ -18,6 +18,7 @@ import com.byb.backend.repository.MessageRepository;
 import com.byb.backend.repository.StudentRepository;
 import com.byb.backend.repository.TrainerRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MessageService {
 
     private final MessageRepository messageRepository;
@@ -254,6 +256,62 @@ public class MessageService {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // OWNERSHIP-CHECKED VARIANTS
+    //
+    // The plain methods above act on any id handed to them, which is
+    // fine for internal callers but was reachable straight from the
+    // controller — so anyone could mark another person's message read,
+    // or delete it. These take the caller and answer false rather than
+    // throwing, so the controller can return a flat 403 that reveals
+    // nothing about whether the message exists.
+    // ═══════════════════════════════════════════════════════════════
+
+    /** Only the recipient can mark a message read. */
+    @Transactional
+    public boolean markAsReadFor(String messageId, String callerId) {
+        Message message = messageRepository.findById(messageId).orElse(null);
+        if (message == null || !callerId.equals(message.getReceiverId())) {
+            return false;
+        }
+        message.setIsRead(true);
+        message.setReadAt(LocalDateTime.now());
+        messageRepository.save(message);
+        sendReadReceipt(message);
+        return true;
+    }
+
+    /** Only the sender deletes their own message; admins may moderate. */
+    @Transactional
+    public boolean deleteMessageFor(String messageId, String callerId, boolean isAdmin) {
+        Message message = messageRepository.findById(messageId).orElse(null);
+        if (message == null) return false;
+        if (!isAdmin && !callerId.equals(message.getSenderId())) {
+            return false;
+        }
+        message.setIsDeleted(true);
+        messageRepository.save(message);
+        return true;
+    }
+
+    /**
+     * Tell one person that another is typing.
+     *
+     * Addressed to the recipient's own queue rather than broadcast, so
+     * it carries no information to anyone else. Best-effort: a dropped
+     * typing indicator is not worth an error.
+     */
+    public void sendTypingIndicator(String senderId, String receiverId) {
+        try {
+            messagingTemplate.convertAndSendToUser(
+                    receiverId,
+                    "/queue/typing",
+                    Map.of("senderId", senderId, "typing", true));
+        } catch (Exception e) {
+            log.debug("Typing indicator not delivered: {}", e.getMessage());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // GROUP CHAT
     // ═══════════════════════════════════════════════════════════════
 
@@ -338,7 +396,7 @@ public class MessageService {
             try {
                 messagingTemplate.convertAndSendToUser(memberId, "/queue/group-messages", response);
             } catch (Exception e) {
-                System.err.println("Failed WS push to " + memberId + ": " + e.getMessage());
+                log.warn("Failed WS push to {}: {}", memberId, e.getMessage());
             }
         }
 
@@ -660,7 +718,7 @@ public class MessageService {
             );
         } catch (Exception e) {
             // Log error but don't fail the message send
-            System.err.println("Failed to send WebSocket message: " + e.getMessage());
+            log.warn("Failed to send WebSocket message: {}", e.getMessage());
         }
     }
 
@@ -681,7 +739,7 @@ public class MessageService {
                     receipt
             );
         } catch (Exception e) {
-            System.err.println("Failed to send read receipt: " + e.getMessage());
+            log.warn("Failed to send read receipt: {}", e.getMessage());
         }
     }
 }

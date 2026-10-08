@@ -3,162 +3,214 @@ package com.byb.backend.controller;
 import com.byb.backend.dto.message.ConversationResponse;
 import com.byb.backend.dto.message.MessageResponse;
 import com.byb.backend.dto.message.SendMessageRequest;
+import com.byb.backend.security.AuthenticatedUser;
+import com.byb.backend.service.FileAccessService;
 import com.byb.backend.service.MessageService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Private messages between learners and trainers.
+ *
+ * ── Who the caller is, is never taken from the request ──────────────
+ * Every endpoint here used to accept the user id as a parameter and act
+ * on it without checking it against the signed-in account. That made the
+ * whole surface readable and writable by anyone with any valid token:
+ * `senderId` in the request body meant a message could be sent *as*
+ * another person, and `?userId1=&userId2=` meant any two people's
+ * conversation could be read by passing their ids.
+ *
+ * The identity now comes from the token, through FileAccessService, the
+ * same way the rest of the codebase establishes a caller. Where an id
+ * still appears in a path or query — the mobile client sends them, and
+ * they are part of the published contract — it is checked against the
+ * caller rather than trusted.
+ *
+ * Administrators are allowed through the read paths on purpose: support
+ * and moderation need it. They cannot send as somebody else.
+ */
 @RestController
 @RequestMapping("/api/messages")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "Messages", description = "Student-Trainer messaging endpoints")
+@SecurityRequirement(name = "bearerAuth")
 public class MessageController {
 
     private final MessageService messageService;
+    private final FileAccessService fileAccessService;
 
-    /**
-     * Send a message (REST endpoint)
-     */
+    /** Send a message. The sender is the caller, whatever the body says. */
     @PostMapping("/send")
     @Operation(summary = "Send a message")
-    public ResponseEntity<MessageResponse> sendMessage(@RequestBody SendMessageRequest request) {
-        MessageResponse message = messageService.sendMessage(request);
-        return ResponseEntity.ok(message);
+    public ResponseEntity<?> sendMessage(@RequestBody SendMessageRequest request) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+
+        if (request == null || isBlank(request.getReceiverId()) || isBlank(request.getContent())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Recipient and content are required"));
+        }
+        if (request.getReceiverId().equals(caller.getUserId())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "You cannot message yourself"));
+        }
+
+        // Overwritten, not validated: there is no legitimate reason for a
+        // client to name a different sender, so the value is simply
+        // replaced rather than rejected with a hint about what it checks.
+        request.setSenderId(caller.getUserId());
+        return ResponseEntity.ok(messageService.sendMessage(request));
     }
 
     /**
-     * Send a message (WebSocket endpoint)
-     * Client sends to: /app/chat
+     * Send over the WebSocket. Same rule, different transport: the
+     * principal is set by StompAuthChannelInterceptor at CONNECT, so a
+     * frame cannot claim a sender either.
      */
     @MessageMapping("/chat")
-    public void sendMessageViaWebSocket(@Payload SendMessageRequest message) {
-        // Service handles WebSocket delivery
+    public void sendMessageViaWebSocket(@Payload SendMessageRequest message, Principal principal) {
+        if (!(principal instanceof AuthenticatedUser caller)) {
+            log.warn("Dropped a chat frame with no authenticated principal");
+            return;
+        }
+        if (message == null || isBlank(message.getReceiverId()) || isBlank(message.getContent())) {
+            return;
+        }
+        if (message.getReceiverId().equals(caller.getUserId())) return;
+
+        message.setSenderId(caller.getUserId());
         messageService.sendMessage(message);
     }
 
-    /**
-     * Get conversation between two users
-     */
+    /** A conversation, readable only by the two people in it. */
     @GetMapping("/conversation")
     @Operation(summary = "Get conversation between two users")
-    public ResponseEntity<List<MessageResponse>> getConversation(
+    public ResponseEntity<?> getConversation(
             @RequestParam String userId1,
             @RequestParam String userId2,
             @RequestParam(defaultValue = "50") int limit
     ) {
-        List<MessageResponse> messages = messageService.getConversation(userId1, userId2, limit);
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+
+        boolean isParticipant = caller.getUserId().equals(userId1)
+                || caller.getUserId().equals(userId2);
+        if (!isParticipant && !caller.isAdmin()) {
+            return forbidden();
+        }
+        List<MessageResponse> messages =
+                messageService.getConversation(userId1, userId2, limit);
         return ResponseEntity.ok(messages);
     }
 
-    /**
-     * Get all conversations for a user
-     */
+    /** Someone's conversation list — their own, or an administrator's view. */
     @GetMapping("/conversations/{userId}")
     @Operation(summary = "Get all conversations for a user")
-    public ResponseEntity<List<ConversationResponse>> getUserConversations(@PathVariable String userId) {
+    public ResponseEntity<?> getUserConversations(@PathVariable String userId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+        if (!caller.getUserId().equals(userId) && !caller.isAdmin()) {
+            return forbidden();
+        }
         List<ConversationResponse> conversations = messageService.getUserConversations(userId);
         return ResponseEntity.ok(conversations);
     }
 
     /**
-     * Mark message as read
+     * Mark one message read.
+     *
+     * Delegated to the service with the caller's id so the check happens
+     * where the message is actually loaded — doing it here would mean
+     * fetching the row twice.
      */
     @PutMapping("/{messageId}/read")
     @Operation(summary = "Mark message as read")
-    public ResponseEntity<Void> markAsRead(@PathVariable String messageId) {
-        messageService.markAsRead(messageId);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> markAsRead(@PathVariable String messageId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+        boolean done = messageService.markAsReadFor(messageId, caller.getUserId());
+        return done ? ResponseEntity.ok().build() : forbidden();
     }
 
-    /**
-     * Mark all messages in a conversation as read
-     */
+    /** Mark a conversation read. Only your own unread count is yours to clear. */
     @PutMapping("/conversation/read")
     @Operation(summary = "Mark conversation as read")
-    public ResponseEntity<Void> markConversationAsRead(
+    public ResponseEntity<?> markConversationAsRead(
             @RequestParam String conversationId,
             @RequestParam String userId
     ) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+        if (!caller.getUserId().equals(userId)) return forbidden();
+
         messageService.markConversationAsRead(conversationId, userId);
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * Get unread message count
-     */
     @GetMapping("/unread/{userId}")
     @Operation(summary = "Get unread message count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@PathVariable String userId) {
-        long count = messageService.getUnreadCount(userId);
-        return ResponseEntity.ok(Map.of("unreadCount", count));
+    public ResponseEntity<?> getUnreadCount(@PathVariable String userId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+        if (!caller.getUserId().equals(userId) && !caller.isAdmin()) {
+            return forbidden();
+        }
+        return ResponseEntity.ok(Map.of("unreadCount", messageService.getUnreadCount(userId)));
     }
 
-    /**
-     * Delete a message
-     */
+    /** Delete a message you sent. */
     @DeleteMapping("/{messageId}")
-    @Operation(summary = "Delete a message")
-    public ResponseEntity<Void> deleteMessage(@PathVariable String messageId) {
-        messageService.deleteMessage(messageId);
-        return ResponseEntity.ok().build();
+    @Operation(summary = "Delete a message you sent")
+    public ResponseEntity<?> deleteMessage(@PathVariable String messageId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) return unauthenticated();
+        boolean done = messageService.deleteMessageFor(messageId, caller.getUserId(), caller.isAdmin());
+        return done ? ResponseEntity.ok().build() : forbidden();
     }
 
     /**
-     * Typing indicator (WebSocket only)
-     * Client sends to: /app/typing
+     * Typing indicator, delivered to the other party only.
+     *
+     * Routed to a user destination rather than a shared topic so it
+     * reaches the recipient and nobody else.
      */
     @MessageMapping("/typing")
-    public void handleTypingIndicator(
-            @Payload Map<String, String> payload,
-            SimpMessageHeaderAccessor headerAccessor
-    ) {
-        // Broadcast typing indicator to receiver
-        // Implementation depends on your frontend needs
-        String receiverId = payload.get("receiverId");
-        String senderId = payload.get("senderId");
-        // messagingTemplate.convertAndSendToUser(receiverId, "/queue/typing", senderId);
+    public void handleTypingIndicator(@Payload Map<String, String> payload, Principal principal) {
+        if (!(principal instanceof AuthenticatedUser caller)) return;
+        String receiverId = payload == null ? null : payload.get("receiverId");
+        if (isBlank(receiverId)) return;
+        messageService.sendTypingIndicator(caller.getUserId(), receiverId);
     }
 
-    // ─── Group chat ─────────────────────────────────────────────────
+    // ── helpers ─────────────────────────────────────────────────────
 
-    /**
-     * List all messages in a group's chat. Membership check happens in
-     * the service — non-members get a 403-equivalent (SecurityException
-     * → translated by GlobalExceptionHandler). Sender ID has to be in
-     * the query so the service can verify the caller belongs.
-     */
-    @GetMapping("/group/{groupId}")
-    @Operation(summary = "Get all messages in a group chat")
-    public ResponseEntity<List<MessageResponse>> getGroupMessages(
-            @PathVariable String groupId,
-            @RequestParam String viewerId) {
-        return ResponseEntity.ok(messageService.getGroupMessages(groupId, viewerId));
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private ResponseEntity<?> unauthenticated() {
+        return ResponseEntity.status(401).body(Map.of("error", "Not signed in"));
     }
 
     /**
-     * Post a message to a group's chat. Service rejects non-members and
-     * empty content. Returns the saved message so the client can update
-     * its UI optimistically.
+     * 403 with no detail. Saying "that conversation isn't yours" would
+     * confirm the conversation exists, which is the thing being withheld.
      */
-    @PostMapping("/group/{groupId}")
-    @Operation(summary = "Send a message to a group chat")
-    public ResponseEntity<MessageResponse> sendGroupMessage(
-            @PathVariable String groupId,
-            @RequestBody Map<String, String> body) {
-        String senderId = body.get("senderId");
-        String content = body.get("content");
-        String messageType = body.getOrDefault("messageType", "text");
-        String attachmentUrl = body.get("attachmentUrl");
-        return ResponseEntity.ok(messageService.sendGroupMessage(
-                senderId, groupId, content, messageType, attachmentUrl));
+    private ResponseEntity<?> forbidden() {
+        return ResponseEntity.status(403).body(Map.of(
+                "error", "Not available",
+                "message", "You don't have access to that."));
     }
 }
