@@ -84,12 +84,20 @@ export default function SettingsPrivacyScreen() {
         );
     };
 
+    /**
+     * Opens the real deletion flow.
+     *
+     * This used to show an alert saying deletion was "coming soon —
+     * contact support in the meantime", which stopped being true when
+     * self-service deletion shipped. The screen it now opens asks for
+     * the password again and calls DELETE /api/account; the confirmation
+     * and the warning live there, so there is nothing to duplicate here.
+     *
+     * Worth keeping reachable: both app stores require an in-app route
+     * to account deletion, and this is the screen a reviewer looks for.
+     */
     const handleDeleteAccount = () => {
-        Alert.alert(
-            'Delete account?',
-            'This will permanently remove your account and all your data. This action cannot be undone.\n\n(Coming soon — contact support to request deletion in the meantime.)',
-            [{ text: 'OK', style: 'cancel' }]
-        );
+        router.push('/delete-account' as any);
     };
 
     return (
