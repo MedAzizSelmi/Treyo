@@ -29,7 +29,7 @@ const PRODUCTION_API_URL: string =
     '';
 
 // Last-resort LAN fallback for development only.
-const MANUAL_OVERRIDE = 'http://10.28.247.140:8085';
+const MANUAL_OVERRIDE = 'http://192.168.1.138:8085';
 
 function resolveApiBase(): string {
     // hostUri looks like "192.168.100.68:8081" or "localhost:8081"

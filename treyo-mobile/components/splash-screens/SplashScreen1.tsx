@@ -18,18 +18,32 @@ type SplashScreenProps = {
 const { width, height } = Dimensions.get('screen');
 
 export default function SplashScreen1({ onFinish }: SplashScreenProps) {
-    // The logo starts fully visible at its final size, deliberately.
+    // The logo fades up from nothing.
     //
     // Android always draws its own splash window before any JavaScript
-    // runs, and app.json styles that one to match this screen. If the
-    // logo animated in from opacity 0 and scale 0.9, the handover would
-    // read as two separate screens: the native logo appears, vanishes,
-    // then fades back in. Starting settled makes the native splash and
-    // this one look like a single continuous screen.
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-    const scaleAnim = useRef(new Animated.Value(1)).current;
+    // runs, and that one is now configured blank — pure black, no mark —
+    // so there is nothing on screen to match and nothing to jump. Fading
+    // in from black is the natural entrance. (While the native splash
+    // still showed the logo, this had to start settled instead, or the
+    // mark appeared, vanished and faded back in.)
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const scaleAnim = useRef(new Animated.Value(0.94)).current;
 
     useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 700,
+                useNativeDriver: true,
+            }),
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                tension: 40,
+                friction: 7,
+                useNativeDriver: true,
+            }),
+        ]).start();
+
         const timer = setTimeout(() => {
             Animated.timing(fadeAnim, {
                 toValue: 0,

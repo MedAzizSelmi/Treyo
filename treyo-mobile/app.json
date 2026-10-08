@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "treyo-mobile",
+    "name": "Treyo",
     "slug": "treyo-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -42,9 +42,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0c0729",
-          "image": "./assets/images/Treyo-white.png",
-          "imageWidth": 220
+          "backgroundColor": "#000000",
+          "image": "./assets/images/splash-blank.png",
+          "imageWidth": 200
         }
       ],
       [
