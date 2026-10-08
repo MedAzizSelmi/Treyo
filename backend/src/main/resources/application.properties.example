@@ -193,6 +193,41 @@ affinda.api.key=
 affinda.api.base-url=https://api.affinda.com/v2
 
 # ===================================================================
+# PAYMENT RECEIPTS (PDF)
+# ===================================================================
+# Emailed to the learner when a paid enrolment completes, and
+# re-downloadable from payment history. Printed on the document, so
+# these are what the customer sees.
+#
+# This is a reçu de paiement, not a facture. The money has already
+# arrived by card from an individual, so there is nothing to demand;
+# and issuing real factures means a gap-free sequential number, which
+# is a legal obligation that cannot be repaired once numbers have been
+# handed out with holes in them. If LeanConsulting's accountant says
+# invoices are required, that is a deliberate piece of work, not a
+# config change.
+receipt.company.name=LeanConsulting
+receipt.company.address=
+receipt.company.email=direction@leanconsulting.com.tn
+receipt.company.phone=+216 20 348 898
+# Registre National des Entreprises. Printed only when set.
+receipt.company.rne=
+
+# The learner is charged exactly the listed course price, so that
+# figure is the TTC total and the breakdown is derived from it rather
+# than added on top — a receipt whose total disagrees with the card
+# statement is worse than no receipt.
+#
+# Set enabled=false where these sales carry no VAT; the block is then
+# left off the document entirely. Whether they do is a question for an
+# accountant.
+#
+# The timbre fiscal on LeanConsulting's invoice template is absent on
+# purpose: it was never charged, so billing it here would not add up.
+receipt.vat.enabled=true
+receipt.vat.rate=19
+
+# ===================================================================
 # LOGGING
 # ===================================================================
 # PRODUCTION: keep these at INFO/WARN. Hibernate SQL at DEBUG writes

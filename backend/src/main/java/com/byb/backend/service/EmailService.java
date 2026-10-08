@@ -195,11 +195,59 @@ public class EmailService {
         send(toEmail, subject, html);
     }
 
+    /**
+     * Confirm a payment, with the receipt attached.
+     *
+     * Until this existed a learner who paid got nothing they could keep:
+     * the gateway's result page vanishes, and the only record was a row
+     * inside the app. The attachment is also the "correspondance client"
+     * side of the evidence ClicToPay expect to be retained for 18 months
+     * against a chargeback.
+     *
+     * The PDF is passed in rather than built here — rendering belongs to
+     * ReceiptService, and this method stays about delivery.
+     */
+    public void sendPaymentReceiptEmail(String toEmail, String learnerName,
+                                        String courseTitle, String amountLabel,
+                                        byte[] receiptPdf, String receiptFilename) {
+        String subject = "Your Treyo receipt — " + (courseTitle == null ? "enrolment" : courseTitle);
+        String html = simpleTemplate(
+                "Payment received",
+                "Hi " + (learnerName == null || learnerName.isBlank() ? "there" : learnerName) + ",",
+                "Thanks — your payment of <strong>" + safe(amountLabel) + "</strong> for <strong>"
+                        + safe(courseTitle) + "</strong> went through, and your place is confirmed."
+                        + "<br><br>Your receipt is attached as a PDF.",
+                null,
+                null,
+                "Keep this email: the attached receipt is your proof of payment."
+        );
+        send(toEmail, subject, html, receiptPdf, receiptFilename);
+    }
+
     private void send(String toEmail, String subject, String html) {
+        send(toEmail, subject, html, null, null);
+    }
+
+    private void send(String toEmail, String subject, String html,
+                      byte[] attachment, String attachmentName) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
+            // Multipart only when there is something to attach. A
+            // multipart message with a single part is still valid, but
+            // some clients render it with a phantom empty attachment,
+            // so the plain messages stay exactly as they were.
+            boolean multipart = attachment != null && attachment.length > 0;
             MimeMessageHelper helper = new MimeMessageHelper(
-                    message, MimeMessageHelper.MULTIPART_MODE_NO, StandardCharsets.UTF_8.name());
+                    message,
+                    multipart ? MimeMessageHelper.MULTIPART_MODE_MIXED
+                              : MimeMessageHelper.MULTIPART_MODE_NO,
+                    StandardCharsets.UTF_8.name());
+            if (multipart) {
+                helper.addAttachment(
+                        attachmentName == null ? "receipt.pdf" : attachmentName,
+                        new org.springframework.core.io.ByteArrayResource(attachment),
+                        "application/pdf");
+            }
             helper.setFrom(fromAddress, fromName);
             helper.setTo(toEmail);
             helper.setSubject(subject);

@@ -7,13 +7,18 @@ import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.StudentRepository;
 import com.byb.backend.repository.TrainerRepository;
+import com.byb.backend.security.AuthenticatedUser;
 import com.byb.backend.service.EnrollmentService;
+import com.byb.backend.service.FileAccessService;
+import com.byb.backend.service.ReceiptDeliveryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +34,8 @@ import java.util.stream.Collectors;
 public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
+    private final ReceiptDeliveryService receiptDeliveryService;
+    private final FileAccessService fileAccessService;
     private final EnrollmentRepository enrollmentRepository;
     private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
@@ -136,4 +143,44 @@ public class EnrollmentController {
         Enrollment enrollment = enrollmentService.completeEnrollment(enrollmentId);
         return ResponseEntity.ok(enrollment);
     }
+
+    /**
+     * Download the receipt for a paid enrolment.
+     *
+     * Rendered on demand rather than stored: everything it contains is
+     * already in the database, so a file on disk would be a second copy
+     * to back up, serve and eventually lose.
+     *
+     * Readable by the learner it belongs to, and by an administrator —
+     * who needs it to answer a dispute.
+     */
+    @GetMapping("/{enrollmentId}/receipt")
+    @Operation(summary = "Download the PDF receipt for a paid enrollment")
+    public ResponseEntity<?> downloadReceipt(@PathVariable String enrollmentId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Not signed in"));
+        }
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
+        if (enrollment == null
+                || (!caller.isAdmin() && !caller.getUserId().equals(enrollment.getStudentId()))) {
+            // Same answer for "not yours" and "does not exist", so the
+            // response cannot be used to probe for enrolment ids.
+            return ResponseEntity.status(404).body(Map.of("error", "No receipt for that enrollment"));
+        }
+
+        byte[] pdf = receiptDeliveryService.render(enrollment);
+        if (pdf == null) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "error", "No receipt",
+                    "message", "This enrollment has no payment to receipt."));
+        }
+
+        String filename = receiptDeliveryService.filenameFor(enrollment);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
 }

@@ -150,6 +150,17 @@
             built-in WebClient — no SDK dependency needed. See
             PaymentService for the full integration.
         -->
+
+        <!-- PDF generation for payment receipts.
+             OpenPDF rather than iText: iText 7 is AGPL, which for a
+             commercial product means either publishing the source or
+             buying a licence. OpenPDF is the LGPL/MPL fork of the last
+             freely-licensed iText and carries no such condition. -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.43</version>
+        </dependency>
     </dependencies>
 
     <build>

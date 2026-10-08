@@ -876,6 +876,53 @@ export const searchLogService = {
 // ══════════════════════════════════════════════
 // Two-Factor Authentication (TOTP)
 // ══════════════════════════════════════════════
+/**
+ * Save a paid enrolment's receipt and hand it to the OS share sheet.
+ *
+ * Fetched rather than opened in a browser: the endpoint is behind the
+ * bearer token, so a plain link would come back 401. The PDF is written
+ * to the cache directory — it is a copy of something the server can
+ * regenerate at any time, so it does not need to survive eviction.
+ *
+ * Returns false when sharing is unavailable on the device, so the
+ * caller can say so rather than appearing to do nothing.
+ */
+export async function downloadReceipt(enrollmentId: string): Promise<boolean> {
+    const token = await SecureStore.getItemAsync('jwt_token');
+    const res = await fetch(`${API_URL}/enrollments/${enrollmentId}/receipt`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+        throw new Error(res.status === 404 ? 'No receipt for this payment.' : 'Could not fetch the receipt.');
+    }
+
+    const [{ File, Paths }, Sharing] = await Promise.all([
+        import('expo-file-system'),
+        import('expo-sharing'),
+    ]);
+
+    // Blob -> bytes -> file. expo-file-system's File takes a Uint8Array
+    // directly, which avoids a base64 round-trip through JS strings.
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const file = new File(Paths.cache, `Treyo-receipt-${enrollmentId}.pdf`);
+    try {
+        if (file.exists) file.delete();
+    } catch (_) {
+        // A stale copy that cannot be removed is not worth failing over;
+        // create() below will overwrite or throw something more useful.
+    }
+    file.create({ overwrite: true });
+    file.write(bytes);
+
+    if (!(await Sharing.isAvailableAsync())) return false;
+    await Sharing.shareAsync(file.uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Treyo receipt',
+        UTI: 'com.adobe.pdf',
+    });
+    return true;
+}
+
 export const twoFactorService = {
     /** Whether 2FA is on, and how many recovery codes are left. */
     status: async (): Promise<{ enabled: boolean; recoveryCodesRemaining: number }> => {

@@ -451,7 +451,10 @@
         "status": {
             "refunded": "تم الاسترداد",
             "partial": "مدفوع جزئيًا"
-        }
+        },
+        "receipt": "الإيصال",
+        "receiptFailed": "تعذّر جلب الإيصال.",
+        "receiptNoShare": "المشاركة غير متاحة على هذا الجهاز."
     },
     "security": {
         "title": "الخصوصية",

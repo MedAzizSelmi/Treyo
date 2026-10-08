@@ -451,7 +451,10 @@
         "status": {
             "refunded": "Remboursé",
             "partial": "Partiellement payé"
-        }
+        },
+        "receipt": "Reçu",
+        "receiptFailed": "Impossible de récupérer le reçu.",
+        "receiptNoShare": "Le partage n'est pas disponible sur cet appareil."
     },
     "security": {
         "title": "Confidentialité",

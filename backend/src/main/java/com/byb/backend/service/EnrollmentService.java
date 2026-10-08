@@ -27,6 +27,7 @@ public class EnrollmentService {
     private final CourseRepository courseRepository;
     private final PaymentService paymentService;
     private final MLRecommendationService mlRecommendationService;
+    private final ReceiptDeliveryService receiptDeliveryService;
 
     /**
      * Confirm an enrollment after the student has paid for it.
@@ -123,6 +124,14 @@ public class EnrollmentService {
         enrollment.setProgressPercentage(BigDecimal.ZERO);
 
         enrollment = enrollmentRepository.save(enrollment);
+
+        // Email the receipt. Async and best-effort inside the service:
+        // a mail server being briefly unreachable must not roll back an
+        // enrolment that has already been paid for, and the learner can
+        // re-download it from payment history either way.
+        if (isPaidCourse) {
+            receiptDeliveryService.emailReceipt(enrollment.getEnrollmentId());
+        }
 
         // Keep the course's enrollment counter current. Nothing maintained
         // it before, so it stayed at 0 forever — which silently disabled

@@ -1,11 +1,11 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
-import { authService, enrollmentService } from '../services/api';
+import { authService, enrollmentService, downloadReceipt } from '../services/api';
 
 /**
  * Payment history.
@@ -44,6 +44,28 @@ export default function PaymentsScreen() {
     /** All courses are priced in one currency today; fall back to TND. */
     const currency = items.find(e => e.courseCurrency)?.courseCurrency ?? 'TND';
     const money = (n: number) => `${n.toFixed(2)} ${currency}`;
+
+    // Which receipt is being fetched, so only that row spins.
+    const [receiptFor, setReceiptFor] = useState<string | null>(null);
+
+    /**
+     * Fetch and share the PDF. The same document was emailed when the
+     * payment completed; this is for the day they need it again and
+     * cannot find the email.
+     */
+    const getReceipt = async (enrollmentId: string) => {
+        setReceiptFor(enrollmentId);
+        try {
+            const shared = await downloadReceipt(enrollmentId);
+            if (!shared) {
+                Alert.alert(t('payments.receipt'), t('payments.receiptNoShare'));
+            }
+        } catch (e: any) {
+            Alert.alert(t('payments.receipt'), e?.message || t('payments.receiptFailed'));
+        } finally {
+            setReceiptFor(null);
+        }
+    };
 
     /**
      * A receipt is dated by when the money moved, so paidAt wins and
@@ -178,9 +200,34 @@ export default function PaymentsScreen() {
                                         </Text>
                                     )}
                                 </View>
-                                <Text style={[styles.txnPrice, free && { color: '#aaaaaa' }]}>
-                                    {free ? t('payments.free') : money(price)}
-                                </Text>
+                                <View style={styles.txnRight}>
+                                    <Text style={[styles.txnPrice, free && { color: '#aaaaaa' }]}>
+                                        {free ? t('payments.free') : money(price)}
+                                    </Text>
+                                    {/* Only paid rows have a receipt. The same
+                                        PDF was emailed when the payment went
+                                        through; this is for when that email
+                                        cannot be found. */}
+                                    {!free && !!e.enrollmentId && (
+                                        <TouchableOpacity
+                                            style={styles.receiptBtn}
+                                            onPress={() => getReceipt(e.enrollmentId)}
+                                            disabled={receiptFor === e.enrollmentId}
+                                            hitSlop={8}
+                                        >
+                                            {receiptFor === e.enrollmentId ? (
+                                                <ActivityIndicator size="small" color="#7cce06" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="download-outline" size={13} color="#7cce06" />
+                                                    <Text style={styles.receiptBtnText}>
+                                                        {t('payments.receipt')}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                         );
                     })
@@ -239,6 +286,9 @@ const styles = StyleSheet.create({
     },
     txnTitle: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
     txnDate: { fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 },
+    txnRight: { alignItems: 'flex-end', gap: 6 },
+    receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    receiptBtnText: { fontSize: 11, color: '#7cce06', fontWeight: '600' },
     txnMethod: { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 3, letterSpacing: 0.4 },
     txnRef: { fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 2 },
     txnPrice: { fontSize: 15, fontWeight: '700', color: '#7cce06' },

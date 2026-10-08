@@ -451,7 +451,10 @@
         "status": {
             "refunded": "Refunded",
             "partial": "Partially paid"
-        }
+        },
+        "receipt": "Receipt",
+        "receiptFailed": "Could not fetch the receipt.",
+        "receiptNoShare": "Sharing is not available on this device."
     },
     "security": {
         "title": "Privacy",
