@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2 } from 'lucide-react';
+import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2, Lock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import {
@@ -491,6 +491,23 @@ export default function AdminMessagesPage() {
                   input itself is hidden — clicking the visible image button
                   forwards the click to it, which is the standard pattern
                   for styling file inputs in any browser. */}
+              {/* A finished group's chat is frozen, not hidden. The
+                  server refuses a send to a completed or cancelled group,
+                  so offering a composer here only produced an error after
+                  something had been typed. readOnly comes from the server
+                  for exactly that reason — the rule is not restated. The
+                  history stays visible: it is dispute evidence, and the
+                  one time anyone needs to read it is when a payment is
+                  being contested. */}
+              {selected?.readOnly ? (
+                <div className="border-t border-border p-4 flex items-center justify-center gap-2 text-sm text-muted">
+                  <Lock className="w-4 h-4" />
+                  <span>
+                    This group has {selected?.groupStatus === 'cancelled' ? 'been cancelled' : 'finished'} —
+                    the conversation is read-only.
+                  </span>
+                </div>
+              ) : (
               <div className="border-t border-border p-3 flex items-end gap-2">
                 {/* Hidden native file input */}
                 <input
@@ -539,6 +556,7 @@ export default function AdminMessagesPage() {
                   <Send className="w-4 h-4" />
                 </button>
               </div>
+              )}
             </>
           )}
         </div>

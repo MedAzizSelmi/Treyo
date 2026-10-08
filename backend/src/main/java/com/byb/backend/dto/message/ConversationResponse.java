@@ -32,6 +32,20 @@ public class ConversationResponse {
     // 1-to-1 conversation view.
     private Boolean isGroup;
     private String groupId;
+
+    /** forming, ready, active, completed, cancelled. Groups only. */
+    private String groupStatus;
+
+    /**
+     * Whether the chat still accepts messages.
+     *
+     * Derived server-side on purpose. sendGroupMessage refuses a group
+     * that has completed or been cancelled, and a client that worked
+     * that rule out for itself would eventually disagree with the
+     * server — showing a composer that only fails once something has
+     * been typed, which is exactly what the dashboard was doing.
+     */
+    private Boolean readOnly;
     private String courseTitle;   // shown as the conversation subtitle
     private Integer memberCount;  // students + trainer (admins not counted in the visible total)
 }

@@ -352,9 +352,7 @@ public class MessageService {
         // groupStatus to "completed"). Read access stays open — the
         // chat history doesn't disappear, but no new messages can be
         // added.
-        String status = group.getGroupStatus();
-        if (Boolean.FALSE.equals(group.getIsActive())
-                || (status != null && (status.equalsIgnoreCase("completed") || status.equalsIgnoreCase("cancelled")))) {
+        if (isGroupReadOnly(group)) {
             throw new IllegalStateException("This group has ended — chat is read-only");
         }
 
@@ -620,9 +618,29 @@ public class MessageService {
                 .isOnline(false)
                 .isGroup(true)
                 .groupId(group.getGroupId())
+                .groupStatus(group.getGroupStatus())
+                // The same condition sendGroupMessage refuses on, so the
+                // client never offers a composer the server will reject.
+                .readOnly(isGroupReadOnly(group))
                 .courseTitle(courseTitle)
                 .memberCount(memberCount)
                 .build();
+    }
+
+    /**
+     * Whether a group's chat has closed to new messages.
+     *
+     * One definition, used both to refuse a send and to tell clients
+     * what to render. Read access deliberately stays open: the history
+     * is evidence — a learner contesting a payment is exactly when
+     * someone needs to read what was said — so it is never hidden, only
+     * frozen.
+     */
+    private boolean isGroupReadOnly(Group group) {
+        if (Boolean.FALSE.equals(group.getIsActive())) return true;
+        String status = group.getGroupStatus();
+        return status != null
+                && (status.equalsIgnoreCase("completed") || status.equalsIgnoreCase("cancelled"));
     }
 
     // ============================================
