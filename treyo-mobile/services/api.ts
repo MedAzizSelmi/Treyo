@@ -159,6 +159,22 @@ export async function fetchUpload(path: string, formData: FormData): Promise<any
 // ══════════════════════════════════════════════
 // Auth Services
 // ══════════════════════════════════════════════
+/**
+ * Open the realtime socket after a session is established.
+ *
+ * The root layout connects at app start, but that effect has already run
+ * by the time someone signs in, so without this the socket would not come
+ * up until a chat screen mounted and connected it lazily.
+ */
+async function connectRealtimeQuietly() {
+    try {
+        const { connectRealtime } = await import('./realtime');
+        await connectRealtime();
+    } catch (_) {
+        // Realtime is a supplement; every screen still works over REST.
+    }
+}
+
 export const authService = {
     login: async (email: string, password: string) => {
         const response = await api.post('/auth/login', { email, password });
@@ -177,6 +193,7 @@ export const authService = {
                 onboardingComplete: response.data.onboardingComplete,
             };
             await SecureStore.setItemAsync('user_data', JSON.stringify(userData));
+            connectRealtimeQuietly();
         }
         return response.data;
     },
@@ -220,6 +237,7 @@ export const authService = {
                 role: data.role,
                 onboardingComplete: data.onboardingComplete,
             }));
+            connectRealtimeQuietly();
         }
         return data;
     },
@@ -255,6 +273,7 @@ export const authService = {
                 role: data.role,
                 onboardingComplete: data.onboardingComplete,
             }));
+            connectRealtimeQuietly();
         }
         return data;
     },
@@ -299,6 +318,11 @@ export const authService = {
         try {
             const { unregisterCurrentDevice } = await import('./push');
             await unregisterCurrentDevice();
+            // Drop the socket as well, or it keeps delivering the
+            // previous account's messages to the next person to sign in
+            // on this device.
+            const { disconnectRealtime } = await import('./realtime');
+            await disconnectRealtime();
         } catch (_) {}
         await SecureStore.deleteItemAsync('jwt_token');
         await SecureStore.deleteItemAsync('refresh_token');

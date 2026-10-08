@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
@@ -15,6 +15,7 @@ export default function MessagesScreen() {
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
     const [conversations, setConversations] = useState<any[]>([]);
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
@@ -71,6 +72,22 @@ export default function MessagesScreen() {
         return `${days}d ago`;
     };
 
+    /**
+     * Filtered on the name and the last message, so searching finds a
+     * conversation either by who it is with or by what was said. Matching
+     * is case-insensitive and done here rather than on the server: the
+     * list is already loaded, and a round trip per keystroke would be
+     * slower than filtering a few dozen rows.
+     */
+    const visibleConversations = conversations.filter((conv: any) => {
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        return `${conv.otherUserName ?? ''} ${conv.lastMessage ?? ''} ${conv.courseTitle ?? ''}`
+            .toLowerCase()
+            .includes(q);
+    });
+
+
     return (
         <ScreenBackground>
             <ScrollView
@@ -104,20 +121,36 @@ export default function MessagesScreen() {
                 <Text style={styles.pageSubtitle}>{t('messages.tapToOpen')}</Text>
 
                 {/* ── Search bar ── */}
-                <TouchableOpacity style={styles.searchBar} activeOpacity={0.7}>
+                {/* A real input. This was a TouchableOpacity wrapping
+                    static Text — it looked like a search bar, focused
+                    nothing and filtered nothing. */}
+                <View style={styles.searchBar}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                     <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.4)" />
-                    <Text style={styles.searchPlaceholder}>Search conversations...</Text>
-                </TouchableOpacity>
+                    <TextInput
+                        style={styles.searchInput}
+                        value={search}
+                        onChangeText={setSearch}
+                        placeholder="Search conversations..."
+                        placeholderTextColor="rgba(255,255,255,0.35)"
+                        autoCorrect={false}
+                        returnKeyType="search"
+                    />
+                    {search.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                            <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.4)" />
+                        </TouchableOpacity>
+                    )}
+                </View>
 
                 {/* ── Conversations ── */}
                 {loading ? (
                     <View style={{ paddingTop: 60, alignItems: 'center' }}>
                         <ActivityIndicator size="large" color="#7cce06" />
                     </View>
-                ) : conversations.length > 0 ? (
+                ) : visibleConversations.length > 0 ? (
                     <View style={styles.listWrap}>
-                        {conversations.map((conv: any, index: number) => {
+                        {visibleConversations.map((conv: any, index: number) => {
                             // Backend now flags group conversations with isGroup=true.
                             // We use a different avatar (people icon) and route taps
                             // to the dedicated /group-chat screen.
@@ -129,13 +162,24 @@ export default function MessagesScreen() {
                                         params: { groupId: conv.groupId, groupName: conv.otherUserName || '' },
                                     });
                                 }
-                                // DM taps are intentionally a no-op for now — the
-                                // 1-to-1 chat screen isn't wired up yet (separate concern).
+                                // Direct message: open the 1-to-1 chat. The
+                                // conversation id goes along so the screen can
+                                // clear this conversation's unread badge.
+                                else if (conv.otherUserId) {
+                                    router.push({
+                                        pathname: '/chat' as any,
+                                        params: {
+                                            userId: conv.otherUserId,
+                                            userName: conv.otherUserName || '',
+                                            conversationId: conv.conversationId || '',
+                                        },
+                                    });
+                                }
                             };
                             return (
                                 <TouchableOpacity
                                     key={conv.conversationId || index}
-                                    style={[styles.convCard, index < conversations.length - 1 && styles.convCardBorder]}
+                                    style={[styles.convCard, index < visibleConversations.length - 1 && styles.convCardBorder]}
                                     activeOpacity={0.7}
                                     onPress={onPress}
                                 >
@@ -227,6 +271,7 @@ const styles = StyleSheet.create({
     pageSubtitle: { fontSize: 15, color: '#aaaaaa', marginBottom: 20 },
     searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 16, paddingVertical: 14, marginBottom: 20 },
     searchPlaceholder: { fontSize: 14, color: 'rgba(255,255,255,0.35)' },
+    searchInput: { flex: 1, color: '#ffffff', fontSize: 14, padding: 0 },
     listWrap: { borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
     convCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: 'rgba(255,255,255,0.03)' },
     convCardBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },

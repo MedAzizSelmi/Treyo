@@ -7,6 +7,7 @@ import OnboardingCarousel from '../components/splash-screens/Onboardingcarousel'
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { configureNotifications, registerForPushNotifications } from '../services/push';
+import { connectRealtime } from '../services/realtime';
 import { authService } from '../services/api';
 import { initI18n } from '../i18n';
 import NetworkBanner from '../components/NetworkBanner';
@@ -44,6 +45,10 @@ export default function RootLayout() {
                 const user = await authService.getCurrentUser();
                 if (user?.userId) {
                     registerForPushNotifications(user.userId, user.role || user.userType).catch(() => {});
+                    // One socket for the whole app. Chat screens attach
+                    // listeners to it rather than opening their own, so
+                    // navigating between conversations does not reconnect.
+                    connectRealtime().catch(() => {});
                 }
             } catch (_) {}
         })();

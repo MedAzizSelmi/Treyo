@@ -12,13 +12,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { useTranslation } from 'react-i18next';
 import { authService, messageService, groupService, fetchUpload, API_BASE_URL } from '../services/api';
+import { onRealtime, isRealtimeConnected } from '../services/realtime';
 
 // How often we re-fetch the message list while the chat is open. 4s matches
 // the admin dashboard's cadence — frequent enough that a reply lands within
 // a heartbeat without hammering the API. Mirror updates to the admin side
 // if you change this. Polling is paused while a send is in flight to avoid
 // a race that briefly removes the optimistic bubble before the GET catches up.
-const POLL_INTERVAL_MS = 4000;
+// Only used when the socket is down; messages arrive over STOMP now, so
+// this no longer needs to be tight enough to feel live.
+const POLL_INTERVAL_MS = 10000;
 
 /**
  * Group chat screen.
@@ -181,12 +184,29 @@ export default function GroupChatScreen() {
     // it without re-arming every time sending toggles.
     const sendingRef = useRef(sending);
     sendingRef.current = sending;
+
+    // Live group messages. The server pushes to each member's own
+    // destination, so anything arriving here is addressed to this
+    // account — only the group has to be checked.
+    useEffect(() => {
+        if (!groupId) return;
+        return onRealtime('group-messages', (msg: any) => {
+            if (!msg || String(msg.groupId) !== String(groupId)) return;
+            if (sendingRef.current) return;
+            load(true);
+        });
+    }, [groupId, load]);
+
+    // A slow poll kept as a safety net, not as the delivery mechanism.
+    // The socket drops on a tunnel, a backgrounded app or a changed
+    // network, and a chat that silently stops updating is worse than one
+    // that occasionally refreshes a beat late. This used to run every
+    // few seconds as the only path; now it is the fallback.
     useEffect(() => {
         if (!groupId) return;
         const id = setInterval(() => {
-            // Don't reconcile mid-send — the optimistic bubble would briefly
-            // disappear if the GET landed before our POST round-trip finished.
             if (sendingRef.current) return;
+            if (isRealtimeConnected()) return;
             load(true);
         }, POLL_INTERVAL_MS);
         return () => clearInterval(id);
