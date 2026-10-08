@@ -311,6 +311,21 @@ export const authService = {
         return response.data;
     },
 
+    /**
+     * End every session on this account, on every device.
+     *
+     * Tokens are stateless, so nothing issued could previously be taken
+     * back — a lost phone stayed signed in for the refresh token's 30
+     * days. The server marks a revocation point and refuses anything
+     * older; this device is signed out locally straight after, since its
+     * own tokens are now among the refused.
+     */
+    signOutEverywhere: async () => {
+        const response = await api.post('/account/sign-out-everywhere', {});
+        await authService.logout();
+        return response.data;
+    },
+
     logout: async () => {
         // Drop the push token first so the next account on this device
         // doesn't keep getting the previous user's notifications. Lazy

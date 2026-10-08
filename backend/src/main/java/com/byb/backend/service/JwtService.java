@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.security.Key;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -100,6 +102,21 @@ public class JwtService {
     /** The {@code type} claim, or null on an ordinary access token. */
     public String extractType(String token) {
         return extractClaim(token, claims -> claims.get("type", String.class));
+    }
+
+    /**
+     * When this token was issued, for revocation checks.
+     *
+     * The JWT {@code iat} claim has second granularity, which is why
+     * tokensValidFrom is stored truncated to the second: comparing a
+     * whole-second issue time against a sub-second cut-off would refuse a
+     * token minted in the very same second it was set.
+     */
+    public LocalDateTime extractIssuedAt(String token) {
+        Date issuedAt = extractClaim(token, Claims::getIssuedAt);
+        return issuedAt == null
+                ? null
+                : LocalDateTime.ofInstant(issuedAt.toInstant(), ZoneId.systemDefault());
     }
 
     /** True only for an unexpired token minted by the method above. */

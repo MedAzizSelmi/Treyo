@@ -64,6 +64,34 @@ public class AccountController {
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
     }
 
+    /**
+     * End every session on this account, including the current one.
+     *
+     * The remedy that did not exist: refresh tokens live 30 days and
+     * nothing could be taken back, so a stolen phone stayed signed in for
+     * a month and changing the password did not help.
+     *
+     * No password is asked for, deliberately. This only ever reduces
+     * access — someone who has hold of a session gains nothing by
+     * triggering it, since it signs them out too — and the moment a
+     * person reaches for it is the moment they are least able to recall
+     * a password calmly.
+     *
+     * Access tokens are not re-checked per request, so another device may
+     * keep reading for up to the access token's lifetime (an hour) before
+     * its refresh is refused. The app says so rather than implying the
+     * cut is instant.
+     */
+    @PostMapping("/sign-out-everywhere")
+    @Operation(summary = "Invalidate every token issued for this account")
+    public ResponseEntity<?> signOutEverywhere(Authentication authentication) {
+        String email = authentication.getName();
+        authService.revokeAllSessions(email);
+        return ResponseEntity.ok(Map.of(
+                "status", "revoked",
+                "message", "All devices have been signed out."));
+    }
+
     @DeleteMapping
     @Operation(summary = "Delete the signed-in user's own account")
     public ResponseEntity<?> deleteOwnAccount(@RequestBody Map<String, String> body) {

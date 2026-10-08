@@ -471,9 +471,6 @@
         "authenticatorOn": "Un code vous sera demandé à chaque connexion",
         "authenticatorOff": "Ajoutez une deuxième étape avec une application d'authentification",
         "activeSessions": "SESSIONS ACTIVES",
-        "thisDevice": "Cet appareil",
-        "activeNow": "Actif maintenant",
-        "current": "Actuel",
         "tip": "Conseil : ne réutilisez jamais le même mot de passe. Pensez à un gestionnaire comme 1Password, Bitwarden ou celui de votre navigateur.",
         "strengthWeak": "Faible",
         "strengthFair": "Moyen",
@@ -490,7 +487,10 @@
         "updated": "Mot de passe mis à jour",
         "updatedBody": "Votre mot de passe a été changé avec succès.",
         "updateFailed": "Échec de la mise à jour",
-        "updateFailedBody": "Impossible de changer le mot de passe. Réessayez."
+        "updateFailedBody": "Impossible de changer le mot de passe. Réessayez.",
+        "signOutEverywhere": "Déconnecter tous les appareils",
+        "signOutEverywhereBody": "Se déconnecter de Treyo sur tous les appareils, y compris celui-ci",
+        "signOutEverywhereConfirm": "Tous les appareils seront déconnectés, y compris celui-ci. Les autres appareils peuvent rester connectés jusqu'à une heure avant d'être coupés."
     },
     "feed": {
         "title": "Actualité du jour",

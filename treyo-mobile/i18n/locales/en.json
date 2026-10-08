@@ -471,9 +471,6 @@
         "authenticatorOn": "You'll be asked for a code every time you sign in",
         "authenticatorOff": "Add a second step with an authenticator app",
         "activeSessions": "ACTIVE SESSIONS",
-        "thisDevice": "This device",
-        "activeNow": "Active now",
-        "current": "Current",
         "tip": "Tip: never reuse passwords across services. Consider a password manager like 1Password, Bitwarden, or your browser's built-in vault.",
         "strengthWeak": "Weak",
         "strengthFair": "Fair",
@@ -490,7 +487,10 @@
         "updated": "Password updated",
         "updatedBody": "Your password has been changed successfully.",
         "updateFailed": "Failed to update password",
-        "updateFailedBody": "Could not change password. Please try again."
+        "updateFailedBody": "Could not change password. Please try again.",
+        "signOutEverywhere": "Sign out everywhere",
+        "signOutEverywhereBody": "Sign out of Treyo on every device, including this one",
+        "signOutEverywhereConfirm": "Every device will be signed out, including this one. Other devices may stay signed in for up to an hour before they are cut off."
     },
     "feed": {
         "title": "Daily Feed",

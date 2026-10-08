@@ -96,6 +96,17 @@ public class Student extends BaseEntity {
     @Column(name = "is_verified")
     private Boolean isVerified = false;
 
+    /**
+     * Tokens issued before this instant are refused.
+     *
+     * Stateless JWT means nothing issued can normally be taken back, and
+     * refresh tokens last 30 days. This is the revocation point: signing
+     * out everywhere sets it, and so does changing the password. NULL
+     * means nothing has ever been revoked.
+     */
+    @Column(name = "tokens_valid_from")
+    private LocalDateTime tokensValidFrom;
+
     // ── Two-factor authentication (TOTP) ──
     // The secret is a credential in its own right: anyone holding it can
     // mint valid codes, so it leaves the server only during setup, before

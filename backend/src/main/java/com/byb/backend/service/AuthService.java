@@ -20,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -203,6 +206,68 @@ public class AuthService {
                 .role(Role.TRAINER)
                 .onboardingComplete(trainer.isProfileComplete())
                 .build();
+    }
+
+    /**
+     * Invalidate every token this account currently holds.
+     *
+     * The cheap half of a sessions table: one timestamp, and anything
+     * issued before it stops working. Used by "sign out everywhere" and
+     * by a password change, which previously left a thief's session
+     * untouched — the hash changed and their token kept working.
+     *
+     * Truncated to the second because the JWT `iat` claim has no finer
+     * resolution. A sub-second value would reject the token handed out by
+     * the very login that follows this call.
+     */
+    @Transactional
+    public void revokeAllSessions(String email) {
+        LocalDateTime cutoff = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        var student = studentRepository.findByEmail(email).orElse(null);
+        if (student != null) {
+            student.setTokensValidFrom(cutoff);
+            studentRepository.save(student);
+        }
+        var trainer = trainerRepository.findByEmail(email).orElse(null);
+        if (trainer != null) {
+            trainer.setTokensValidFrom(cutoff);
+            trainerRepository.save(trainer);
+        }
+        // An email can exist in more than one table — a learner promoted
+        // to administrator keeps their original row — so every match is
+        // revoked rather than the first one found.
+        var admin = adminRepository.findByEmail(email).orElse(null);
+        if (admin != null) {
+            admin.setTokensValidFrom(cutoff);
+            adminRepository.save(admin);
+        }
+        log.info("All sessions revoked for {}", email);
+    }
+
+    /** True if this token predates the account's revocation point. */
+    private boolean isRevoked(String email, String token) {
+        LocalDateTime issuedAt = jwtService.extractIssuedAt(token);
+        if (issuedAt == null) {
+            // No `iat` means a token this application did not mint in its
+            // current form. Refusing is the safe reading.
+            return true;
+        }
+        for (LocalDateTime validFrom : revocationPoints(email)) {
+            if (validFrom != null && issuedAt.isBefore(validFrom)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Every revocation point for this address, across account types. */
+    private List<LocalDateTime> revocationPoints(String email) {
+        List<LocalDateTime> points = new ArrayList<>(3);
+        studentRepository.findByEmail(email).ifPresent(s -> points.add(s.getTokensValidFrom()));
+        trainerRepository.findByEmail(email).ifPresent(t -> points.add(t.getTokensValidFrom()));
+        adminRepository.findByEmail(email).ifPresent(a -> points.add(a.getTokensValidFrom()));
+        return points;
     }
 
     /**
@@ -535,6 +600,16 @@ public class AuthService {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
+        // Revocation. This is the choke point: a refresh token lives 30
+        // days, so without a check here a stolen session simply could not
+        // be ended. Access tokens are not checked per request — the
+        // filter is deliberately lookup-free — so a revoked session can
+        // still read for up to the access token's hour before its refresh
+        // is refused here and the client is signed out.
+        if (isRevoked(email, refreshToken)) {
+            throw new BadCredentialsException("Session has been signed out");
+        }
+
         String role = jwtService.extractRole(refreshToken);
 
         // Resolve the account, preferring the role recorded in the token so
@@ -596,7 +671,22 @@ public class AuthService {
     }
 
     @Transactional
+    /**
+     * Change a password, then end every session it protected.
+     *
+     * A password change is usually a reaction to losing control of the
+     * account; leaving the existing tokens alive would let whoever
+     * prompted it carry on for another 30 days. The work is delegated so
+     * the revocation happens once, on the way out — the branch-by-branch
+     * version below returns from six different places and one of them
+     * would eventually be missed.
+     */
     public void changePassword(String email, String role, String currentPassword, String newPassword) {
+        applyPasswordChange(email, role, currentPassword, newPassword);
+        revokeAllSessions(email);
+    }
+
+    private void applyPasswordChange(String email, String role, String currentPassword, String newPassword) {
         // Role-first, because one email can exist in more than one table:
         // promoting a student/trainer to admin creates an Admin row and
         // leaves the original intact. Scanning student-then-trainer-then-

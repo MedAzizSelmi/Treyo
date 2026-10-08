@@ -471,9 +471,6 @@
         "authenticatorOn": "Se te pedirá un código cada vez que inicies sesión",
         "authenticatorOff": "Añade un segundo paso con una aplicación de autenticación",
         "activeSessions": "SESIONES ACTIVAS",
-        "thisDevice": "Este dispositivo",
-        "activeNow": "Activo ahora",
-        "current": "Actual",
         "tip": "Consejo: no reutilices contraseñas. Considera un gestor como 1Password, Bitwarden o el integrado en tu navegador.",
         "strengthWeak": "Débil",
         "strengthFair": "Aceptable",
@@ -490,7 +487,10 @@
         "updated": "Contraseña actualizada",
         "updatedBody": "Tu contraseña se cambió correctamente.",
         "updateFailed": "Error al actualizar",
-        "updateFailedBody": "No se pudo cambiar la contraseña. Inténtalo de nuevo."
+        "updateFailedBody": "No se pudo cambiar la contraseña. Inténtalo de nuevo.",
+        "signOutEverywhere": "Cerrar sesión en todos los dispositivos",
+        "signOutEverywhereBody": "Cerrar sesión en Treyo en todos los dispositivos, incluido este",
+        "signOutEverywhereConfirm": "Se cerrará la sesión en todos los dispositivos, incluido este. Los demás pueden seguir conectados hasta una hora antes de ser desconectados."
     },
     "feed": {
         "title": "Feed del día",

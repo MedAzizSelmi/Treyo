@@ -27,6 +27,7 @@ export default function SecuritySettingsScreen() {
     const [twoFaOn, setTwoFaOn] = useState(false);
     const [recoveryLeft, setRecoveryLeft] = useState(0);
     const [twoFaLoading, setTwoFaLoading] = useState(true);
+    const [signingOut, setSigningOut] = useState(false);
 
     const loadTwoFa = useCallback(async () => {
         try {
@@ -110,6 +111,40 @@ export default function SecuritySettingsScreen() {
      */
     const promptDisable = () => {
         router.push('/two-factor-disable' as any);
+    };
+
+    /**
+     * Ends every session, this device included — there is no way to keep
+     * the current one, since the server revokes by time rather than by
+     * device. Confirmed first, because it logs the user out of the app
+     * they are standing in.
+     */
+    const handleSignOutEverywhere = () => {
+        Alert.alert(
+            t('security.signOutEverywhere'),
+            t('security.signOutEverywhereConfirm'),
+            [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                    text: t('security.signOutEverywhere'),
+                    style: 'destructive',
+                    onPress: async () => {
+                        setSigningOut(true);
+                        try {
+                            await authService.signOutEverywhere();
+                            router.replace('/' as any);
+                        } catch (e: any) {
+                            Alert.alert(
+                                t('common.error'),
+                                e?.response?.data?.message || t('security.updateFailedBody'),
+                            );
+                        } finally {
+                            setSigningOut(false);
+                        }
+                    },
+                },
+            ],
+        );
     };
 
     return (
@@ -218,18 +253,31 @@ export default function SecuritySettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── Active sessions placeholder ── */}
+                {/* ── Sessions ──
+                    This was a hardcoded "This device — Active now" row
+                    pretending to be a device list. Nothing tracked
+                    sessions, so it could not have been real.
+
+                    What the server can honestly offer is revocation: a
+                    cut-off after which every existing token is refused.
+                    It cannot name the devices, so neither does this. */}
                 <Text style={styles.sectionLabel}>{t('security.activeSessions')}</Text>
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                    <View style={styles.sessionRow}>
-                        <View style={styles.sessionDot} />
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.sessionTitle}>{t('security.thisDevice')}</Text>
-                            <Text style={styles.sessionSubtitle}>{t('security.activeNow')}</Text>
+                    <TouchableOpacity style={styles.sessionRow} onPress={handleSignOutEverywhere}>
+                        <View style={styles.twoFaIconWrap}>
+                            <Ionicons name="log-out-outline" size={22} color="#ff6b6b" />
                         </View>
-                        <Text style={styles.sessionTag}>{t('security.current')}</Text>
-                    </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.sessionTitle}>{t('security.signOutEverywhere')}</Text>
+                            <Text style={styles.sessionSubtitle}>
+                                {t('security.signOutEverywhereBody')}
+                            </Text>
+                        </View>
+                        {signingOut
+                            ? <ActivityIndicator color="#ff6b6b" />
+                            : <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.3)" />}
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.tipWrap}>
@@ -337,14 +385,8 @@ const styles = StyleSheet.create({
     twoFaSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2, lineHeight: 17 },
 
     sessionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
-    sessionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7cce06' },
     sessionTitle: { fontSize: 14, fontWeight: '600', color: '#ffffff' },
     sessionSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-    sessionTag: {
-        fontSize: 11, fontWeight: '700', color: '#7cce06',
-        backgroundColor: 'rgba(124,206,6,0.12)',
-        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
-    },
 
     dangerRow: {
         flexDirection: 'row', alignItems: 'center', gap: 12,
