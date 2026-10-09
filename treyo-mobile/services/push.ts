@@ -43,8 +43,8 @@ const IS_EXPO_GO = (Constants as any)?.appOwnership === 'expo';
  */
 
 /**
- * The conversation currently on screen, as "dm:<userId>" or
- * "group:<groupId>", or null when none is.
+ * The group chat currently on screen, as "group:<groupId>", or null
+ * when none is.
  *
  * A module-level variable rather than React state because the consumer
  * is setNotificationHandler, which is itself registered at module load
@@ -58,10 +58,6 @@ export function setActiveConversation(key: string | null) {
     activeConversation = key;
 }
 
-export function conversationKeyForDirect(userId: string) {
-    return `dm:${userId}`;
-}
-
 export function conversationKeyForGroup(groupId: string) {
     return `group:${groupId}`;
 }
@@ -69,15 +65,10 @@ export function conversationKeyForGroup(groupId: string) {
 /**
  * Which conversation, if any, a push belongs to.
  *
- * Mirrors the payloads MessageService builds: direct messages carry
- * senderId — the other party, from the recipient's side — and group
- * messages carry groupId.
+ * Mirrors the payload MessageService builds for a group message.
  */
 function conversationOf(data: any): string | null {
     if (!data) return null;
-    if (data.type === 'direct_message' && data.senderId) {
-        return conversationKeyForDirect(String(data.senderId));
-    }
     if (data.type === 'group_message' && data.groupId) {
         return conversationKeyForGroup(String(data.groupId));
     }

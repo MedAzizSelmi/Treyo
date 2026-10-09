@@ -158,33 +158,18 @@ export function isRealtimeConnected(): boolean {
 }
 
 /**
- * Send a direct message over the socket.
+ * Tell a group that we are typing. Best-effort, never awaited.
  *
- * Returns false when the socket is not up, so the caller can fall back
- * to the REST endpoint rather than silently losing what was typed. The
- * server sets the sender from the authenticated session either way —
- * senderId is not ours to choose.
+ * Throttled by the caller rather than here: this fires from an onChange
+ * handler, and one frame per keystroke would be forty frames for a
+ * short message.
  */
-export function publishDirectMessage(receiverId: string, content: string): boolean {
-    if (!client || !connected) return false;
-    try {
-        client.publish({
-            destination: '/app/chat',
-            body: JSON.stringify({ receiverId, content, messageType: 'text' }),
-        });
-        return true;
-    } catch (_) {
-        return false;
-    }
-}
-
-/** Tell the other party we are typing. Best-effort, never awaited. */
-export function publishTyping(receiverId: string): void {
+export function publishTyping(groupId: string): void {
     if (!client || !connected) return;
     try {
         client.publish({
             destination: '/app/typing',
-            body: JSON.stringify({ receiverId }),
+            body: JSON.stringify({ groupId }),
         });
     } catch (_) {}
 }

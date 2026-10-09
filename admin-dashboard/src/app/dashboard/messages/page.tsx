@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2, Lock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { connectRealtime, onRealtime, isRealtimeConnected } from '@/lib/realtime';
 import {
   getAdminConversations,
   getGroupMessages,
@@ -28,8 +29,12 @@ import {
  * pane takes over the screen and the list is dismissed.
  */
 
-const POLL_MS = 4000; // refresh open chat every 4s
-const CONV_POLL_MS = 15000; // refresh conv list every 15s (less critical)
+// Fallbacks only. Messages arrive over STOMP now and these are skipped
+// entirely while the socket is up — they cover a dropped connection,
+// where a moderation screen that silently stops updating is worse than
+// one a beat behind.
+const POLL_MS = 15000;
+const CONV_POLL_MS = 30000;
 
 export default function AdminMessagesPage() {
   const [adminId, setAdminId] = useState<string | null>(null);
@@ -40,6 +45,14 @@ export default function AdminMessagesPage() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  const [typingName, setTypingName] = useState('');
+
+  // The socket handlers are registered once; these let them read the
+  // current selection and loader without tearing the subscription down
+  // and rebuilding it every time an admin clicks a different group.
+  const selectedRef = useRef<any | null>(null);
+  const loadMessagesRef = useRef<(() => void) | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Resolve "who is logged in" once on mount ─────────────────────
   useEffect(() => {
@@ -67,9 +80,47 @@ export default function AdminMessagesPage() {
   useEffect(() => {
     if (!adminId) return;
     loadConversations();
-    const id = setInterval(loadConversations, CONV_POLL_MS);
+    const id = setInterval(() => {
+      if (isRealtimeConnected()) return;
+      loadConversations();
+    }, CONV_POLL_MS);
     return () => clearInterval(id);
   }, [adminId, loadConversations]);
+
+  // Live group messages. The backend fans every one out to each
+  // member's own destination and counts administrators as members, so
+  // these frames were already arriving — nothing was listening.
+  useEffect(() => {
+    if (!adminId) return;
+    connectRealtime();
+    const off = onRealtime('group-messages', (msg: any) => {
+      // The list always moves: a message in any group changes its
+      // preview and its ordering.
+      loadConversations();
+      if (selectedRef.current?.groupId && msg?.groupId === selectedRef.current.groupId) {
+        loadMessagesRef.current?.();
+      }
+    });
+    return off;
+  }, [adminId, loadConversations]);
+
+  // Someone in the open group is typing.
+  useEffect(() => {
+    if (!adminId) return;
+    const off = onRealtime('typing', (payload: any) => {
+      if (!payload?.senderId) return;
+      if (payload.groupId !== selectedRef.current?.groupId) return;
+      const name = String(payload.senderName || '').trim();
+      setTypingName(name);
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      // No "stopped typing" frame exists by design, so it expires here.
+      typingTimer.current = setTimeout(() => setTypingName(''), 4000);
+    });
+    return () => {
+      off();
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+    };
+  }, [adminId]);
 
   // ── Selected conversation: load + poll ──────────────────────────
   const loadMessages = useCallback(async () => {
@@ -82,12 +133,18 @@ export default function AdminMessagesPage() {
     }
   }, [selected, adminId]);
 
+  selectedRef.current = selected;
+  loadMessagesRef.current = loadMessages;
+
   // First load = show spinner; subsequent polls = silent refresh.
   useEffect(() => {
     if (!selected) return;
     setChatLoading(true);
     loadMessages().finally(() => setChatLoading(false));
-    const id = setInterval(loadMessages, POLL_MS);
+    const id = setInterval(() => {
+      if (isRealtimeConnected()) return;
+      loadMessages();
+    }, POLL_MS);
     return () => clearInterval(id);
   }, [selected, loadMessages]);
 
@@ -298,9 +355,16 @@ export default function AdminMessagesPage() {
                   <p className="text-sm font-semibold text-white truncate">
                     {selected.otherUserName}
                   </p>
-                  <p className="text-[11px] text-muted">
-                    {selected.memberCount} members · {selected.courseTitle}
-                  </p>
+                  {/* Replaces the member count while someone is typing
+                      rather than adding a line, so the message list does
+                      not shift down and back every few seconds. */}
+                  {typingName ? (
+                    <p className="text-[11px] text-accent truncate">{typingName} is typing…</p>
+                  ) : (
+                    <p className="text-[11px] text-muted">
+                      {selected.memberCount} members · {selected.courseTitle}
+                    </p>
+                  )}
                 </div>
               </div>
 

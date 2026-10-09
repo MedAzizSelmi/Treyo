@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { useTranslation } from 'react-i18next';
 import { authService, messageService, groupService, fetchUpload, API_BASE_URL } from '../services/api';
-import { onRealtime, isRealtimeConnected } from '../services/realtime';
+import { onRealtime, isRealtimeConnected, publishTyping } from '../services/realtime';
 import { setActiveConversation, conversationKeyForGroup } from '../services/push';
 
 // Fallback only. Messages arrive over STOMP now, and this interval is
@@ -49,6 +49,9 @@ export default function GroupChatScreen() {
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [draft, setDraft] = useState('');
+    // Names of people currently typing, keyed by sender so two
+    // people typing at once do not overwrite each other.
+    const [typingNames, setTypingNames] = useState<Record<string, string>>({});
     const [error, setError] = useState<string | null>(null);
     // True while we're uploading a picked image to the backend. The
     // composer's send button shows a spinner during this so the user
@@ -169,6 +172,63 @@ export default function GroupChatScreen() {
 
     // First load shows the spinner + scrolls to the bottom of history.
     useEffect(() => { load(); }, [load]);
+
+    /**
+     * "Salma is typing…", "Salma and Karim are typing…", or
+     * "3 people are typing…" past two — naming everyone in a group of
+     * twenty would be a paragraph in the header.
+     */
+    const typingLabel = (() => {
+        const names = Object.values(typingNames).filter(Boolean);
+        if (names.length === 0) return '';
+        if (names.length === 1) return `${names[0]} is typing…`;
+        if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+        return `${names.length} people are typing…`;
+    })();
+
+    // Who is typing. Each frame refreshes that person's expiry: the
+    // server never sends a "stopped typing", deliberately, so the
+    // indicator has to time itself out or it would stick forever when
+    // someone closes the app mid-sentence.
+    const typingTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+    useEffect(() => {
+        if (!groupId) return;
+        const off = onRealtime('typing', (payload: any) => {
+            if (!payload?.senderId || String(payload.groupId) !== String(groupId)) return;
+            const id = String(payload.senderId);
+            const name = String(payload.senderName || '').trim();
+            setTypingNames(prev => ({ ...prev, [id]: name }));
+
+            if (typingTimers.current[id]) clearTimeout(typingTimers.current[id]);
+            typingTimers.current[id] = setTimeout(() => {
+                setTypingNames(prev => {
+                    const next = { ...prev };
+                    delete next[id];
+                    return next;
+                });
+                delete typingTimers.current[id];
+            }, 4000);
+        });
+        return () => {
+            off();
+            Object.values(typingTimers.current).forEach(clearTimeout);
+            typingTimers.current = {};
+        };
+    }, [groupId]);
+
+    // Announce our own typing, at most once every few seconds. The
+    // handler fires per keystroke, and one frame per character would be
+    // forty frames for a short message — all of them saying the same
+    // thing, and each fanned out to every member.
+    const lastTypingSent = useRef(0);
+    const onChangeDraft = useCallback((text: string) => {
+        setDraft(text);
+        if (!groupId || !text) return;
+        const now = Date.now();
+        if (now - lastTypingSent.current < 2500) return;
+        lastTypingSent.current = now;
+        publishTyping(String(groupId));
+    }, [groupId]);
 
     // Same as the direct chat: suppress banners for the group being
     // read. In a busy group this is the difference between a readable
@@ -383,9 +443,17 @@ export default function GroupChatScreen() {
                         <Text style={styles.headerTitle} numberOfLines={1}>
                             {groupName || 'Group chat'}
                         </Text>
-                        <Text style={styles.headerSubtitle}>
-                            Trainer · students · admin
-                        </Text>
+                        {/* Replaces the static subtitle while anyone is
+                            typing, rather than sitting beside it — two
+                            lines of chrome under the name pushes the
+                            messages down for no gain. */}
+                        {typingLabel ? (
+                            <Text style={styles.headerTyping} numberOfLines={1}>{typingLabel}</Text>
+                        ) : (
+                            <Text style={styles.headerSubtitle}>
+                                Trainer · students · admin
+                            </Text>
+                        )}
                     </View>
                 </View>
 
@@ -667,7 +735,7 @@ export default function GroupChatScreen() {
                             placeholder={t('chat.placeholder')}
                             placeholderTextColor="rgba(255,255,255,0.35)"
                             value={draft}
-                            onChangeText={setDraft}
+                            onChangeText={onChangeDraft}
                             multiline
                             maxLength={2000}
                             editable={!sending}
@@ -744,6 +812,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: { fontSize: 16, fontWeight: '700', color: '#ffffff' },
     headerSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 },
+    headerTyping: { fontSize: 12, color: '#7cce06', marginTop: 1 },
 
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 12 },
     errorText: { fontSize: 14, color: 'rgba(255,255,255,0.6)', textAlign: 'center' },

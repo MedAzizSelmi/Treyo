@@ -112,50 +112,12 @@ public class MessageService {
         // Send via WebSocket to receiver
         sendViaWebSocket(response);
 
-        // OS-level push, as the group path already does. The socket only
-        // exists while the app is running, so without this a direct
-        // message reached nobody who had closed it — they found out
-        // whenever they next happened to open Messages. That mattered
-        // little while there was no 1-to-1 chat screen to open; it
-        // matters now that there is.
-        sendDirectMessagePush(message, senderName);
+        // Deliberately no push here. Messaging in Treyo is group-based:
+        // nothing in the app or the dashboard starts a one-to-one
+        // conversation, so notifying about one would be notifying about
+        // something no user can produce. The group path pushes.
 
         return response;
-    }
-
-    /**
-     * Notify the recipient of a direct message.
-     *
-     * Titled with the sender's name alone — a direct message has no
-     * other context to give, unlike a group where the group's name is
-     * the useful half. The payload carries enough for the tap handler
-     * to open the conversation rather than dropping the user on a list.
-     *
-     * Best-effort: a push that cannot be sent must not fail the message
-     * that has already been saved.
-     */
-    private void sendDirectMessagePush(Message message, String senderName) {
-        try {
-            boolean hasContent = message.getContent() != null && !message.getContent().isBlank();
-            String body = hasContent ? message.getContent() : "📷 Photo";
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("type", "direct_message");
-            // The other party, from the recipient's point of view — which
-            // is the sender. This is what /chat needs to open.
-            data.put("senderId", message.getSenderId());
-            data.put("senderName", senderName);
-            data.put("messageId", message.getMessageId());
-
-            pushNotificationService.sendToUser(
-                    message.getReceiverId(),
-                    senderName == null || senderName.isBlank() ? "New message" : senderName,
-                    body,
-                    data);
-        } catch (Exception e) {
-            log.warn("Direct message push not sent for {}: {}",
-                    message.getMessageId(), e.getMessage());
-        }
     }
 
     /**
@@ -337,20 +299,37 @@ public class MessageService {
     }
 
     /**
-     * Tell one person that another is typing.
+     * Tell a group's members that someone is typing.
      *
-     * Addressed to the recipient's own queue rather than broadcast, so
-     * it carries no information to anyone else. Best-effort: a dropped
-     * typing indicator is not worth an error.
+     * Addressed to each member's own destination rather than broadcast
+     * to a shared topic, so the membership rule that governs the
+     * messages governs this too. The sender is skipped, and so is
+     * anyone outside the group.
+     *
+     * Best-effort: a dropped indicator is not worth an error, and the
+     * client expires it on a timer regardless — there is deliberately
+     * no "stopped typing" frame, so none can be missed.
      */
-    public void sendTypingIndicator(String senderId, String receiverId) {
+    public void sendGroupTypingIndicator(String senderId, String groupId) {
         try {
-            messagingTemplate.convertAndSendToUser(
-                    receiverId,
-                    "/queue/typing",
-                    Map.of("senderId", senderId, "typing", true));
+            Group group = groupRepository.findById(groupId).orElse(null);
+            if (group == null || isGroupReadOnly(group)) return;
+
+            Set<String> members = resolveGroupMemberIds(group);
+            if (!members.contains(senderId)) return;
+
+            String senderName = getUserName(senderId, determineUserType(senderId));
+            Map<String, Object> payload = Map.of(
+                    "groupId", groupId,
+                    "senderId", senderId,
+                    "senderName", senderName == null ? "" : senderName);
+
+            for (String memberId : members) {
+                if (memberId.equals(senderId)) continue;
+                messagingTemplate.convertAndSendToUser(memberId, "/queue/typing", payload);
+            }
         } catch (Exception e) {
-            log.debug("Typing indicator not delivered: {}", e.getMessage());
+            log.debug("Group typing indicator not delivered: {}", e.getMessage());
         }
     }
 

@@ -61,17 +61,6 @@ export default function RootLayout() {
             try {
                 if (data.type === 'group_message' && data.groupId) {
                     router.push({ pathname: '/group-chat' as any, params: { groupId: data.groupId } });
-                } else if (data.type === 'direct_message' && data.senderId) {
-                    // Open the conversation itself. The sender is the
-                    // other party from the recipient's side, which is
-                    // whose chat /chat expects to be given.
-                    router.push({
-                        pathname: '/chat' as any,
-                        params: {
-                            userId: data.senderId,
-                            userName: data.senderName || '',
-                        },
-                    });
                 } else if (data.type) {
                     // Generic notification → drop into the notifications tab.
                     // Both student and trainer tabs have one.

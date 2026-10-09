@@ -4,6 +4,7 @@ import com.byb.backend.dto.message.ConversationResponse;
 import com.byb.backend.dto.message.MessageResponse;
 import com.byb.backend.dto.message.SendMessageRequest;
 import com.byb.backend.security.AuthenticatedUser;
+import com.byb.backend.security.StompPrincipal;
 import com.byb.backend.service.FileAccessService;
 import com.byb.backend.service.MessageService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -74,25 +75,6 @@ public class MessageController {
         return ResponseEntity.ok(messageService.sendMessage(request));
     }
 
-    /**
-     * Send over the WebSocket. Same rule, different transport: the
-     * principal is set by StompAuthChannelInterceptor at CONNECT, so a
-     * frame cannot claim a sender either.
-     */
-    @MessageMapping("/chat")
-    public void sendMessageViaWebSocket(@Payload SendMessageRequest message, Principal principal) {
-        if (!(principal instanceof AuthenticatedUser caller)) {
-            log.warn("Dropped a chat frame with no authenticated principal");
-            return;
-        }
-        if (message == null || isBlank(message.getReceiverId()) || isBlank(message.getContent())) {
-            return;
-        }
-        if (message.getReceiverId().equals(caller.getUserId())) return;
-
-        message.setSenderId(caller.getUserId());
-        messageService.sendMessage(message);
-    }
 
     /** A conversation, readable only by the two people in it. */
     @GetMapping("/conversation")
@@ -181,17 +163,18 @@ public class MessageController {
     }
 
     /**
-     * Typing indicator, delivered to the other party only.
+     * Typing indicator for a group.
      *
-     * Routed to a user destination rather than a shared topic so it
-     * reaches the recipient and nobody else.
+     * Fanned out to each member's own destination rather than a shared
+     * topic, so membership is still what decides who sees it — the
+     * service drops anyone who does not belong to the group.
      */
     @MessageMapping("/typing")
     public void handleTypingIndicator(@Payload Map<String, String> payload, Principal principal) {
-        if (!(principal instanceof AuthenticatedUser caller)) return;
-        String receiverId = payload == null ? null : payload.get("receiverId");
-        if (isBlank(receiverId)) return;
-        messageService.sendTypingIndicator(caller.getUserId(), receiverId);
+        if (!(principal instanceof StompPrincipal caller)) return;
+        String groupId = payload == null ? null : payload.get("groupId");
+        if (isBlank(groupId)) return;
+        messageService.sendGroupTypingIndicator(caller.userId(), groupId);
     }
 
     // ── Group chat ──────────────────────────────────────────────────

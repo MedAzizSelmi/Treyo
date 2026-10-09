@@ -80,6 +80,11 @@ export default function MessagesScreen() {
      * slower than filtering a few dozen rows.
      */
     const visibleConversations = conversations.filter((conv: any) => {
+        // Groups only. Messaging in Treyo is group-based — there is no
+        // way to start a one-to-one conversation and no screen to open
+        // one, so a direct-message row would be a dead tap. The admin
+        // dashboard filters the same way.
+        if (!conv.isGroup) return false;
         const q = search.trim().toLowerCase();
         if (!q) return true;
         return `${conv.otherUserName ?? ''} ${conv.lastMessage ?? ''} ${conv.courseTitle ?? ''}`
@@ -160,19 +165,6 @@ export default function MessagesScreen() {
                                     router.push({
                                         pathname: '/group-chat' as any,
                                         params: { groupId: conv.groupId, groupName: conv.otherUserName || '' },
-                                    });
-                                }
-                                // Direct message: open the 1-to-1 chat. The
-                                // conversation id goes along so the screen can
-                                // clear this conversation's unread badge.
-                                else if (conv.otherUserId) {
-                                    router.push({
-                                        pathname: '/chat' as any,
-                                        params: {
-                                            userId: conv.otherUserId,
-                                            userName: conv.otherUserName || '',
-                                            conversationId: conv.conversationId || '',
-                                        },
                                     });
                                 }
                             };
