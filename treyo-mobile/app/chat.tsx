@@ -2,12 +2,13 @@ import {
     View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity,
     ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { messageService, authService } from '../services/api';
 import { onRealtime, publishDirectMessage, publishTyping } from '../services/realtime';
+import { setActiveConversation, conversationKeyForDirect } from '../services/push';
 
 /**
  * One-to-one chat.
@@ -110,6 +111,18 @@ export default function ChatScreen() {
             if (typingTimer.current) clearTimeout(typingTimer.current);
         };
     }, [otherUserId]);
+
+    // Tell the notification handler this conversation is on screen, so
+    // a message from this person does not pop a banner over the thread
+    // being read. Cleared on blur — and on unmount, since a stale value
+    // would keep suppressing banners for a chat that is long gone.
+    useFocusEffect(
+        useCallback(() => {
+            if (!otherUserId) return;
+            setActiveConversation(conversationKeyForDirect(String(otherUserId)));
+            return () => setActiveConversation(null);
+        }, [otherUserId]),
+    );
 
     useEffect(() => {
         if (messages.length) {

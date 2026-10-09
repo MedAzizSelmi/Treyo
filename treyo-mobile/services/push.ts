@@ -42,18 +42,73 @@ const IS_EXPO_GO = (Constants as any)?.appOwnership === 'expo';
  *     without re-fetching it on logout.
  */
 
+/**
+ * The conversation currently on screen, as "dm:<userId>" or
+ * "group:<groupId>", or null when none is.
+ *
+ * A module-level variable rather than React state because the consumer
+ * is setNotificationHandler, which is itself registered at module load
+ * and outlives every component. Threading this through a context would
+ * mean the handler reading state it cannot subscribe to.
+ */
+let activeConversation: string | null = null;
+
+/** Called by a chat screen on focus, and with null on blur. */
+export function setActiveConversation(key: string | null) {
+    activeConversation = key;
+}
+
+export function conversationKeyForDirect(userId: string) {
+    return `dm:${userId}`;
+}
+
+export function conversationKeyForGroup(groupId: string) {
+    return `group:${groupId}`;
+}
+
+/**
+ * Which conversation, if any, a push belongs to.
+ *
+ * Mirrors the payloads MessageService builds: direct messages carry
+ * senderId — the other party, from the recipient's side — and group
+ * messages carry groupId.
+ */
+function conversationOf(data: any): string | null {
+    if (!data) return null;
+    if (data.type === 'direct_message' && data.senderId) {
+        return conversationKeyForDirect(String(data.senderId));
+    }
+    if (data.type === 'group_message' && data.groupId) {
+        return conversationKeyForGroup(String(data.groupId));
+    }
+    return null;
+}
+
 export function configureNotifications() {
-    // setNotificationHandler runs every time a push arrives while the
-    // app is in the foreground. Returning shouldShowBanner makes the
-    // OS show its usual banner UI even while the app is active — what
-    // users expect from Messenger / WhatsApp.
+    // Runs for every push that arrives while the app is in the
+    // foreground, and decides how it is presented.
     Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-            shouldShowBanner: true,
-            shouldShowList: true,
-            shouldPlaySound: true,
-            shouldSetBadge: true,
-        }),
+        handleNotification: async (notification) => {
+            const data: any = notification?.request?.content?.data;
+            const belongsToOpenChat =
+                activeConversation !== null && conversationOf(data) === activeConversation;
+
+            return {
+                // A banner over the conversation you are already reading
+                // is noise — two people typing back and forth would get
+                // one on every reply, over the keyboard.
+                shouldShowBanner: !belongsToOpenChat,
+                // Deliberately still true. If activeConversation ever
+                // goes stale — a screen unmounting without clearing it —
+                // the cost is a missing pop, not a missing message: it
+                // still lands in the tray and still counts. Suppressing
+                // the notification itself would turn a cosmetic bug into
+                // a lost message.
+                shouldShowList: true,
+                shouldPlaySound: !belongsToOpenChat,
+                shouldSetBadge: true,
+            };
+        },
     });
 }
 

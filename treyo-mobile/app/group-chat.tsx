@@ -8,19 +8,22 @@ import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { useTranslation } from 'react-i18next';
 import { authService, messageService, groupService, fetchUpload, API_BASE_URL } from '../services/api';
 import { onRealtime, isRealtimeConnected } from '../services/realtime';
+import { setActiveConversation, conversationKeyForGroup } from '../services/push';
 
-// How often we re-fetch the message list while the chat is open. 4s matches
-// the admin dashboard's cadence — frequent enough that a reply lands within
-// a heartbeat without hammering the API. Mirror updates to the admin side
-// if you change this. Polling is paused while a send is in flight to avoid
-// a race that briefly removes the optimistic bubble before the GET catches up.
-// Only used when the socket is down; messages arrive over STOMP now, so
-// this no longer needs to be tight enough to feel live.
+// Fallback only. Messages arrive over STOMP now, and this interval is
+// skipped entirely while the socket is up — it covers a dropped
+// connection (a tunnel, a backgrounded app, a changed network), where a
+// chat that silently stops updating is worse than one a beat behind.
+// That is why it no longer needs to be tight enough to feel live; it
+// used to be 4s because polling was the only delivery path.
+//
+// Still paused while a send is in flight, to avoid a race that briefly
+// removes the optimistic bubble before the GET catches up.
 const POLL_INTERVAL_MS = 10000;
 
 /**
@@ -166,6 +169,17 @@ export default function GroupChatScreen() {
 
     // First load shows the spinner + scrolls to the bottom of history.
     useEffect(() => { load(); }, [load]);
+
+    // Same as the direct chat: suppress banners for the group being
+    // read. In a busy group this is the difference between a readable
+    // thread and one notification per message arriving over it.
+    useFocusEffect(
+        useCallback(() => {
+            if (!groupId) return;
+            setActiveConversation(conversationKeyForGroup(String(groupId)));
+            return () => setActiveConversation(null);
+        }, [groupId]),
+    );
 
     // Check whether the group has wrapped up. If so, the composer is
     // hidden and a "group ended" banner replaces it. We check once on
