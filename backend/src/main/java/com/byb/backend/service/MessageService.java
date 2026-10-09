@@ -112,7 +112,50 @@ public class MessageService {
         // Send via WebSocket to receiver
         sendViaWebSocket(response);
 
+        // OS-level push, as the group path already does. The socket only
+        // exists while the app is running, so without this a direct
+        // message reached nobody who had closed it — they found out
+        // whenever they next happened to open Messages. That mattered
+        // little while there was no 1-to-1 chat screen to open; it
+        // matters now that there is.
+        sendDirectMessagePush(message, senderName);
+
         return response;
+    }
+
+    /**
+     * Notify the recipient of a direct message.
+     *
+     * Titled with the sender's name alone — a direct message has no
+     * other context to give, unlike a group where the group's name is
+     * the useful half. The payload carries enough for the tap handler
+     * to open the conversation rather than dropping the user on a list.
+     *
+     * Best-effort: a push that cannot be sent must not fail the message
+     * that has already been saved.
+     */
+    private void sendDirectMessagePush(Message message, String senderName) {
+        try {
+            boolean hasContent = message.getContent() != null && !message.getContent().isBlank();
+            String body = hasContent ? message.getContent() : "📷 Photo";
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("type", "direct_message");
+            // The other party, from the recipient's point of view — which
+            // is the sender. This is what /chat needs to open.
+            data.put("senderId", message.getSenderId());
+            data.put("senderName", senderName);
+            data.put("messageId", message.getMessageId());
+
+            pushNotificationService.sendToUser(
+                    message.getReceiverId(),
+                    senderName == null || senderName.isBlank() ? "New message" : senderName,
+                    body,
+                    data);
+        } catch (Exception e) {
+            log.warn("Direct message push not sent for {}: {}",
+                    message.getMessageId(), e.getMessage());
+        }
     }
 
     /**
