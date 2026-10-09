@@ -75,6 +75,21 @@ and never reaches this server.
 bar that is a `<Text>`, a toggle that writes to local storage — this codebase
 had all three. Either make it work or remove it.
 
+**Messaging is group chats only, and that is a product decision.** There is no
+one-to-one chat and there should not be: nothing starts a direct conversation,
+both Messages lists filter to `isGroup`, and the dashboard does the same. A
+group chat appears for a learner when their enrolment is assigned a `groupId`,
+for the trainer who runs it, and for every admin.
+
+The backend still has DM endpoints and a `Message` table that supports them —
+that is dormant scaffolding, not a half-finished feature. A 1-to-1 screen was
+once built on the strength of a comment reading *"DM taps are intentionally a
+no-op"*, by reading past the word "intentionally". Don't repeat that. If
+learner-to-trainer contact is ever wanted, it is a product conversation first.
+
+**A comment saying something is deliberate is evidence.** Prefer asking over
+assuming a gap.
+
 ## Conventions
 
 Commit messages explain **why**, in prose, not bullet lists of what changed.
@@ -90,9 +105,10 @@ Development is complete. Everything below is deliberate, not missing.
 
 **Done:** ClicToPay payments with a sandbox-tested cahier des recettes; email
 verification; self-service account deletion; Google and LinkedIn sign-in; TOTP
-two-factor with recovery codes; session revocation (`tokens_valid_from`); direct
-and group chat over STOMP with push notifications; PDF payment receipts emailed
-on purchase; FCM; recommendation engine.
+two-factor with recovery codes; session revocation (`tokens_valid_from`); group
+chat over STOMP with typing indicators and push notifications, live in the
+dashboard too; PDF payment receipts emailed on purchase; FCM; recommendation
+engine.
 
 **Blocked, not forgotten:** Apple sign-in needs a paid Apple developer account
 (`social.apple.client-ids` is empty, and App Store review *requires* it once
