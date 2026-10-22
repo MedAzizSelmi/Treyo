@@ -268,9 +268,13 @@ public class EmailService {
         String html = simpleTemplate(
                 "Payment received",
                 "Hi " + (learnerName == null || learnerName.isBlank() ? "there" : learnerName) + ",",
-                "Thanks — your payment of <strong>" + safe(amountLabel) + "</strong> for <strong>"
-                        + safe(courseTitle) + "</strong> went through, and your place is confirmed."
-                        + "<br><br>Your receipt is attached as a PDF.",
+                // Plain text: the template escapes the body, so the <strong>
+                // and <br> this used to contain arrived as literal tags.
+                // Line breaks come through, the body is pre-wrap.
+                "Thanks — your payment of " + amountLabel + " for "
+                        + (courseTitle == null ? "your course" : courseTitle)
+                        + " went through, and your place is confirmed.\n\n"
+                        + "Your receipt is attached as a PDF.",
                 null,
                 null,
                 "Keep this email: the attached receipt is your proof of payment."

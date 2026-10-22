@@ -7,6 +7,7 @@ import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.GroupRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,7 @@ public class EnrollmentService {
     private final CourseRepository courseRepository;
     private final PaymentService paymentService;
     private final MLRecommendationService mlRecommendationService;
-    private final ReceiptDeliveryService receiptDeliveryService;
+    private final ApplicationEventPublisher events;
 
     /**
      * Confirm an enrollment after the student has paid for it.
@@ -125,12 +126,14 @@ public class EnrollmentService {
 
         enrollment = enrollmentRepository.save(enrollment);
 
-        // Email the receipt. Async and best-effort inside the service:
-        // a mail server being briefly unreachable must not roll back an
-        // enrolment that has already been paid for, and the learner can
-        // re-download it from payment history either way.
+        // Email the receipt — once this transaction commits, not now.
+        // Started from here directly, it looked the enrolment up before
+        // the commit, found nothing and never sent; see
+        // ReceiptDeliveryService.emailReceipt. Best-effort there: a mail
+        // server being briefly unreachable must not roll back an enrolment
+        // that has already been paid for.
         if (isPaidCourse) {
-            receiptDeliveryService.emailReceipt(enrollment.getEnrollmentId());
+            events.publishEvent(new ReceiptDeliveryService.EnrollmentPaid(enrollment.getEnrollmentId()));
         }
 
         // Keep the course's enrollment counter current. Nothing maintained

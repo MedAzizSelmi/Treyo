@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -26,6 +28,13 @@ import java.math.RoundingMode;
 @RequiredArgsConstructor
 @Slf4j
 public class ReceiptDeliveryService {
+
+    /**
+     * Published by EnrollmentService when a paid enrolment is saved. The
+     * receipt goes out once the transaction that saved it has committed —
+     * see emailReceipt.
+     */
+    public record EnrollmentPaid(String enrollmentId) {}
 
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
@@ -51,19 +60,39 @@ public class ReceiptDeliveryService {
     }
 
     /**
-     * Email the receipt. Async and swallowing its own failures: a paid
-     * enrolment must not be undone because a mail server was briefly
-     * unreachable, and the learner can always re-download from payment
-     * history.
+     * Email the receipt once the paid enrolment has been committed.
+     *
+     * After commit, not merely on another thread. It used to be called
+     * directly from inside the confirming transaction and run async, so
+     * its own lookup raced that transaction — which still had the course
+     * counter, a call to the recommendation service and the group to
+     * update — and lost: it found no enrolment and returned silently, and
+     * no learner ever got a receipt. Waiting for the commit also means a
+     * confirmation that rolls back sends nothing.
+     *
+     * fallbackExecution covers a caller with no transaction, where there
+     * is nothing to wait for.
+     *
+     * Async and swallowing its own failures: a paid enrolment must not be
+     * undone because a mail server was briefly unreachable, and the
+     * learner can always re-download from payment history.
      */
     @Async
-    public void emailReceipt(String enrollmentId) {
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void emailReceipt(EnrollmentPaid event) {
+        String enrollmentId = event.enrollmentId();
         try {
             Enrollment enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
-            if (enrollment == null) return;
+            if (enrollment == null) {
+                log.warn("Receipt not sent: enrolment {} not found", enrollmentId);
+                return;
+            }
 
             ReceiptService.ReceiptData data = dataFor(enrollment);
-            if (data == null) return;
+            if (data == null) {
+                log.info("No receipt for {}: nothing was paid", enrollmentId);
+                return;
+            }
             if (data.learnerEmail() == null || data.learnerEmail().isBlank()) {
                 log.info("No address on file for {} — receipt not emailed", enrollmentId);
                 return;
