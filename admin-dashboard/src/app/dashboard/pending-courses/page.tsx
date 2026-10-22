@@ -260,6 +260,11 @@ export default function PendingCoursesPage() {
                   <p className="text-xs text-muted mb-3">
                     Trainers submit courses without a price — set one here before approving.
                     Default currency comes from your Settings (Revenue currency).
+                    {/* Prices are HT: the app labels them so and the card is
+                        charged the price plus VAT (backend VatPolicy). An admin
+                        entering a VAT-inclusive figure would tax it twice. */}
+                    {' '}<strong className="text-foreground">Enter the price before VAT (HT)</strong>
+                    {' '}— learners are charged it plus VAT.
                   </p>
                   <div className="flex items-stretch gap-2">
                     <input
@@ -268,7 +273,7 @@ export default function PendingCoursesPage() {
                       step="0.01"
                       value={price}
                       onChange={(e) => { setPrice(e.target.value); setPriceError(''); }}
-                      placeholder="e.g. 250"
+                      placeholder="e.g. 250 (HT)"
                       className="flex-1 rounded-lg bg-card-hover border border-border p-2.5 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
                     />
                     <select

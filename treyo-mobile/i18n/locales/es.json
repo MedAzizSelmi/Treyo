@@ -174,7 +174,9 @@
         "oneTimePayment": "pago único",
         "progress": "{{done}} de {{total}} sesiones completadas",
         "courseCompleted": "🎉 Curso completado",
-        "groupEnded": "Grupo finalizado — chat solo lectura"
+        "groupEnded": "Grupo finalizado — chat solo lectura",
+        "priceExclVat": "Base imp.",
+        "priceInclVat": "{{amount}} {{currency}} IVA incluido"
     },
     "schedule": {
         "myScheduleTitle": "Mi agenda",

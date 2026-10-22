@@ -174,7 +174,9 @@
         "oneTimePayment": "paiement unique",
         "progress": "{{done}} séances sur {{total}} terminées",
         "courseCompleted": "🎉 Cours terminé",
-        "groupEnded": "Groupe terminé — chat en lecture seule"
+        "groupEnded": "Groupe terminé — chat en lecture seule",
+        "priceExclVat": "HT",
+        "priceInclVat": "{{amount}} {{currency}} TTC"
     },
     "schedule": {
         "myScheduleTitle": "Mon planning",

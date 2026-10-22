@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { ReviewsList } from '../components/ReviewsList';
+import { formatAmount, isPricedExclVat } from '../utils/price';
 import ReportTrainerModal from '../components/ReportTrainerModal';
 import { trainerService, courseService, authService, API_BASE_URL } from '../services/api';
 
@@ -234,7 +235,10 @@ export default function TrainerProfileScreen() {
                                             )}
                                             {course.price != null && (
                                                 <Text style={styles.coursePrice}>
-                                                    {Number(course.price) === 0 ? 'Free' : `${Number(course.price).toFixed(0)} DT`}
+                                                    {Number(course.price) === 0
+                                                        ? t('common.free')
+                                                        : `${formatAmount(Number(course.price))} ${course.currency || 'TND'}`
+                                                            + (isPricedExclVat(course) ? ` ${t('course.priceExclVat')}` : '')}
                                                 </Text>
                                             )}
                                         </View>

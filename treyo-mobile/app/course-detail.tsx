@@ -10,6 +10,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { ReviewsList } from '../components/ReviewsList';
+import { formatAmount, isPricedExclVat } from '../utils/price';
 import {
     courseService, trainerService, enrollmentService,
     interactionService, authService, groupService, API_BASE_URL,
@@ -209,6 +210,11 @@ export default function CourseDetailScreen() {
 
     const rating = course.averageRating ? Number(course.averageRating) : null;
     const price = course.price ? Number(course.price) : 0;
+    const currency = course.currency || 'TND';
+    // Prices are set before VAT; the learner pays them plus VAT. The
+    // total comes from the server, so it is exactly what will be charged.
+    const exclVat = isPricedExclVat(course);
+    const priceInclVat = course.priceInclVat != null ? Number(course.priceInclVat) : price;
     const minStudents = course.minStudentsRequired || 0;
     const interestedCount = course.interestedStudentsCount ?? course.totalEnrolled ?? 0;
     const progressPct = minStudents > 0 ? Math.min(Math.round((interestedCount / minStudents) * 100), 100) : 100;
@@ -306,8 +312,8 @@ export default function CourseDetailScreen() {
                     <StatItem
                         icon="cash-outline"
                         iconColor="#7cce06"
-                        value={price === 0 ? 'Free' : `${price}`}
-                        label={price === 0 ? '' : (course.currency || 'TND')}
+                        value={price === 0 ? t('common.free') : formatAmount(price)}
+                        label={price === 0 ? '' : `${currency}${exclVat ? ` ${t('course.priceExclVat')}` : ''}`}
                     />
                 </View>
 
@@ -558,10 +564,15 @@ export default function CourseDetailScreen() {
                 <View style={styles.enrollBarInner}>
                     <View>
                         <Text style={styles.enrollPriceValue}>
-                            {price === 0 ? 'Free' : `${price} ${course.currency || 'TND'}`}
+                            {price === 0 ? t('common.free') : `${formatAmount(price)} ${currency}`}
+                            {exclVat && <Text style={styles.enrollPriceTax}> {t('course.priceExclVat')}</Text>}
                         </Text>
                         {price > 0 && (
-                            <Text style={styles.enrollPriceLabel}>{t('course.oneTimePayment')}</Text>
+                            <Text style={styles.enrollPriceLabel}>
+                                {exclVat
+                                    ? t('course.priceInclVat', { amount: formatAmount(priceInclVat), currency })
+                                    : t('course.oneTimePayment')}
+                            </Text>
                         )}
                     </View>
 
@@ -920,6 +931,7 @@ const styles = StyleSheet.create({
     },
     enrollPriceValue: { fontSize: 20, fontWeight: '800', color: '#ffffff' },
     enrollPriceLabel: { fontSize: 11, color: '#aaaaaa' },
+    enrollPriceTax: { fontSize: 12, fontWeight: '600', color: '#aaaaaa' },
     enrollBtn: {
         backgroundColor: '#7cce06', borderRadius: 14,
         paddingHorizontal: 28, paddingVertical: 14,

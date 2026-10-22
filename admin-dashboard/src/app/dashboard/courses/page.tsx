@@ -197,7 +197,7 @@ export default function CoursesPage() {
     },
     {
       key: 'price',
-      label: 'Price',
+      label: 'Price (HT)',
       sortable: true,
       render: (r: any) => (
         <span className="text-foreground font-medium">

@@ -55,6 +55,7 @@ public class PaymentService {
     private final CourseRepository courseRepository;
     private final WebClient.Builder webClientBuilder;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final VatPolicy vatPolicy;
 
     /** ISO 4217 numeric code for the Tunisian dinar, per the manual. */
     private static final String CURRENCY_TND = "788";
@@ -144,8 +145,11 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
 
         // ClicToPay bills in MILLIMES (1 TND = 1000) with no decimal
-        // separator. Course.price is stored in major TND units, e.g. 49.99.
-        BigDecimal priceMajor = course.getPrice() == null ? BigDecimal.ZERO : course.getPrice();
+        // separator. Course.price is stored in major TND units, e.g. 49.99,
+        // and is set before VAT: the learner is charged it plus VAT, the
+        // same total the app showed them before paying (VatPolicy).
+        BigDecimal priceExclVat = course.getPrice() == null ? BigDecimal.ZERO : course.getPrice();
+        BigDecimal priceMajor = vatPolicy.withVat(priceExclVat);
         long amountMillimes = priceMajor.setScale(3, RoundingMode.HALF_UP)
                 .movePointRight(3)
                 .longValueExact();

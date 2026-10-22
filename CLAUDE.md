@@ -84,6 +84,13 @@ saying a payment succeeded. `PaymentService.isPaidFor` also checks the order
 number references the right student *and* course — otherwise a valid reference
 for a cheap course unlocks an expensive one.
 
+**Course prices are HT.** Admins set them before VAT, the app labels them
+HT / excl. VAT / Base imp. / خ.ق.م, and the card is charged the price plus
+VAT — `VatPolicy`, driven by `receipt.vat.*`. The server sends `vatRate` and
+`priceInclVat` with each course so the app never computes the total itself.
+Payments before October 2026 were charged the bare price; their receipts
+still come out right because the breakdown is derived from what was paid.
+
 **Card data is never stored.** ClicToPay's anti-fraud terms are stricter than
 PCI-DSS: no number, no CVV, **no expiry date**. Only brand and last four, taken
 from the mask the gateway applies. The card is typed on ClicToPay's hosted page

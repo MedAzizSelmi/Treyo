@@ -174,7 +174,9 @@
         "oneTimePayment": "دفعة واحدة",
         "progress": "{{done}} من {{total}} حصص مكتملة",
         "courseCompleted": "🎉 اكتملت الدورة",
-        "groupEnded": "انتهت المجموعة — المحادثة للقراءة فقط"
+        "groupEnded": "انتهت المجموعة — المحادثة للقراءة فقط",
+        "priceExclVat": "خ.ق.م",
+        "priceInclVat": "{{amount}} {{currency}} جميع الأداءات محتسبة"
     },
     "schedule": {
         "myScheduleTitle": "جدولي",

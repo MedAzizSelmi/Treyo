@@ -27,7 +27,13 @@ public class CourseResponse {
     private String format;
     private String prerequisites;
     private String[] learningOutcomes;
+    // Set before VAT; the app labels it HT / excl. VAT.
     private BigDecimal price;
+    // VAT rate in percent (0 when VAT is not applied), and what the
+    // learner actually pays — computed by the server so the total shown
+    // before payment is exactly what the gateway is asked for.
+    private BigDecimal vatRate;
+    private BigDecimal priceInclVat;
     private String currency;
     private Boolean hasCertificate;
     private Integer minStudentsRequired;

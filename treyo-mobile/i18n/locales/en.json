@@ -174,7 +174,9 @@
         "oneTimePayment": "one-time payment",
         "progress": "{{done}} of {{total}} sessions done",
         "courseCompleted": "🎉 Course completed",
-        "groupEnded": "Group ended — chat is read-only"
+        "groupEnded": "Group ended — chat is read-only",
+        "priceExclVat": "excl. VAT",
+        "priceInclVat": "{{amount}} {{currency}} incl. VAT"
     },
     "schedule": {
         "myScheduleTitle": "My Schedule",

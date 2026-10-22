@@ -33,9 +33,12 @@ import java.time.format.DateTimeFormatter;
  * reference already identifies this document uniquely.
  *
  * ── On VAT ──────────────────────────────────────────────────────────
- * The learner was charged exactly the listed course price, so that
- * figure is the TTC total and the breakdown is derived from it rather
- * than added to it. The rate is configurable and the whole block can be
+ * The amount paid is the TTC total, and the breakdown is derived from it
+ * rather than added to it, so the receipt always agrees with the bank
+ * statement. Since October 2026 that total is the course price plus VAT
+ * (VatPolicy); earlier payments were charged the listed price, and their
+ * receipts come out right too, because both are worked back from what
+ * was actually taken. The rate is configurable and the whole block can be
  * switched off, because whether these sales carry VAT at all is a
  * question for LeanConsulting's accountant, not for this file.
  *

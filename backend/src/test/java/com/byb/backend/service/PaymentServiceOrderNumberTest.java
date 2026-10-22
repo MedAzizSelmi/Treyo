@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class PaymentServiceOrderNumberTest {
 
-    private final PaymentService service = new PaymentService(null, null, null, null);
+    private final PaymentService service = new PaymentService(null, null, null, null, null);
 
     private String compose(String studentId, String courseId, String groupId) throws Exception {
         Method m = PaymentService.class.getDeclaredMethod(

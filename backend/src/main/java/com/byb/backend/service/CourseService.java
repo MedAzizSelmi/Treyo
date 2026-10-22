@@ -27,6 +27,7 @@ public class CourseService {
     private final EnrollmentRepository enrollmentRepository;
     private final com.byb.backend.repository.ModuleRepository moduleRepository;
     private final FileAccessService fileAccessService;
+    private final VatPolicy vatPolicy;
 
     @Transactional
     public CourseResponse createCourse(String trainerId, CreateCourseRequest request) {
@@ -291,6 +292,8 @@ public class CourseService {
                 .prerequisites(course.getPrerequisites())
                 .learningOutcomes(course.getLearningOutcomes())
                 .price(course.getPrice())
+                .vatRate(vatPolicy.rate())
+                .priceInclVat(vatPolicy.withVat(course.getPrice()))
                 .currency(course.getCurrency())
                 .hasCertificate(course.getHasCertificate())
                 .minStudentsRequired(course.getMinStudentsRequired())
