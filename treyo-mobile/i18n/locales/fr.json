@@ -249,7 +249,11 @@
         "supportLegal": "Support & Légal",
         "dangerZone": "Zone dangereuse",
         "emailPushPrefs": "Préférences e-mail et push",
-        "madeWithCare": "Fait avec soin · Treyo"
+        "madeWithCare": "Fait avec soin · Treyo",
+        "clearSearchConfirmTitle": "Effacer l'historique de recherche ?",
+        "clearSearchConfirmBody": "Vos recherches de cours passées sur cet appareil seront supprimées.",
+        "clearSearchDone": "Effacé",
+        "clearSearchDoneBody": "Votre historique de recherche a été supprimé."
     },
     "profile": {
         "editProfile": "Modifier le profil",

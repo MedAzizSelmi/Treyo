@@ -249,7 +249,11 @@
         "supportLegal": "الدعم والقانون",
         "dangerZone": "منطقة خطرة",
         "emailPushPrefs": "تفضيلات البريد والإشعارات",
-        "madeWithCare": "صُنع بعناية · Treyo"
+        "madeWithCare": "صُنع بعناية · Treyo",
+        "clearSearchConfirmTitle": "مسح سجل البحث؟",
+        "clearSearchConfirmBody": "ستُحذف عمليات البحث السابقة عن الدورات على هذا الجهاز.",
+        "clearSearchDone": "تم المسح",
+        "clearSearchDoneBody": "تم حذف سجل البحث الخاص بك."
     },
     "profile": {
         "editProfile": "تعديل الملف الشخصي",

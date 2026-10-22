@@ -8,10 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService } from '../services/api';
+import { clearSearchHistory } from '../utils/searchHistory';
 
-const HISTORY_KEY = 'student_search_history';
 const LANGUAGE_KEY = 'app_language';
-const TWO_FA_KEY = 'two_fa_enabled';
 
 const LANGUAGE_LABELS: Record<string, string> = {
     en: 'English',
@@ -47,8 +46,8 @@ export default function SettingsPrivacyScreen() {
     const router = useRouter();
     const { t } = useTranslation();
     const [language, setLanguage] = useState('en');
-    const [twoFaOn, setTwoFaOn] = useState(false);
     const [userRole, setUserRole] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
     const appVersion = Constants.expoConfig?.version || '1.0.0';
     const isStudent = userRole === 'STUDENT';
     const isTrainer = userRole === 'TRAINER';
@@ -57,27 +56,26 @@ export default function SettingsPrivacyScreen() {
         (async () => {
             const lang = await AsyncStorage.getItem(LANGUAGE_KEY);
             if (lang) setLanguage(lang);
-            const twoFa = await AsyncStorage.getItem(TWO_FA_KEY);
-            setTwoFaOn(twoFa === 'true');
 
             // Role drives which sections to show — students see search history & payment
             // history; trainers don't have either feature in the app.
             const user = await authService.getCurrentUser();
             if (user?.role) setUserRole(String(user.role));
+            setUserId(user?.userId ?? null);
         })();
     }, []);
 
     const handleClearSearchHistory = () => {
         Alert.alert(
-            'Clear search history?',
-            'Your past course searches will be removed from this device.',
+            t('settings.clearSearchConfirmTitle'),
+            t('settings.clearSearchConfirmBody'),
             [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('common.cancel'), style: 'cancel' },
                 {
-                    text: 'Clear', style: 'destructive',
+                    text: t('search.clearAll'), style: 'destructive',
                     onPress: async () => {
-                        await AsyncStorage.removeItem(HISTORY_KEY);
-                        Alert.alert('Cleared', 'Search history removed.');
+                        if (userId) await clearSearchHistory(userId);
+                        Alert.alert(t('settings.clearSearchDone'), t('settings.clearSearchDoneBody'));
                     },
                 },
             ]

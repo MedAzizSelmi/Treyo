@@ -4,12 +4,9 @@ import { BlurView } from 'expo-blur';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService, courseService, searchLogService } from '../services/api';
-
-const HISTORY_KEY = 'student_search_history';
-const HISTORY_LIMIT = 10;
+import { HISTORY_LIMIT, loadSearchHistory, saveSearchHistory } from '../utils/searchHistory';
 
 const LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
 
@@ -29,9 +26,14 @@ export default function CourseSearchScreen() {
 
     useEffect(() => {
         loadCourses();
-        loadHistory();
+        // History is per account, so it can only be read once we know
+        // whose it is.
         authService.getCurrentUser()
-            .then(u => setStudentId(u?.userId ?? null))
+            .then(async u => {
+                const id = u?.userId ?? null;
+                setStudentId(id);
+                if (id) setHistory(await loadSearchHistory(id));
+            })
             .catch(() => {});
     }, []);
 
@@ -46,16 +48,9 @@ export default function CourseSearchScreen() {
         }
     };
 
-    const loadHistory = async () => {
-        try {
-            const raw = await AsyncStorage.getItem(HISTORY_KEY);
-            if (raw) setHistory(JSON.parse(raw));
-        } catch (_) {}
-    };
-
-    const saveHistory = async (next: string[]) => {
+    const saveHistory = (next: string[]) => {
         setHistory(next);
-        try { await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (_) {}
+        if (studentId) saveSearchHistory(studentId, next);
     };
 
     /** Push a term to the front, dedupe, cap to HISTORY_LIMIT.

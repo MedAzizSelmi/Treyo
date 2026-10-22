@@ -309,6 +309,15 @@ export const authService = {
      *  nothing left to sign into. */
     deleteAccount: async (proof: { password: string } | { code: string }) => {
         const response = await api.delete('/account', { data: proof });
+        // The account is gone, so its searches on this phone go too.
+        try {
+            const raw = await SecureStore.getItemAsync('user_data');
+            const userId = raw ? JSON.parse(raw)?.userId : null;
+            if (userId) {
+                const { clearSearchHistory } = await import('../utils/searchHistory');
+                await clearSearchHistory(userId);
+            }
+        } catch (_) {}
         await authService.logout();
         return response.data;
     },
