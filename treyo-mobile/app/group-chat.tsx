@@ -503,12 +503,19 @@ export default function GroupChatScreen() {
                                 );
                             }
 
-                            // WhatsApp pattern — only the first bubble in a streak
-                            // from one sender gets the avatar + name header. Streaks
-                            // mean less visual repetition for chained replies.
-                            const prev = messages[i - 1];
-                            const showHeader = !isMine
-                                && (!prev || prev.senderId !== msg.senderId || prev.senderType === 'system');
+                            // WhatsApp pattern for a run of messages from one
+                            // sender: the name on the first bubble, the avatar
+                            // beside the last, so the circle sits at the foot of
+                            // what that person said rather than at its top.
+                            // Bubbles inside a run sit closer together, so the
+                            // run reads as one block.
+                            const sameSender = (m: any) => !!m
+                                && m.senderType !== 'system' && m.senderId !== 'SYSTEM'
+                                && m.senderId === msg.senderId;
+                            const firstOfRun = !sameSender(messages[i - 1]);
+                            const lastOfRun = !sameSender(messages[i + 1]);
+                            const showHeader = !isMine && firstOfRun;
+                            const showAvatar = !isMine && lastOfRun;
 
                             // Resolve the absolute URL for the sender's photo so
                             // <Image> doesn't get a leading "/files/..." that won't
@@ -543,13 +550,17 @@ export default function GroupChatScreen() {
                             return (
                                 <View
                                     key={msg.messageId || i}
-                                    style={[styles.msgRow, isMine ? styles.msgRowMine : styles.msgRowTheirs]}
+                                    style={[
+                                        styles.msgRow,
+                                        isMine ? styles.msgRowMine : styles.msgRowTheirs,
+                                        !lastOfRun && styles.msgRowInRun,
+                                    ]}
                                 >
                                     {/* Layout for non-mine messages: avatar circle on
-                                        the left (outside bubble), bubble on the right
-                                        containing name + content + timestamp. Matches
-                                        the requested WhatsApp-style design. */}
-                                    {!isMine && showHeader && (
+                                        the left (outside bubble), level with the foot of
+                                        the last bubble in the run; the bubble holds name
+                                        + content + timestamp. */}
+                                    {showAvatar && (
                                         <TouchableOpacity
                                             onPress={openProfile}
                                             activeOpacity={0.7}
@@ -568,11 +579,9 @@ export default function GroupChatScreen() {
                                         </TouchableOpacity>
                                     )}
 
-                                    {/* Spacer keeps continuation bubbles aligned with
-                                        the first bubble's text (where the avatar used
-                                        to be) — so a streak reads as a single visual
-                                        block from one speaker. */}
-                                    {!isMine && !showHeader && <View style={styles.avatarSpacer} />}
+                                    {/* Spacer where there is no avatar, so every
+                                        bubble in a run lines up with the last one's. */}
+                                    {!isMine && !showAvatar && <View style={styles.avatarSpacer} />}
 
                                     {(() => {
                                         // Image attachment detection — a message is
@@ -845,8 +854,8 @@ const styles = StyleSheet.create({
     },
 
     // Each message row is now a horizontal flex line: optional avatar on
-    // the left (only for non-mine messages, and only on the FIRST bubble
-    // in a streak), then the bubble. maxWidth caps total row width so
+    // the left (only for non-mine messages, and only on the LAST bubble
+    // in a run), then the bubble. maxWidth caps total row width so
     // a long message doesn't span the entire screen.
     msgRow: {
         flexDirection: 'row',
@@ -855,6 +864,8 @@ const styles = StyleSheet.create({
         maxWidth: '85%',
         gap: 6,
     },
+    // Inside a run of one sender's messages the gap tightens.
+    msgRowInRun: { marginBottom: 3 },
     msgRowMine: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
     msgRowTheirs: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
 

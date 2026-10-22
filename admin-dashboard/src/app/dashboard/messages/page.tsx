@@ -400,13 +400,17 @@ export default function AdminMessagesPage() {
                         </div>
                       );
                     }
-                    // WhatsApp pattern: only the first bubble in a streak from
-                    // one sender gets the header (avatar + name). Consecutive
-                    // bubbles from the same person stack without it.
-                    const prev = messages[i - 1];
-                    const showHeader = !isMine && (
-                      !prev || prev.senderId !== msg.senderId || prev.senderType === 'system'
-                    );
+                    // WhatsApp pattern for a run of messages from one sender,
+                    // same as the app: the name on the first bubble, the
+                    // avatar beside the last, so the circle sits at the foot
+                    // of what that person said. Bubbles inside a run sit
+                    // closer together so the run reads as one block.
+                    const sameSender = (m: any) =>
+                      !!m && m.senderType !== 'system' && m.senderId === msg.senderId;
+                    const firstOfRun = !sameSender(messages[i - 1]);
+                    const lastOfRun = !sameSender(messages[i + 1]);
+                    const showHeader = !isMine && firstOfRun;
+                    const showAvatar = !isMine && lastOfRun;
 
                     // Resolve photo URL — backend ships either an absolute URL
                     // or a relative "/files/..." path; we prefix the latter.
@@ -452,14 +456,13 @@ export default function AdminMessagesPage() {
                         key={msg.messageId || i}
                         className={`flex items-end gap-2 max-w-[85%] ${
                           isMine ? 'self-end flex-row-reverse' : 'self-start'
-                        }`}
+                        } ${firstOfRun ? '' : '-mt-2'}`}
                       >
-                        {/* Avatar — only for non-mine, only on the first
-                            bubble in a streak from this sender. We render a
-                            spacer otherwise so streak continuations stay
-                            aligned with the first bubble's left edge. */}
+                        {/* Avatar — only for non-mine, only on the last
+                            bubble in a run from this sender. A spacer stands
+                            in elsewhere so every bubble in the run lines up. */}
                         {!isMine && (
-                          showHeader ? (
+                          showAvatar ? (
                             photoUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
