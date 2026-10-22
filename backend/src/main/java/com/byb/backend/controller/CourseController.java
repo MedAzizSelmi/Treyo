@@ -2,6 +2,7 @@ package com.byb.backend.controller;
 
 import com.byb.backend.dto.course.CreateCourseRequest;
 import com.byb.backend.dto.course.CourseResponse;
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.CourseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,6 +23,7 @@ import java.util.Map;
 public class CourseController {
 
     private final CourseService courseService;
+    private final CallerGuard callerGuard;
 
     // ─────────────────────────────────────────────────────────────────
     // NEW FLOW (v2 — replaces admin-owned CourseTemplate):
@@ -39,8 +41,11 @@ public class CourseController {
     @PostMapping
     @Operation(summary = "Trainer submits a new course for admin review")
     public ResponseEntity<?> createCourse(
-            @RequestParam String trainerId,
+            @RequestParam(required = false) String trainerId,
             @Valid @RequestBody CreateCourseRequest request) {
+        // Outside the try: its IllegalArgumentException catch is fine, but
+        // the refusal must reach the handler as a 403, not a 400.
+        trainerId = callerGuard.self(trainerId);
         try {
             CourseResponse course = courseService.createTrainerCourse(trainerId, request);
             return ResponseEntity.ok(course);
@@ -53,8 +58,9 @@ public class CourseController {
     @Operation(summary = "Trainer edits their pending course (only while PENDING or REJECTED)")
     public ResponseEntity<?> updateCourse(
             @PathVariable String courseId,
-            @RequestParam String trainerId,
+            @RequestParam(required = false) String trainerId,
             @Valid @RequestBody CreateCourseRequest request) {
+        trainerId = callerGuard.self(trainerId);
         try {
             CourseResponse course = courseService.updateTrainerCourse(courseId, trainerId, request);
             return ResponseEntity.ok(course);

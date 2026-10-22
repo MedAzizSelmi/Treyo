@@ -1,9 +1,12 @@
 package com.byb.backend.controller;
 
 import com.byb.backend.model.Course;
+import com.byb.backend.model.Enrollment;
 import com.byb.backend.model.Review;
 import com.byb.backend.model.Trainer;
 import com.byb.backend.repository.CourseRepository;
+import com.byb.backend.repository.EnrollmentRepository;
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.repository.ReviewRepository;
 import com.byb.backend.repository.TrainerRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +50,8 @@ public class ReviewController {
     // Needed for enriching review responses with the author's name and
     // photo so the mobile UI doesn't have to fan-out per-review lookups.
     private final com.byb.backend.repository.StudentRepository studentRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final CallerGuard callerGuard;
 
     /**
      * Whether the student has already left a review for this course.
@@ -55,8 +60,9 @@ public class ReviewController {
     @GetMapping("/check")
     @Operation(summary = "Has this student already reviewed this course?")
     public ResponseEntity<Map<String, Object>> check(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         Optional<Review> existing = reviewRepository.findByStudentIdAndCourseId(studentId, courseId);
         Map<String, Object> out = new HashMap<>();
         out.put("reviewed", existing.isPresent());
@@ -106,8 +112,12 @@ public class ReviewController {
             courseFeedback = stringOrNull(body.get("feedback"));
         }
 
-        if (studentId == null || courseId == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "studentId and courseId are required"));
+        // The author is the caller. Any account could post a review in
+        // any learner's name, and so move a course's and a trainer's
+        // average rating at will.
+        studentId = callerGuard.self(studentId);
+        if (courseId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "courseId is required"));
         }
         if (courseRating == null || courseRating < 1 || courseRating > 5) {
             return ResponseEntity.badRequest().body(Map.of("error", "courseRating must be 1-5"));
@@ -131,6 +141,19 @@ public class ReviewController {
         } else if (trainerId == null) {
             trainerId = resolvedTrainerId;
         }
+
+        // Only someone who took the course reviews it — the same rule the
+        // app follows, since it only offers the survey for a completed
+        // enrollment (home.tsx, maybePromptReview).
+        Enrollment enrollment = enrollmentRepository.findByStudentIdAndCourseId(studentId, courseId).orElse(null);
+        boolean completed = enrollment != null
+                && ("completed".equalsIgnoreCase(enrollment.getEnrollmentStatus())
+                    || enrollment.getCompletedAt() != null);
+        if (!completed) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "You can review a course once you have completed it"));
+        }
+        enrollmentId = enrollment.getEnrollmentId();
 
         if (reviewRepository.findByStudentIdAndCourseId(studentId, courseId).isPresent()) {
             return ResponseEntity.status(409).body(Map.of("error", "You've already reviewed this course"));
@@ -225,6 +248,7 @@ public class ReviewController {
 
     /**
      * Admin moderation list — every review including hidden ones,
+     * restricted to administrators in SecurityConfig.
      * newest first. The `isHidden` flag tells the dashboard whether
      * to render the row as muted + "Show" button vs visible + "Hide".
      */

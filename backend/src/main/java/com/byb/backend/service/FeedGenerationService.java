@@ -110,14 +110,30 @@ public class FeedGenerationService {
      */
     @Scheduled(cron = "0 0 6 * * *")
     public void dailyJob() {
+        generateIfTodayIsEmpty();
+    }
+
+    /**
+     * Generate a batch only if today does not have one yet. Shared by the
+     * cron, the startup catch-up, and non-admin calls to /api/feed/generate.
+     *
+     * Synchronized so that several people tapping the empty-feed button at
+     * once produce one batch, not one each: the count and the insert are
+     * not atomic otherwise. Each save commits on its own (generateBatch's
+     * @Transactional does not apply to a call from inside this class), so
+     * the posts are visible to the next caller by the time the lock frees.
+     *
+     * @return the number of posts inserted, 0 if today already had them
+     */
+    public synchronized int generateIfTodayIsEmpty() {
         LocalDateTime startOfToday = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         long todayCount = feedPostRepository.countByPublishedAtAfter(startOfToday);
         if (todayCount >= 3) {
-            log.info("Feed: today already has {} posts, skipping daily generation", todayCount);
-            return;
+            log.info("Feed: today already has {} posts, skipping generation", todayCount);
+            return 0;
         }
-        log.info("Feed: starting daily generation");
-        generateBatch();
+        log.info("Feed: generating today's batch");
+        return generateBatch();
     }
 
     /**

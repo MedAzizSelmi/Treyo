@@ -6,6 +6,7 @@ import com.byb.backend.model.Group;
 import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.GroupRepository;
+import com.byb.backend.security.CallerGuard;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +41,7 @@ public class GroupController {
     private final ObjectMapper objectMapper;
     // Used to attach session-progress metadata to single-group responses.
     private final com.byb.backend.service.CourseLifecycleService courseLifecycleService;
+    private final CallerGuard callerGuard;
 
     /**
      * Upcoming sessions for the trainer's home dashboard.
@@ -82,6 +84,8 @@ public class GroupController {
     @GetMapping("/trainer/{trainerId}/upcoming")
     @Operation(summary = "Upcoming sessions for a trainer (forming + active groups starting now or later)")
     public ResponseEntity<List<Map<String, Object>>> getUpcomingSessions(@PathVariable String trainerId) {
+        // Carries meeting links, which are as good as an invitation.
+        callerGuard.selfOrAdmin(trainerId);
         LocalDateTime now = LocalDateTime.now();
 
         // Inline lifecycle pass — same idea as the conversations and
@@ -199,6 +203,10 @@ public class GroupController {
             @RequestBody Map<String, Object> body) {
         Group g = groupRepository.findById(groupId).orElse(null);
         if (g == null) return ResponseEntity.notFound().build();
+        // The trainer who runs the group, or an administrator. Anyone
+        // signed in could previously rewrite any group's sessions — and
+        // with them the trainer's earnings, which are computed from them.
+        callerGuard.requireOwnerOrAdmin(g.getTrainerId());
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sessions =
@@ -257,6 +265,7 @@ public class GroupController {
     @GetMapping("/student/{studentId}/sessions")
     @Operation(summary = "Upcoming scheduled sessions for a student across all enrolled groups")
     public ResponseEntity<List<Map<String, Object>>> getStudentSessions(@PathVariable String studentId) {
+        callerGuard.selfOrAdmin(studentId);
         LocalDateTime now = LocalDateTime.now();
         List<Map<String, Object>> out = new ArrayList<>();
 

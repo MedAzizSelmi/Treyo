@@ -7,6 +7,7 @@ import com.byb.backend.model.Trainer;
 import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.GroupRepository;
 import com.byb.backend.repository.TrainerRepository;
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.TrainerService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +35,7 @@ public class TrainerController {
     private final CourseRepository courseRepository;
     private final GroupRepository groupRepository;
     private final ObjectMapper objectMapper;
+    private final CallerGuard callerGuard;
 
     @GetMapping("/{trainerId}")
     @Operation(summary = "Get a trainer's public profile by ID")
@@ -92,8 +94,11 @@ public class TrainerController {
     @PutMapping("/me/profile/page1")
     @Operation(summary = "Update trainer profile - Page 1 (Contact Info)")
     public ResponseEntity<TrainerProfileResponse> updateProfilePage1(
-            @RequestParam String trainerId,
+            @RequestParam(required = false) String trainerId,
             @Valid @RequestBody TrainerProfilePage1Request request) {
+        // The path says /me but the id came from the query string,
+        // so any account could edit any trainer. The token decides.
+        trainerId = callerGuard.self(trainerId);
         TrainerProfileResponse profile = trainerService.updateProfilePage1(trainerId, request);
         return ResponseEntity.ok(profile);
     }
@@ -101,8 +106,9 @@ public class TrainerController {
     @PutMapping("/me/profile/page2")
     @Operation(summary = "Update trainer profile - Page 2 (Professional Info)")
     public ResponseEntity<TrainerProfileResponse> updateProfilePage2(
-            @RequestParam String trainerId,
+            @RequestParam(required = false) String trainerId,
             @Valid @RequestBody TrainerProfilePage2Request request) {
+        trainerId = callerGuard.self(trainerId);
         TrainerProfileResponse profile = trainerService.updateProfilePage2(trainerId, request);
         return ResponseEntity.ok(profile);
     }
@@ -110,8 +116,9 @@ public class TrainerController {
     @PutMapping("/me/profile/page3")
     @Operation(summary = "Update trainer profile - Page 3 (Bio & Photo)")
     public ResponseEntity<TrainerProfileResponse> updateProfilePage3(
-            @RequestParam String trainerId,
+            @RequestParam(required = false) String trainerId,
             @Valid @RequestBody TrainerProfilePage3Request request) {
+        trainerId = callerGuard.self(trainerId);
         TrainerProfileResponse profile = trainerService.updateProfilePage3(trainerId, request);
         return ResponseEntity.ok(profile);
     }
@@ -136,8 +143,9 @@ public class TrainerController {
     @PutMapping("/me/availability")
     @Operation(summary = "Trainer's own active/inactive toggle + concurrent-groups cap")
     public ResponseEntity<TrainerProfileResponse> updateAvailability(
-            @RequestParam String trainerId,
+            @RequestParam(required = false) String trainerId,
             @RequestBody java.util.Map<String, Object> body) {
+        trainerId = callerGuard.self(trainerId);
         TrainerProfileResponse profile = trainerService.updateAvailability(trainerId, body);
         return ResponseEntity.ok(profile);
     }
@@ -165,6 +173,8 @@ public class TrainerController {
             @RequestParam int year,
             @RequestParam int month
     ) {
+        // Earnings are the trainer's own business, and an administrator's.
+        callerGuard.selfOrAdmin(trainerId);
         java.util.Set<String> seen = new java.util.HashSet<>();
         java.util.List<Map<String, Object>> days = new java.util.ArrayList<>();
         java.math.BigDecimal total = java.math.BigDecimal.ZERO;
@@ -248,6 +258,7 @@ public class TrainerController {
             @PathVariable String trainerId,
             @RequestBody Map<String, String> body
     ) {
+        callerGuard.self(trainerId);
         String currency = body == null ? null : body.get("currency");
         if (currency == null || currency.isBlank()) {
             return ResponseEntity.badRequest().build();

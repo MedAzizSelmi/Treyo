@@ -2,6 +2,7 @@ package com.byb.backend.controller;
 
 import com.byb.backend.model.SearchLog;
 import com.byb.backend.repository.SearchLogRepository;
+import com.byb.backend.security.CallerGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class SearchLogController {
 
     private final SearchLogRepository searchLogRepository;
+    private final CallerGuard callerGuard;
 
     /**
      * Body:
@@ -45,12 +47,14 @@ public class SearchLogController {
     @PostMapping("/log")
     @Operation(summary = "Record a search query (drives ML recommendations)")
     public ResponseEntity<?> log(@RequestBody Map<String, Object> body) {
-        String studentId = stringOrNull(body.get("studentId"));
+        // Logged against the caller, whatever the body says — otherwise
+        // anyone could steer another learner's recommendations.
+        String studentId = callerGuard.self(stringOrNull(body.get("studentId")));
         String queryText = stringOrNull(body.get("query"));
         String clickedCourseId = stringOrNull(body.get("clickedCourseId"));
 
-        if (studentId == null || queryText == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "studentId and query are required"));
+        if (queryText == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "query is required"));
         }
         if (queryText.length() > 200) queryText = queryText.substring(0, 200);
 

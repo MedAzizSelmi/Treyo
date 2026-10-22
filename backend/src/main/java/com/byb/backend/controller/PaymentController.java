@@ -1,5 +1,6 @@
 package com.byb.backend.controller;
 
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.EnrollmentService;
 import com.byb.backend.service.PaymentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +39,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final EnrollmentService enrollmentService;
+    private final CallerGuard callerGuard;
 
     /**
      * Initialise a payment for an enrollment. The mobile app opens the
@@ -47,9 +49,12 @@ public class PaymentController {
     @Operation(summary = "Create a ClicToPay payment for an enrollment")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<?> createEnrollmentPayment(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId,
             @RequestParam(required = false) String groupId) {
+        // Before the try: its RuntimeException catch would turn a refusal
+        // into a 502 "provider error".
+        studentId = callerGuard.self(studentId);
         try {
             Map<String, Object> payment = paymentService.createEnrollmentPayment(studentId, courseId, groupId);
             return ResponseEntity.ok(payment);

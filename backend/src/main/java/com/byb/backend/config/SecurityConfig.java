@@ -93,6 +93,11 @@ public class SecurityConfig {
 
                     // Admin endpoints - ADMIN role only
                     auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                    // Review moderation predates the /api/admin prefix and
+                    // the dashboard calls it where it is, so it is named
+                    // here rather than moved. It was reachable by any
+                    // signed-in learner, who could hide any review.
+                    auth.requestMatchers("/api/reviews/admin/**").hasRole("ADMIN");
                     // All other endpoints require authentication
                     auth.anyRequest().authenticated();
                 })

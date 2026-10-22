@@ -1,6 +1,7 @@
 package com.byb.backend.controller;
 
 import com.byb.backend.dto.course.CourseResponse;
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.CourseService;
 import com.byb.backend.service.InteractionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,18 +17,25 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/interactions")
 @RequiredArgsConstructor
+/**
+ * A learner's own interactions with courses. Every studentId here must be
+ * the caller's: these feed the recommender and the "interested" counts the
+ * admin forms groups from, and were writable for any learner by anyone.
+ */
 @Tag(name = "Interactions", description = "Student-course interactions")
 @SecurityRequirement(name = "bearerAuth")
 public class InteractionController {
 
     private final InteractionService interactionService;
     private final CourseService courseService;
+    private final CallerGuard callerGuard;
 
     @PostMapping("/interested")
     @Operation(summary = "Student clicks 'Interested' button")
     public ResponseEntity<Void> markInterested(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         interactionService.trackInterest(studentId, courseId);
         return ResponseEntity.ok().build();
     }
@@ -35,8 +43,9 @@ public class InteractionController {
     @PostMapping("/view")
     @Operation(summary = "Track course view")
     public ResponseEntity<Void> trackView(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         interactionService.trackView(studentId, courseId);
         return ResponseEntity.ok().build();
     }
@@ -51,8 +60,9 @@ public class InteractionController {
     @DeleteMapping("/interested")
     @Operation(summary = "Cancel a previously expressed interest")
     public ResponseEntity<Void> cancelInterest(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         interactionService.cancelInterest(studentId, courseId);
         return ResponseEntity.ok().build();
     }
@@ -60,8 +70,9 @@ public class InteractionController {
     @GetMapping("/status")
     @Operation(summary = "Check if student has expressed interest and/or is enrolled")
     public ResponseEntity<Map<String, Boolean>> getInterestStatus(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         return ResponseEntity.ok(Map.of(
                 "interested", interactionService.hasExpressedInterest(studentId, courseId),
                 "enrolled", interactionService.isEnrolled(studentId, courseId)
@@ -77,8 +88,9 @@ public class InteractionController {
     @PostMapping("/saved")
     @Operation(summary = "Toggle a course in the student's favourites")
     public ResponseEntity<Map<String, Boolean>> toggleSaved(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         boolean nowSaved = interactionService.toggleSaved(studentId, courseId);
         return ResponseEntity.ok(Map.of("saved", nowSaved));
     }
@@ -90,8 +102,9 @@ public class InteractionController {
     @GetMapping("/saved/status")
     @Operation(summary = "Check if a single course is in the student's favourites")
     public ResponseEntity<Map<String, Boolean>> isSaved(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId) {
+        studentId = callerGuard.self(studentId);
         return ResponseEntity.ok(Map.of(
                 "saved", interactionService.isSaved(studentId, courseId)
         ));
@@ -106,6 +119,7 @@ public class InteractionController {
     @GetMapping("/saved/student/{studentId}")
     @Operation(summary = "List the student's favourite courses with full details")
     public ResponseEntity<List<CourseResponse>> getSavedCourses(@PathVariable String studentId) {
+        callerGuard.selfOrAdmin(studentId);
         return ResponseEntity.ok(courseService.getSavedCoursesForStudent(studentId));
     }
 }

@@ -8,6 +8,7 @@ import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.StudentRepository;
 import com.byb.backend.repository.TrainerRepository;
 import com.byb.backend.security.AuthenticatedUser;
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.EnrollmentService;
 import com.byb.backend.service.FileAccessService;
 import com.byb.backend.service.ReceiptDeliveryService;
@@ -41,10 +42,16 @@ public class EnrollmentController {
     private final CourseRepository courseRepository;
     private final TrainerRepository trainerRepository;
     private final ObjectMapper objectMapper;
+    private final CallerGuard callerGuard;
 
     @GetMapping("/course/{courseId}")
     @Operation(summary = "Get all enrollments for a course (trainer view)")
     public ResponseEntity<List<Map<String, Object>>> getCourseEnrollments(@PathVariable String courseId) {
+        // A course's roster is the trainer's and the administrators' to
+        // see — not other learners', and not other trainers'.
+        Course course = courseRepository.findByCourseId(courseId).orElse(null);
+        if (course == null) return ResponseEntity.notFound().build();
+        callerGuard.requireOwnerOrAdmin(course.getTrainerId());
         List<Enrollment> enrollments = enrollmentRepository.findByCourseId(courseId);
         List<Map<String, Object>> result = enrollments.stream().map(e -> {
             Map<String, Object> m = new java.util.LinkedHashMap<>();
@@ -69,13 +76,16 @@ public class EnrollmentController {
     @PostMapping("/confirm")
     @Operation(summary = "Student confirms enrollment (requires successful Konnect payment for paid courses)")
     public ResponseEntity<Enrollment> confirmEnrollment(
-            @RequestParam String studentId,
+            @RequestParam(required = false) String studentId,
             @RequestParam String courseId,
             @RequestParam(required = false) String groupId,
             // For paid courses this MUST be a Konnect paymentRef returned
             // by POST /api/payments/enrollment-payment and completed via
             // the user's redirect flow. Optional for free courses.
             @RequestParam(required = false) String paymentRef) {
+        // A learner enrolls themselves. isPaidFor already stops a payment
+        // being reused, but nothing stopped enrolling someone else.
+        studentId = callerGuard.self(studentId);
         Enrollment enrollment = enrollmentService.confirmEnrollment(
                 studentId, courseId, groupId, paymentRef);
         return ResponseEntity.ok(enrollment);
@@ -84,6 +94,7 @@ public class EnrollmentController {
     @GetMapping("/student/{studentId}")
     @Operation(summary = "Get all enrollments for student")
     public ResponseEntity<List<Map<String, Object>>> getStudentEnrollments(@PathVariable String studentId) {
+        callerGuard.selfOrAdmin(studentId);
         List<Enrollment> enrollments = enrollmentService.getStudentEnrollments(studentId);
         return ResponseEntity.ok(withCourseDetails(enrollments));
     }
@@ -91,6 +102,7 @@ public class EnrollmentController {
     @GetMapping("/student/{studentId}/active")
     @Operation(summary = "Get active enrollments for student")
     public ResponseEntity<List<Map<String, Object>>> getActiveEnrollments(@PathVariable String studentId) {
+        callerGuard.selfOrAdmin(studentId);
         List<Enrollment> enrollments = enrollmentService.getActiveEnrollments(studentId);
         return ResponseEntity.ok(withCourseDetails(enrollments));
     }
@@ -133,6 +145,11 @@ public class EnrollmentController {
     @PutMapping("/{enrollmentId}/start")
     @Operation(summary = "Start an enrollment (mark as active)")
     public ResponseEntity<Enrollment> startEnrollment(@PathVariable String enrollmentId) {
+        // No client calls this or /complete — group formation and
+        // CourseLifecycleService move enrollments along. Left reachable
+        // by any account, they let a learner mark themselves completed,
+        // which is what unlocks the review. Administrators only.
+        callerGuard.requireAdmin();
         Enrollment enrollment = enrollmentService.startEnrollment(enrollmentId);
         return ResponseEntity.ok(enrollment);
     }
@@ -140,6 +157,7 @@ public class EnrollmentController {
     @PutMapping("/{enrollmentId}/complete")
     @Operation(summary = "Complete an enrollment")
     public ResponseEntity<Enrollment> completeEnrollment(@PathVariable String enrollmentId) {
+        callerGuard.requireAdmin();
         Enrollment enrollment = enrollmentService.completeEnrollment(enrollmentId);
         return ResponseEntity.ok(enrollment);
     }

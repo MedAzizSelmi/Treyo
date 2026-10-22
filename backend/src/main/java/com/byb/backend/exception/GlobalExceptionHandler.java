@@ -2,6 +2,7 @@ package com.byb.backend.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -32,6 +33,19 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now()
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    /**
+     * Thrown by CallerGuard when a request names a user who is not the
+     * caller. Without this it would fall into the RuntimeException handler
+     * above and read as a 400. Same body as MessageController's refusals,
+     * and the message is fixed so it says nothing about what exists.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "error", "Not available",
+                "message", "You don't have access to that."));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

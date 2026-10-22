@@ -1,6 +1,7 @@
 package com.byb.backend.controller;
 
 import com.byb.backend.dto.recommendation.RecommendationResponse;
+import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.MLRecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -17,12 +18,16 @@ import org.springframework.web.bind.annotation.*;
 public class RecommendationController {
 
     private final MLRecommendationService mlRecommendationService;
+    private final CallerGuard callerGuard;
 
     @GetMapping("/student/{studentId}")
     @Operation(summary = "Get AI-powered recommendations for student")
     public ResponseEntity<RecommendationResponse> getRecommendations(
             @PathVariable String studentId,
             @RequestParam(defaultValue = "10") int count) {
+        // Recommendations are built from a learner's views, searches and
+        // enrollments, so they describe that learner. Theirs to read.
+        callerGuard.selfOrAdmin(studentId);
         RecommendationResponse recommendations = mlRecommendationService.getRecommendations(studentId, count);
         return ResponseEntity.ok(recommendations);
     }

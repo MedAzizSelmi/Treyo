@@ -198,14 +198,23 @@ public class NotificationService {
         return notificationRepository.countUnreadByUserId(userId);
     }
 
+    /**
+     * Mark a notification read, if it belongs to {@code userId}.
+     *
+     * @return false when there is no such notification or it is someone
+     *         else's — the caller cannot tell which, by design
+     */
     @Transactional
-    public void markAsRead(String notificationId) {
-        Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+    public boolean markAsReadFor(String notificationId, String userId) {
+        Notification notification = notificationRepository.findById(notificationId).orElse(null);
+        if (notification == null || userId == null || !userId.equals(notification.getUserId())) {
+            return false;
+        }
 
         notification.setIsRead(true);
         notification.setReadAt(LocalDateTime.now());
         notificationRepository.save(notification);
+        return true;
     }
 
     private NotificationResponse mapToResponse(Notification notification) {

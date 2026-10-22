@@ -54,8 +54,13 @@ have already added columns as nullable with no default, so
 column, backfill, then set the default and NOT NULL as separate statements.
 
 **Identity comes from the token, never from a request parameter.** Use
-`FileAccessService.caller()`. Every endpoint under `/api/messages` once took
-the user id as a parameter and acted on it unchecked.
+`CallerGuard` (`self`, `selfOrAdmin`, `requireOwnerOrAdmin`, `requireAdmin`),
+or `FileAccessService.caller()` underneath it. Every endpoint under
+`/api/messages`, and later most of the trainer, enrollment, notification,
+interaction, feed and review endpoints, took the user id as a parameter and
+acted on it unchecked. Clients still send those ids; the guard only accepts
+the caller's own. `OwnershipChecksTest` covers them — add a case when you
+add an endpoint that names a user.
 
 **Only access tokens authenticate.** Refresh tokens and 2FA challenges carry
 `userId` and `role` too; `JwtAuthenticationFilter` rejects anything with a
