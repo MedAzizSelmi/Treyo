@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2, Lock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { connectRealtime, onRealtime, isRealtimeConnected } from '@/lib/realtime';
+import { connectRealtime, onRealtime, isRealtimeConnected, publishTyping } from '@/lib/realtime';
 import {
   getAdminConversations,
   getGroupMessages,
@@ -53,6 +53,9 @@ export default function AdminMessagesPage() {
   const selectedRef = useRef<any | null>(null);
   const loadMessagesRef = useRef<(() => void) | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // When this admin last announced typing; one frame every few seconds,
+  // not one per keystroke, each of which fans out to every member.
+  const lastTypingSent = useRef(0);
 
   // ── Resolve "who is logged in" once on mount ─────────────────────
   useEffect(() => {
@@ -98,6 +101,9 @@ export default function AdminMessagesPage() {
       // preview and its ordering.
       loadConversations();
       if (selectedRef.current?.groupId && msg?.groupId === selectedRef.current.groupId) {
+        // Their message has landed, so they have stopped typing it.
+        setTypingName('');
+        if (typingTimer.current) clearTimeout(typingTimer.current);
         loadMessagesRef.current?.();
       }
     });
@@ -266,7 +272,7 @@ export default function AdminMessagesPage() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, selected]);
+  }, [messages, selected, typingName]);
 
   if (!adminId || convLoading) return <LoadingSpinner />;
 
@@ -548,6 +554,23 @@ export default function AdminMessagesPage() {
                     );
                   })
                 )}
+
+                {/* Where the next message will appear, so it is seen;
+                    the header line alone was easy to miss. */}
+                {typingName && (
+                  <div className="self-start flex flex-col gap-1" aria-live="polite">
+                    <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-card-hover border border-border px-4 py-3">
+                      {[0, 1, 2].map((i) => (
+                        <span
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce"
+                          style={{ animationDelay: `${i * 160}ms` }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-[11px] text-muted pl-1">{typingName} is typing…</span>
+                  </div>
+                )}
               </div>
 
               {/* Composer.
@@ -599,7 +622,14 @@ export default function AdminMessagesPage() {
 
                 <textarea
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    const now = Date.now();
+                    if (e.target.value && selected?.groupId && now - lastTypingSent.current > 2500) {
+                      lastTypingSent.current = now;
+                      publishTyping(selected.groupId);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     // Enter sends; Shift+Enter inserts newline (standard chat pattern).
                     if (e.key === 'Enter' && !e.shiftKey) {

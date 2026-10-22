@@ -84,7 +84,7 @@ const AUTH_FAILURE_SAFE_PATHS = ['/auth/login', '/auth/register', '/auth/refresh
 // a screen firing several calls together triggers one refresh, not five.
 let refreshInFlight: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
     if (refreshInFlight) return refreshInFlight;
 
     refreshInFlight = (async () => {

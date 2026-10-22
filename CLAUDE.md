@@ -71,6 +71,14 @@ add an endpoint that names a user.
 `userId` and `role` too; `JwtAuthenticationFilter` rejects anything with a
 `type` claim. Do not relax that.
 
+**`/ws/**` is `permitAll` on purpose.** A WebSocket upgrade cannot carry an
+Authorization header, so requiring a JWT there refused every handshake with
+a 401 — live chat never worked until it was opened. Authentication happens
+on the STOMP CONNECT frame in `StompAuthChannelInterceptor`.
+`GroupChatRealtimeTest` connects the way the app does; if it fails, chat is
+down. In production nginx needs a `location /ws/` block with the Upgrade
+headers, or `/ws` falls through to the dashboard.
+
 **Payment status is re-verified server-side, always.** Never trust a client
 saying a payment succeeded. `PaymentService.isPaidFor` also checks the order
 number references the right student *and* course — otherwise a valid reference

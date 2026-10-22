@@ -332,7 +332,10 @@
         "notMember": "You're not a member of this group",
         "couldNotSendImage": "Could not send image",
         "grantPhotoAccess": "Please grant photo library access to send images.",
-        "messageRequired": "Message content is required"
+        "messageRequired": "Message content is required",
+        "typingOne": "{{name}} is typing…",
+        "typingTwo": "{{first}} and {{second}} are typing…",
+        "typingMany": "{{count}} people are typing…"
     },
     "trainers": {
         "title": "Trainers",

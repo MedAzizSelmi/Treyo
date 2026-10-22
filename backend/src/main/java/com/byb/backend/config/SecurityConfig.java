@@ -76,7 +76,19 @@ public class SecurityConfig {
                             // (show-details=never), so it reveals only
                             // UP/DOWN.
                             "/actuator/health",
-                            "/error"
+                            "/error",
+                            // The WebSocket handshake. It must be open here
+                            // because the upgrade request carries no
+                            // Authorization header — neither browsers nor
+                            // React Native can add one — so requiring a JWT
+                            // at this layer refused every connection with a
+                            // 401, and live chat never worked at all.
+                            // It is not unguarded: StompAuthChannelInterceptor
+                            // refuses a CONNECT frame without a valid access
+                            // token and any subscription outside the caller's
+                            // own /user/queue destinations, and WebSocketConfig
+                            // limits browser origins.
+                            "/ws/**"
                     ).permitAll();
 
                     // Interactive API docs map the whole attack surface,

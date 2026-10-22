@@ -26,6 +26,11 @@ public class MessageResponse {
     private String receiverId;
     private String receiverType;
     private String conversationId;
+    // The group a group message belongs to; null for a direct message.
+    // Both chat screens match live frames on this field and drop any
+    // frame without it — it was missing, so every message pushed over
+    // the socket was discarded on arrival.
+    private String groupId;
     private String content;
     private String messageType;
     private String attachmentUrl;

@@ -736,6 +736,7 @@ public class MessageService {
                 .receiverId(message.getReceiverId())
                 .receiverType(message.getReceiverType())
                 .conversationId(message.getConversationId())
+                .groupId(groupIdFromConversation(message.getConversationId()))
                 .content(message.getContent())
                 .messageType(message.getMessageType())
                 .attachmentUrl(message.getAttachmentUrl())

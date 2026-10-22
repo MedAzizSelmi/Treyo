@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { authService, messageService, groupService, fetchUpload, API_BASE_URL } from '../services/api';
 import { onRealtime, isRealtimeConnected, publishTyping } from '../services/realtime';
 import { setActiveConversation, conversationKeyForGroup } from '../services/push';
+import { TypingBubble } from '../components/TypingBubble';
 
 // Fallback only. Messages arrive over STOMP now, and this interval is
 // skipped entirely while the socket is up — it covers a dropped
@@ -181,9 +182,9 @@ export default function GroupChatScreen() {
     const typingLabel = (() => {
         const names = Object.values(typingNames).filter(Boolean);
         if (names.length === 0) return '';
-        if (names.length === 1) return `${names[0]} is typing…`;
-        if (names.length === 2) return `${names[0]} and ${names[1]} are typing…`;
-        return `${names.length} people are typing…`;
+        if (names.length === 1) return t('chat.typingOne', { name: names[0] });
+        if (names.length === 2) return t('chat.typingTwo', { first: names[0], second: names[1] });
+        return t('chat.typingMany', { count: names.length });
     })();
 
     // Who is typing. Each frame refreshes that person's expiry: the
@@ -266,6 +267,18 @@ export default function GroupChatScreen() {
         if (!groupId) return;
         return onRealtime('group-messages', (msg: any) => {
             if (!msg || String(msg.groupId) !== String(groupId)) return;
+            // Their message has landed, so they have stopped typing it.
+            if (msg.senderId) {
+                const id = String(msg.senderId);
+                if (typingTimers.current[id]) clearTimeout(typingTimers.current[id]);
+                delete typingTimers.current[id];
+                setTypingNames(prev => {
+                    if (!(id in prev)) return prev;
+                    const next = { ...prev };
+                    delete next[id];
+                    return next;
+                });
+            }
             if (sendingRef.current) return;
             load(true);
         });
@@ -695,6 +708,7 @@ export default function GroupChatScreen() {
                                 </View>
                             );
                         })}
+                        {!!typingLabel && <TypingBubble label={typingLabel} />}
                     </ScrollView>
                 )}
 

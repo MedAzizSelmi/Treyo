@@ -13,12 +13,14 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 /**
  * The real-time messaging transport.
  *
- * A WebSocket upgrade carries no Authorization header, so none of the
- * HTTP security applies to it. Until StompAuthChannelInterceptor was
- * added, that meant the broker accepted any connection from any origin
- * and served any subscription — private conversations included.
- * Authentication now happens on the CONNECT frame, and subscriptions are
- * limited to the caller's own user destinations.
+ * A WebSocket upgrade carries no Authorization header, so the JWT check
+ * that guards the REST API cannot apply to it: SecurityConfig leaves
+ * /ws/** open, and had to — while it was not, every handshake got a 401
+ * and nothing ever connected. Until StompAuthChannelInterceptor was
+ * added, an open handshake meant the broker accepted any connection from
+ * any origin and served any subscription — private conversations
+ * included. Authentication now happens on the CONNECT frame, and
+ * subscriptions are limited to the caller's own user destinations.
  */
 @Configuration
 @EnableWebSocketMessageBroker

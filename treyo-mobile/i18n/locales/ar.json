@@ -332,7 +332,10 @@
         "notMember": "أنت لست عضوًا في هذه المجموعة",
         "couldNotSendImage": "تعذر إرسال الصورة",
         "grantPhotoAccess": "يرجى السماح بالوصول إلى الصور لإرسال الصور.",
-        "messageRequired": "محتوى الرسالة مطلوب"
+        "messageRequired": "محتوى الرسالة مطلوب",
+        "typingOne": "{{name}} يكتب…",
+        "typingTwo": "{{first}} و{{second}} يكتبان…",
+        "typingMany": "{{count}} أشخاص يكتبون…"
     },
     "trainers": {
         "title": "المدربون",

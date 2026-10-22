@@ -332,7 +332,10 @@
         "notMember": "Vous n'êtes pas membre de ce groupe",
         "couldNotSendImage": "Impossible d'envoyer l'image",
         "grantPhotoAccess": "Veuillez autoriser l'accès à la galerie pour envoyer des images.",
-        "messageRequired": "Le message ne peut pas être vide"
+        "messageRequired": "Le message ne peut pas être vide",
+        "typingOne": "{{name}} écrit…",
+        "typingTwo": "{{first}} et {{second}} écrivent…",
+        "typingMany": "{{count}} personnes écrivent…"
     },
     "trainers": {
         "title": "Formateurs",

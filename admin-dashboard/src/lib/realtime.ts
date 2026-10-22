@@ -68,14 +68,25 @@ function subscribeAll() {
 /** Open the connection, or do nothing if it is already open. */
 export function connectRealtime(): void {
     if (client?.active) return;
-    const token = typeof window === 'undefined' ? null : localStorage.getItem('admin_token');
-    if (!token) return;
+    const storedToken = () =>
+        typeof window === 'undefined' ? null : localStorage.getItem('admin_token');
+    if (!storedToken()) return;
 
     client = new Client({
         brokerURL: wsUrl(),
         // On the CONNECT frame, not the URL: a query string ends up in
         // access logs, and a token in a log is a credential in a log.
-        connectHeaders: { Authorization: `Bearer ${token}` },
+        // Read before every attempt: reconnecting with the token the page
+        // first loaded with meant a refused socket once it expired, even
+        // after the admin had signed in again.
+        beforeConnect: async (c) => {
+            const token = storedToken();
+            if (!token) {
+                await c.deactivate();
+                return;
+            }
+            c.connectHeaders = { Authorization: `Bearer ${token}` };
+        },
         reconnectDelay: 4000,
         heartbeatIncoming: 10000,
         heartbeatOutgoing: 10000,
@@ -85,7 +96,7 @@ export function connectRealtime(): void {
         },
         onStompError: (frame) => {
             // The server refuses the socket outright on a bad or expired
-            // token; retrying with the same one will not help.
+            // token; the next attempt picks up whatever token is stored now.
             console.warn('[realtime] refused:', frame.headers['message']);
         },
         onWebSocketClose: () => {
@@ -121,4 +132,20 @@ export function onRealtime(channel: Channel, fn: Listener): () => void {
 
 export function isRealtimeConnected(): boolean {
     return connected;
+}
+
+/**
+ * Tell a group that this admin is typing. Best-effort, never awaited.
+ *
+ * The dashboard showed other people typing but never said so itself, so
+ * learners and trainers in the app never saw an administrator typing.
+ * Throttled by the caller: this runs from an onChange handler.
+ */
+export function publishTyping(groupId: string): void {
+    if (!client || !connected) return;
+    try {
+        client.publish({ destination: '/app/typing', body: JSON.stringify({ groupId }) });
+    } catch {
+        // A dropped indicator is not worth surfacing.
+    }
 }
