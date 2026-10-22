@@ -489,7 +489,11 @@
         "updateFailedBody": "No se pudo cambiar la contraseña. Inténtalo de nuevo.",
         "signOutEverywhere": "Cerrar sesión en todos los dispositivos",
         "signOutEverywhereBody": "Cerrar sesión en Treyo en todos los dispositivos, incluido este",
-        "signOutEverywhereConfirm": "Se cerrará la sesión en todos los dispositivos, incluido este. Los demás pueden seguir conectados hasta una hora antes de ser desconectados."
+        "signOutEverywhereConfirm": "Se cerrará la sesión en todos los dispositivos, incluido este. Los demás pueden seguir conectados hasta una hora antes de ser desconectados.",
+        "useCode": "¿Te registraste con Google o LinkedIn? Crea una contraseña con un código enviado a tu correo.",
+        "usePassword": "Usar mi contraseña actual",
+        "confirmationCode": "Código de confirmación",
+        "missingCodeFieldsBody": "Introduce el código del correo y tu nueva contraseña dos veces."
     },
     "feed": {
         "title": "Feed del día",
@@ -562,7 +566,10 @@
         "deletedTitle": "Cuenta eliminada",
         "deletedBody": "Tus datos personales se han borrado. Gracias por usar Treyo.",
         "wrongPassword": "Esa contraseña no coincide con esta cuenta.",
-        "failed": "No se pudo eliminar tu cuenta. Inténtalo de nuevo."
+        "failed": "No se pudo eliminar tu cuenta. Inténtalo de nuevo.",
+        "useCode": "¿Iniciaste sesión con Google o LinkedIn, u olvidaste tu contraseña? Confirma con un código enviado a tu correo.",
+        "usePassword": "Usar mi contraseña",
+        "confirmCode": "Confirma con un código enviado a tu correo"
     },
     "twoFactor": {
         "title": "Autenticación de dos factores",
@@ -599,5 +606,15 @@
         "disabledTitle": "Dos factores desactivado",
         "disabledBody": "Tu cuenta ahora inicia sesión solo con contraseña.",
         "disableFailed": "No se pudo desactivar."
+    },
+    "emailCode": {
+        "send": "Enviarme un código por correo",
+        "sentTo": "Enviamos un código de 6 dígitos a {{email}}. Caduca en 15 minutos.",
+        "placeholder": "Código de 6 dígitos",
+        "resend": "Reenviar el código",
+        "resendIn": "Reenviar en {{seconds}} s",
+        "tooMany": "Se han solicitado demasiados códigos. Espera un momento e inténtalo de nuevo.",
+        "sendFailed": "No pudimos enviar el código. Inténtalo de nuevo.",
+        "wrongCode": "Ese código es incorrecto o ha caducado. Solicita uno nuevo."
     }
 }

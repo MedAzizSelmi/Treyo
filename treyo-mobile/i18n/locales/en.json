@@ -489,7 +489,11 @@
         "updateFailedBody": "Could not change password. Please try again.",
         "signOutEverywhere": "Sign out everywhere",
         "signOutEverywhereBody": "Sign out of Treyo on every device, including this one",
-        "signOutEverywhereConfirm": "Every device will be signed out, including this one. Other devices may stay signed in for up to an hour before they are cut off."
+        "signOutEverywhereConfirm": "Every device will be signed out, including this one. Other devices may stay signed in for up to an hour before they are cut off.",
+        "useCode": "Signed up with Google or LinkedIn? Set a password with a code sent to your email.",
+        "usePassword": "Use my current password instead",
+        "confirmationCode": "Confirmation code",
+        "missingCodeFieldsBody": "Enter the code from your email and your new password twice."
     },
     "feed": {
         "title": "Daily Feed",
@@ -562,7 +566,10 @@
         "deletedTitle": "Account deleted",
         "deletedBody": "Your personal data has been erased. Thank you for using Treyo.",
         "wrongPassword": "That password doesn't match this account.",
-        "failed": "Your account could not be deleted. Please try again."
+        "failed": "Your account could not be deleted. Please try again.",
+        "useCode": "Signed in with Google or LinkedIn, or forgot your password? Confirm with a code sent to your email.",
+        "usePassword": "Use my password instead",
+        "confirmCode": "Confirm with a code sent to your email"
     },
     "twoFactor": {
         "title": "Two-factor authentication",
@@ -599,5 +606,15 @@
         "disabledTitle": "Two-factor authentication off",
         "disabledBody": "Your account now signs in with a password only.",
         "disableFailed": "Could not switch this off."
+    },
+    "emailCode": {
+        "send": "Email me a code",
+        "sentTo": "We sent a 6-digit code to {{email}}. It expires in 15 minutes.",
+        "placeholder": "6-digit code",
+        "resend": "Resend code",
+        "resendIn": "Resend in {{seconds}}s",
+        "tooMany": "Too many codes requested. Please wait a while and try again.",
+        "sendFailed": "We couldn't send the code. Please try again.",
+        "wrongCode": "That code is wrong or has expired. Ask for a new one."
     }
 }

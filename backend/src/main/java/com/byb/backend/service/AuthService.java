@@ -682,11 +682,30 @@ public class AuthService {
      * would eventually be missed.
      */
     public void changePassword(String email, String role, String currentPassword, String newPassword) {
-        applyPasswordChange(email, role, currentPassword, newPassword);
+        applyPasswordChange(email, role, hash -> requireCurrentPassword(currentPassword, hash), newPassword);
         revokeAllSessions(email);
     }
 
-    private void applyPasswordChange(String email, String role, String currentPassword, String newPassword) {
+    /**
+     * Set a password without the current one, for a caller who has just
+     * proved themselves with an emailed code (ConfirmationCodeService).
+     *
+     * This is how an account created through Google or LinkedIn gets a
+     * password at all: it was given a random one nobody knows, so the
+     * current-password check above could never pass. The code is checked
+     * by the controller before this is reached.
+     */
+    public void setPasswordAfterCode(String email, String role, String newPassword) {
+        applyPasswordChange(email, role, hash -> { }, newPassword);
+        revokeAllSessions(email);
+    }
+
+    /**
+     * @param checkCurrent given the account's stored hash; throws to refuse
+     */
+    private void applyPasswordChange(String email, String role,
+                                     java.util.function.Consumer<String> checkCurrent,
+                                     String newPassword) {
         // Role-first, because one email can exist in more than one table:
         // promoting a student/trainer to admin creates an Admin row and
         // leaves the original intact. Scanning student-then-trainer-then-
@@ -699,7 +718,7 @@ public class AuthService {
         if ("ADMIN".equals(r)) {
             Admin a = adminRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Account not found"));
-            requireCurrentPassword(currentPassword, a.getPasswordHash());
+            checkCurrent.accept(a.getPasswordHash());
             a.setPasswordHash(passwordEncoder.encode(newPassword));
             adminRepository.save(a);
             return;
@@ -708,7 +727,7 @@ public class AuthService {
         if ("TRAINER".equals(r)) {
             Trainer t = trainerRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Account not found"));
-            requireCurrentPassword(currentPassword, t.getPasswordHash());
+            checkCurrent.accept(t.getPasswordHash());
             t.setPasswordHash(passwordEncoder.encode(newPassword));
             trainerRepository.save(t);
             return;
@@ -717,7 +736,7 @@ public class AuthService {
         if ("STUDENT".equals(r)) {
             Student s = studentRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Account not found"));
-            requireCurrentPassword(currentPassword, s.getPasswordHash());
+            checkCurrent.accept(s.getPasswordHash());
             s.setPasswordHash(passwordEncoder.encode(newPassword));
             studentRepository.save(s);
             return;
@@ -728,7 +747,7 @@ public class AuthService {
         var studentOpt = studentRepository.findByEmail(email);
         if (studentOpt.isPresent()) {
             Student s = studentOpt.get();
-            requireCurrentPassword(currentPassword, s.getPasswordHash());
+            checkCurrent.accept(s.getPasswordHash());
             s.setPasswordHash(passwordEncoder.encode(newPassword));
             studentRepository.save(s);
             return;
@@ -737,7 +756,7 @@ public class AuthService {
         var trainerOpt = trainerRepository.findByEmail(email);
         if (trainerOpt.isPresent()) {
             Trainer t = trainerOpt.get();
-            requireCurrentPassword(currentPassword, t.getPasswordHash());
+            checkCurrent.accept(t.getPasswordHash());
             t.setPasswordHash(passwordEncoder.encode(newPassword));
             trainerRepository.save(t);
             return;
@@ -746,7 +765,7 @@ public class AuthService {
         var adminOpt = adminRepository.findByEmail(email);
         if (adminOpt.isPresent()) {
             Admin a = adminOpt.get();
-            requireCurrentPassword(currentPassword, a.getPasswordHash());
+            checkCurrent.accept(a.getPasswordHash());
             a.setPasswordHash(passwordEncoder.encode(newPassword));
             adminRepository.save(a);
             return;

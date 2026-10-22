@@ -4,6 +4,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.byb.backend.model.VerificationToken;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -82,6 +83,42 @@ public class EmailService {
     }
 
     /**
+     * A six-digit code confirming an account action from inside the app
+     * (ConfirmationCodeService).
+     *
+     * Unlike the links above, the code has to appear in the body: it is
+     * typed into the app, so there is no page to click through to. It is
+     * short-lived and single-use, and the message says what it is for so
+     * that someone who did not ask for it knows what was attempted.
+     */
+    @Async
+    public void sendConfirmationCodeEmail(String toEmail, String userName, String code,
+                                          VerificationToken.Purpose purpose, int ttlMinutes) {
+        boolean deletion = purpose == VerificationToken.Purpose.ACCOUNT_DELETE;
+        String subject = deletion
+                ? "Your Treyo account deletion code"
+                : "Your Treyo code to set a password";
+        String action = deletion
+                ? "To confirm that you want to delete your Treyo account, enter this code in the app."
+                : "To set a password for your Treyo account, enter this code in the app.";
+        String footer = deletion
+                ? "If you didn't ask to delete your account, don't share this code with anyone. "
+                        + "Your account stays as it is. Consider changing your Google, LinkedIn or "
+                        + "email password, since someone may have access to your phone."
+                : "If you didn't ask for this, you can ignore the message — nothing changes "
+                        + "without the code.";
+        String html = template(
+                deletion ? "Confirm account deletion" : "Set your password",
+                "Hi " + safe(userName) + ",",
+                action + " It expires in " + ttlMinutes + " minutes.",
+                code,
+                null, null,
+                footer
+        );
+        send(toEmail, subject, html);
+    }
+
+    /**
      * Sent when an admin clicks "Approve" on a pending trainer. The
      * trainer can sign in immediately after — we tell them so they
      * know what to do next.
@@ -137,6 +174,22 @@ public class EmailService {
             String buttonLabel, String buttonHref,
             String footer
     ) {
+        return template(headline, greeting, body, null, buttonLabel, buttonHref, footer);
+    }
+
+    /** simpleTemplate, plus an optional code shown large under the body. */
+    private String template(
+            String headline, String greeting, String body, String code,
+            String buttonLabel, String buttonHref,
+            String footer
+    ) {
+        String codeBlock = "";
+        if (code != null) {
+            codeBlock = "<tr><td align=\"center\" style=\"padding:4px 0 24px;\">" +
+                    "<div style=\"display:inline-block;background:#f1f3f6;border-radius:10px;padding:14px 24px;" +
+                    "font-family:'Courier New',monospace;font-size:30px;font-weight:700;letter-spacing:8px;color:#1a1a2e;\">" +
+                    safe(code) + "</div></td></tr>";
+        }
         String button = "";
         if (buttonLabel != null && buttonHref != null) {
             button = "<tr><td align=\"center\" style=\"padding:8px 0 24px;\">" +
@@ -149,6 +202,7 @@ public class EmailService {
                 "<tr><td style=\"font-size:22px;font-weight:700;color:#1a1a2e;padding-bottom:12px;\">" + safe(headline) + "</td></tr>" +
                 "<tr><td style=\"font-size:14px;color:#444;padding-bottom:8px;\">" + safe(greeting) + "</td></tr>" +
                 "<tr><td style=\"font-size:14px;color:#444;line-height:21px;padding-bottom:20px;white-space:pre-wrap;\">" + safe(body) + "</td></tr>" +
+                codeBlock +
                 button +
                 "<tr><td style=\"font-size:12px;color:#888;line-height:18px;padding-top:16px;border-top:1px solid #eee;\">" + safe(footer) + "</td></tr>" +
                 "<tr><td style=\"font-size:11px;color:#aaa;padding-top:16px;\">Treyo · Smart match, swift growth</td></tr>" +

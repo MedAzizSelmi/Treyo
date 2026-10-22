@@ -489,7 +489,11 @@
         "updateFailedBody": "Impossible de changer le mot de passe. Réessayez.",
         "signOutEverywhere": "Déconnecter tous les appareils",
         "signOutEverywhereBody": "Se déconnecter de Treyo sur tous les appareils, y compris celui-ci",
-        "signOutEverywhereConfirm": "Tous les appareils seront déconnectés, y compris celui-ci. Les autres appareils peuvent rester connectés jusqu'à une heure avant d'être coupés."
+        "signOutEverywhereConfirm": "Tous les appareils seront déconnectés, y compris celui-ci. Les autres appareils peuvent rester connectés jusqu'à une heure avant d'être coupés.",
+        "useCode": "Inscrit avec Google ou LinkedIn ? Définissez un mot de passe avec un code envoyé par e-mail.",
+        "usePassword": "Utiliser mon mot de passe actuel",
+        "confirmationCode": "Code de confirmation",
+        "missingCodeFieldsBody": "Saisissez le code reçu par e-mail et deux fois votre nouveau mot de passe."
     },
     "feed": {
         "title": "Actualité du jour",
@@ -562,7 +566,10 @@
         "deletedTitle": "Compte supprimé",
         "deletedBody": "Vos données personnelles ont été effacées. Merci d'avoir utilisé Treyo.",
         "wrongPassword": "Ce mot de passe ne correspond pas à ce compte.",
-        "failed": "Votre compte n'a pas pu être supprimé. Veuillez réessayer."
+        "failed": "Votre compte n'a pas pu être supprimé. Veuillez réessayer.",
+        "useCode": "Connecté avec Google ou LinkedIn, ou mot de passe oublié ? Confirmez avec un code envoyé par e-mail.",
+        "usePassword": "Utiliser mon mot de passe",
+        "confirmCode": "Confirmez avec un code envoyé par e-mail"
     },
     "twoFactor": {
         "title": "Double authentification",
@@ -599,5 +606,15 @@
         "disabledTitle": "Double authentification désactivée",
         "disabledBody": "Votre compte se connecte désormais avec un mot de passe uniquement.",
         "disableFailed": "Impossible de désactiver."
+    },
+    "emailCode": {
+        "send": "M'envoyer un code par e-mail",
+        "sentTo": "Nous avons envoyé un code à 6 chiffres à {{email}}. Il expire dans 15 minutes.",
+        "placeholder": "Code à 6 chiffres",
+        "resend": "Renvoyer le code",
+        "resendIn": "Renvoyer dans {{seconds}} s",
+        "tooMany": "Trop de codes demandés. Patientez un moment puis réessayez.",
+        "sendFailed": "Impossible d'envoyer le code. Veuillez réessayer.",
+        "wrongCode": "Ce code est incorrect ou a expiré. Demandez-en un nouveau."
     }
 }

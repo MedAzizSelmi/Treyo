@@ -52,6 +52,11 @@ dated `YYYY-MM-DD_name.sql`, idempotent, applied by hand. `ddl-auto=update` will
 have already added columns as nullable with no default, so
 `ADD COLUMN IF NOT EXISTS … NOT NULL DEFAULT x` silently does nothing — add the
 column, backfill, then set the default and NOT NULL as separate statements.
+Don't put `nullable = false` on a new field's `@Column` either: Hibernate
+then tries to add it as NOT NULL to a table with rows, Postgres refuses, and
+the column silently never appears. Leave NOT NULL to the migration. New enum
+values need the column's CHECK constraint rebuilt too — Hibernate never
+alters one (see `2026-10-22_account_confirmation_codes.sql`).
 
 **Identity comes from the token, never from a request parameter.** Use
 `CallerGuard` (`self`, `selfOrAdmin`, `requireOwnerOrAdmin`, `requireAdmin`),

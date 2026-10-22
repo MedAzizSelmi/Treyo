@@ -44,7 +44,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final String[] EMAIL_PATHS = {
             "/api/auth/forgot-password",
             "/api/auth/resend-verification",
-            "/api/auth/register"
+            "/api/auth/register",
+            // Signed-in, and limited per account in ConfirmationCodeService
+            // too; this per-IP cap is the cheap first line.
+            "/api/account/confirmation-code"
     };
 
     @Value("${app.ratelimit.enabled:true}")

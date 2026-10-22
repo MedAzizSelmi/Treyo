@@ -14,8 +14,9 @@ export const metadata = {
  * what gets submitted in the Play Console's data-safety form.
  *
  * It intentionally does not delete anything by itself: deletion needs
- * the password, and a public form that accepts an email address would be
- * a way to harass other people's accounts. It documents the in-app route
+ * the password (or a code emailed to the account, for accounts made with
+ * Google or LinkedIn), and a public form that accepts an email address
+ * would be a way to harass other people's accounts. It documents the in-app route
  * and the email fallback for users who have lost access to the app.
  */
 export default function DeleteAccountPage() {
@@ -37,7 +38,11 @@ export default function DeleteAccountPage() {
             <li>Open Treyo and sign in.</li>
             <li>Go to <strong>Settings → Security</strong>.</li>
             <li>Tap <strong>Delete account</strong>.</li>
-            <li>Confirm with your password.</li>
+            <li>
+              Confirm with your password. If you signed up with Google or
+              LinkedIn, or have forgotten your password, choose to receive a
+              code by email instead and enter it.
+            </li>
           </ol>
           <p className="text-sm text-muted mt-3">
             The account is deleted immediately and you are signed out.

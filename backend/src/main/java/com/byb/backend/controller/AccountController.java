@@ -1,10 +1,13 @@
 package com.byb.backend.controller;
 
 import com.byb.backend.dto.auth.ChangePasswordRequest;
+import com.byb.backend.model.VerificationToken.Purpose;
 import com.byb.backend.repository.StudentRepository;
 import com.byb.backend.repository.TrainerRepository;
+import com.byb.backend.security.AuthenticatedUser;
 import com.byb.backend.service.AccountDeletionService;
 import com.byb.backend.service.AuthService;
+import com.byb.backend.service.ConfirmationCodeService;
 import com.byb.backend.service.FileAccessService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -22,9 +25,14 @@ import java.util.Map;
 /**
  * The account's owner acting on their own account.
  *
- * Deletion is irreversible, so it asks for the password again rather
- * than trusting the token alone: a phone left unlocked for two minutes
- * should not be enough to erase someone's account.
+ * Deletion is irreversible, so it asks for proof again rather than
+ * trusting the token alone: a phone left unlocked for two minutes should
+ * not be enough to erase someone's account. The proof is the password, or
+ * a six-digit code emailed to the account's address. The code exists for
+ * accounts created through Google or LinkedIn, which were given a random
+ * password their owner never knew, and so could not be deleted from the
+ * app at all. It serves anyone who has forgotten their password too.
+ * Setting a password works the same way.
  *
  * Administrators are deliberately not covered. An admin who could delete
  * themselves could leave the platform with no administrator at all;
@@ -40,14 +48,19 @@ public class AccountController {
 
     private final AuthService authService;
     private final AccountDeletionService accountDeletionService;
+    private final ConfirmationCodeService confirmationCodeService;
     private final FileAccessService fileAccessService;
     private final StudentRepository studentRepository;
     private final TrainerRepository trainerRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Change the password, proving it with the current one — or, for an
+     * account that never had one it knows, with a PASSWORD_SET code.
+     */
     @PostMapping("/change-password")
     @Operation(summary = "Change password for the currently authenticated user")
-    public ResponseEntity<Map<String, String>> changePassword(
+    public ResponseEntity<?> changePassword(
             Authentication authentication,
             @Valid @RequestBody ChangePasswordRequest request
     ) {
@@ -60,8 +73,83 @@ public class AccountController {
                 .map(a -> a.substring("ROLE_".length()))
                 .findFirst()
                 .orElse(null);
-        authService.changePassword(email, role, request.getCurrentPassword(), request.getNewPassword());
+
+        boolean hasCode = request.getCode() != null && !request.getCode().isBlank();
+        boolean hasPassword = request.getCurrentPassword() != null && !request.getCurrentPassword().isBlank();
+        if (hasCode == hasPassword) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Confirmation required",
+                    "message", "Enter your current password, or a code sent to your email."));
+        }
+
+        if (hasCode) {
+            if (!confirmationCodeService.consume(email, Purpose.PASSWORD_SET, request.getCode())) {
+                return wrongCode();
+            }
+            authService.setPasswordAfterCode(email, role, request.getNewPassword());
+        } else {
+            authService.changePassword(email, role, request.getCurrentPassword(), request.getNewPassword());
+        }
         return ResponseEntity.ok(Map.of("message", "Password updated successfully"));
+    }
+
+    /**
+     * Email a six-digit code that confirms one action.
+     *
+     * Body: {@code { "purpose": "delete-account" | "set-password" }}.
+     * The code goes to the address on the account the caller is signed
+     * into; the request names no address, so it cannot be pointed at
+     * someone else's inbox.
+     */
+    @PostMapping("/confirmation-code")
+    @Operation(summary = "Email a code confirming account deletion or a password change")
+    public ResponseEntity<?> sendConfirmationCode(@RequestBody(required = false) Map<String, String> body) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Not signed in"));
+        }
+        if (caller.isAdmin()) {
+            return ResponseEntity.status(403).body(Map.of(
+                    "error", "Not available for administrators",
+                    "message", "Administrators change their password from the dashboard."));
+        }
+
+        String requested = body == null ? null : body.get("purpose");
+        Purpose purpose;
+        if ("delete-account".equals(requested)) {
+            purpose = Purpose.ACCOUNT_DELETE;
+        } else if ("set-password".equals(requested)) {
+            purpose = Purpose.PASSWORD_SET;
+        } else {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Unknown purpose",
+                    "message", "purpose must be delete-account or set-password."));
+        }
+
+        String email;
+        String name;
+        if (caller.isTrainer()) {
+            var trainer = trainerRepository.findByTrainerId(caller.getUserId()).orElse(null);
+            if (trainer == null) return ResponseEntity.status(404).body(Map.of("error", "Account not found"));
+            email = trainer.getEmail();
+            name = trainer.getName();
+        } else {
+            var student = studentRepository.findByStudentId(caller.getUserId()).orElse(null);
+            if (student == null) return ResponseEntity.status(404).body(Map.of("error", "Account not found"));
+            email = student.getEmail();
+            name = student.getName();
+        }
+
+        try {
+            confirmationCodeService.issue(email, name, purpose);
+        } catch (ConfirmationCodeService.TooManyCodesException e) {
+            return ResponseEntity.status(429).body(Map.of(
+                    "error", "Too many codes",
+                    "message", e.getMessage()));
+        }
+        return ResponseEntity.ok(Map.of(
+                "status", "sent",
+                "sentTo", ConfirmationCodeService.mask(email)));
     }
 
     /**
@@ -92,18 +180,25 @@ public class AccountController {
                 "message", "All devices have been signed out."));
     }
 
+    /**
+     * Body: {@code { "password": "…" }} or {@code { "code": "123456" }},
+     * the code from POST /confirmation-code with purpose delete-account.
+     */
     @DeleteMapping
     @Operation(summary = "Delete the signed-in user's own account")
-    public ResponseEntity<?> deleteOwnAccount(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> deleteOwnAccount(@RequestBody(required = false) Map<String, String> body) {
         var caller = fileAccessService.caller().orElse(null);
         if (caller == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Not signed in"));
         }
         String password = body == null ? null : body.get("password");
-        if (password == null || password.isBlank()) {
+        String code = body == null ? null : body.get("code");
+        boolean hasPassword = password != null && !password.isBlank();
+        boolean hasCode = code != null && !code.isBlank();
+        if (!hasPassword && !hasCode) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Password required",
-                    "message", "Confirm your password to delete your account."));
+                    "error", "Confirmation required",
+                    "message", "Confirm with your password, or a code sent to your email."));
         }
 
         if (caller.isAdmin()) {
@@ -114,13 +209,23 @@ public class AccountController {
 
         if (caller.isTrainer()) {
             var trainer = trainerRepository.findByTrainerId(caller.getUserId()).orElse(null);
-            if (trainer == null || !passwordEncoder.matches(password, trainer.getPasswordHash())) {
+            if (trainer == null) return hasCode ? wrongCode() : wrongPassword();
+            if (hasCode) {
+                if (!confirmationCodeService.consume(trainer.getEmail(), Purpose.ACCOUNT_DELETE, code)) {
+                    return wrongCode();
+                }
+            } else if (!passwordEncoder.matches(password, trainer.getPasswordHash())) {
                 return wrongPassword();
             }
             accountDeletionService.deleteTrainer(trainer.getTrainerId());
         } else {
             var student = studentRepository.findByStudentId(caller.getUserId()).orElse(null);
-            if (student == null || !passwordEncoder.matches(password, student.getPasswordHash())) {
+            if (student == null) return hasCode ? wrongCode() : wrongPassword();
+            if (hasCode) {
+                if (!confirmationCodeService.consume(student.getEmail(), Purpose.ACCOUNT_DELETE, code)) {
+                    return wrongCode();
+                }
+            } else if (!passwordEncoder.matches(password, student.getPasswordHash())) {
                 return wrongPassword();
             }
             accountDeletionService.deleteStudent(student.getStudentId());
@@ -138,5 +243,13 @@ public class AccountController {
         return ResponseEntity.status(403).body(Map.of(
                 "error", "Incorrect password",
                 "message", "That password doesn't match this account."));
+    }
+
+    private ResponseEntity<?> wrongCode() {
+        // 403 for the same reason as wrongPassword. One message for wrong,
+        // expired and used-up: the difference would only help a guesser.
+        return ResponseEntity.status(403).body(Map.of(
+                "error", "Incorrect code",
+                "message", "That code is wrong or has expired. Ask for a new one."));
     }
 }

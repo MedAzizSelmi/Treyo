@@ -301,12 +301,14 @@ export const authService = {
         return response.data;
     },
 
-    /** Erase the signed-in user's own account. The password is re-checked
-     *  server-side: a token alone must not be enough for something
+    /** Erase the signed-in user's own account. Proof is re-checked
+     *  server-side — the password, or a code from sendConfirmationCode for
+     *  accounts made with Google or LinkedIn, which have no password their
+     *  owner knows. A token alone must not be enough for something
      *  irreversible. Clears local credentials on success, since there is
      *  nothing left to sign into. */
-    deleteAccount: async (password: string) => {
-        const response = await api.delete('/account', { data: { password } });
+    deleteAccount: async (proof: { password: string } | { code: string }) => {
+        const response = await api.delete('/account', { data: proof });
         await authService.logout();
         return response.data;
     },
@@ -394,9 +396,22 @@ export const authService = {
         return !!token;
     },
 
-    /** Change password for the currently logged-in user. Backend verifies the current password. */
-    changePassword: async (currentPassword: string, newPassword: string) => {
-        const response = await api.post('/account/change-password', { currentPassword, newPassword });
+    /** Change password for the currently logged-in user. The backend
+     *  checks the current password, or a code from sendConfirmationCode
+     *  ('set-password') — the only way an account made with Google or
+     *  LinkedIn can get a password. */
+    changePassword: async (
+        proof: { currentPassword: string } | { code: string },
+        newPassword: string,
+    ) => {
+        const response = await api.post('/account/change-password', { ...proof, newPassword });
+        return response.data;
+    },
+
+    /** Email a six-digit code to the signed-in account's own address.
+     *  Resolves to the masked address it went to, e.g. "a•••@gmail.com". */
+    sendConfirmationCode: async (purpose: 'delete-account' | 'set-password'): Promise<{ sentTo: string }> => {
+        const response = await api.post('/account/confirmation-code', { purpose });
         return response.data;
     },
 

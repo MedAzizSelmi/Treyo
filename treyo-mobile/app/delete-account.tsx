@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService } from '../services/api';
+import { EmailCodeField } from '../components/EmailCodeField';
 
 /**
  * Self-service account deletion — required by Google Play for any app
@@ -17,11 +18,18 @@ import { authService } from '../services/api';
  *
  * Two deliberate frictions: the password is retyped, and a final
  * confirmation dialog follows. Nothing here is recoverable afterwards.
+ *
+ * An account created with Google or LinkedIn has no password its owner
+ * knows, so this screen also offers a code emailed to the account's
+ * address. It does the same job as the password — proving the person, not
+ * just the unlocked phone — and helps anyone who has forgotten theirs.
  */
 export default function DeleteAccountScreen() {
     const router = useRouter();
     const { t } = useTranslation();
     const [password, setPassword] = useState('');
+    const [useCode, setUseCode] = useState(false);
+    const [code, setCode] = useState('');
     const [show, setShow] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isTrainer, setIsTrainer] = useState(false);
@@ -32,8 +40,10 @@ export default function DeleteAccountScreen() {
             .catch(() => {});
     }, []);
 
+    const ready = useCode ? code.length === 6 : !!password;
+
     const confirm = () => {
-        if (!password) return;
+        if (!ready) return;
         Alert.alert(
             t('deleteAccount.confirmTitle'),
             t('deleteAccount.confirmBody'),
@@ -47,7 +57,7 @@ export default function DeleteAccountScreen() {
     const submit = async () => {
         setLoading(true);
         try {
-            await authService.deleteAccount(password);
+            await authService.deleteAccount(useCode ? { code } : { password });
             Alert.alert(
                 t('deleteAccount.deletedTitle'),
                 t('deleteAccount.deletedBody'),
@@ -58,7 +68,7 @@ export default function DeleteAccountScreen() {
             Alert.alert(
                 t('common.error'),
                 status === 403
-                    ? t('deleteAccount.wrongPassword')
+                    ? (useCode ? t('emailCode.wrongCode') : t('deleteAccount.wrongPassword'))
                     : (e?.response?.data?.message || t('deleteAccount.failed')),
             );
         } finally {
@@ -95,28 +105,52 @@ export default function DeleteAccountScreen() {
                         {isTrainer && <Bullet text={t('deleteAccount.trainerNote')} />}
                     </View>
 
-                    <Text style={styles.label}>{t('deleteAccount.confirmPassword')}</Text>
-                    <View style={styles.inputWrap}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#aaa" />
-                        <TextInput
-                            style={styles.input}
-                            placeholder={t('deleteAccount.passwordPlaceholder')}
-                            placeholderTextColor="#777"
-                            secureTextEntry={!show}
-                            value={password}
-                            onChangeText={setPassword}
-                            autoCapitalize="none"
-                            editable={!loading}
-                        />
-                        <TouchableOpacity onPress={() => setShow(!show)}>
-                            <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={20} color="rgba(255,255,255,0.5)" />
-                        </TouchableOpacity>
-                    </View>
+                    {useCode ? (
+                        <>
+                            <Text style={styles.label}>{t('deleteAccount.confirmCode')}</Text>
+                            <EmailCodeField
+                                purpose="delete-account"
+                                value={code}
+                                onChangeText={setCode}
+                                disabled={loading}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <Text style={styles.label}>{t('deleteAccount.confirmPassword')}</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="lock-closed-outline" size={20} color="#aaa" />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder={t('deleteAccount.passwordPlaceholder')}
+                                    placeholderTextColor="#777"
+                                    secureTextEntry={!show}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    autoCapitalize="none"
+                                    editable={!loading}
+                                />
+                                <TouchableOpacity onPress={() => setShow(!show)}>
+                                    <Ionicons name={show ? 'eye-off-outline' : 'eye-outline'} size={20} color="rgba(255,255,255,0.5)" />
+                                </TouchableOpacity>
+                            </View>
+                        </>
+                    )}
 
                     <TouchableOpacity
-                        style={[styles.deleteBtn, (!password || loading) && { opacity: 0.5 }]}
+                        onPress={() => { setUseCode(u => !u); setPassword(''); setCode(''); }}
+                        style={styles.switchBtn}
+                        disabled={loading}
+                    >
+                        <Text style={styles.switchText}>
+                            {useCode ? t('deleteAccount.usePassword') : t('deleteAccount.useCode')}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.deleteBtn, (!ready || loading) && { opacity: 0.5 }]}
                         onPress={confirm}
-                        disabled={!password || loading}
+                        disabled={!ready || loading}
                         activeOpacity={0.85}
                     >
                         {loading
@@ -165,11 +199,13 @@ const styles = StyleSheet.create({
     label: { fontSize: 14, fontWeight: '600', color: '#ffffff', marginBottom: 10 },
     inputWrap: {
         flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16,
-        paddingVertical: 14, borderRadius: 14, marginBottom: 28,
+        paddingVertical: 14, borderRadius: 14,
         backgroundColor: 'rgba(255,255,255,0.05)',
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
     },
     input: { flex: 1, fontSize: 15, color: '#ffffff' },
+    switchBtn: { paddingVertical: 14, marginBottom: 14 },
+    switchText: { fontSize: 13, color: '#7cce06', lineHeight: 19 },
     deleteBtn: {
         backgroundColor: '#c62828', borderRadius: 14, paddingVertical: 16,
         alignItems: 'center', marginBottom: 14,

@@ -8,11 +8,17 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService, twoFactorService } from '../services/api';
+import { EmailCodeField } from '../components/EmailCodeField';
 
 export default function SecuritySettingsScreen() {
     const router = useRouter();
     const { t } = useTranslation();
     const [currentPassword, setCurrentPassword] = useState('');
+    // Accounts made with Google or LinkedIn were given a password nobody
+    // knows, so "current password" can never be answered. An emailed code
+    // takes its place, and this becomes how such an account gets one.
+    const [useCode, setUseCode] = useState(false);
+    const [code, setCode] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showCurrent, setShowCurrent] = useState(false);
@@ -60,8 +66,12 @@ export default function SecuritySettingsScreen() {
     const strengthColor = ['transparent', '#ff5454', '#ffa500', '#7cce06', '#7cce06'][passwordStrength];
 
     const handleSubmit = async () => {
-        if (!currentPassword || !newPassword || !confirmPassword) {
-            return Alert.alert(t('security.missingFields'), t('security.missingFieldsBody'));
+        const proven = useCode ? code.length === 6 : !!currentPassword;
+        if (!proven || !newPassword || !confirmPassword) {
+            return Alert.alert(
+                t('security.missingFields'),
+                useCode ? t('security.missingCodeFieldsBody') : t('security.missingFieldsBody'),
+            );
         }
         if (newPassword.length < 8) {
             return Alert.alert(t('security.tooShort'), t('security.tooShortBody'));
@@ -69,16 +79,20 @@ export default function SecuritySettingsScreen() {
         if (newPassword !== confirmPassword) {
             return Alert.alert(t('security.noMatch'), t('security.noMatchBody'));
         }
-        if (newPassword === currentPassword) {
+        if (!useCode && newPassword === currentPassword) {
             return Alert.alert(t('security.chooseNew'), t('security.chooseNewBody'));
         }
 
         setSubmitting(true);
         try {
-            await authService.changePassword(currentPassword, newPassword);
+            await authService.changePassword(useCode ? { code } : { currentPassword }, newPassword);
             Alert.alert(t('security.updated'), t('security.updatedBody'));
-            setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+            setCurrentPassword(''); setCode(''); setNewPassword(''); setConfirmPassword('');
+            setUseCode(false);
         } catch (err: any) {
+            if (useCode && err?.response?.status === 403) {
+                return Alert.alert(t('security.updateFailed'), t('emailCode.wrongCode'));
+            }
             const msg = err?.response?.data?.error
                 || err?.response?.data?.message
                 || err?.message
@@ -165,13 +179,34 @@ export default function SecuritySettingsScreen() {
                 <View style={styles.card}>
                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
 
-                    <PasswordField
-                        label={t('security.currentPassword')}
-                        value={currentPassword}
-                        onChangeText={setCurrentPassword}
-                        show={showCurrent}
-                        onToggleShow={() => setShowCurrent(s => !s)}
-                    />
+                    {useCode ? (
+                        <View style={pwStyles.wrap}>
+                            <Text style={pwStyles.label}>{t('security.confirmationCode')}</Text>
+                            <EmailCodeField
+                                purpose="set-password"
+                                value={code}
+                                onChangeText={setCode}
+                                disabled={submitting}
+                            />
+                        </View>
+                    ) : (
+                        <PasswordField
+                            label={t('security.currentPassword')}
+                            value={currentPassword}
+                            onChangeText={setCurrentPassword}
+                            show={showCurrent}
+                            onToggleShow={() => setShowCurrent(s => !s)}
+                        />
+                    )}
+                    <TouchableOpacity
+                        onPress={() => { setUseCode(u => !u); setCurrentPassword(''); setCode(''); }}
+                        style={styles.switchBtn}
+                        disabled={submitting}
+                    >
+                        <Text style={styles.switchText}>
+                            {useCode ? t('security.usePassword') : t('security.useCode')}
+                        </Text>
+                    </TouchableOpacity>
                     <View style={styles.divider} />
                     <PasswordField
                         label={t('security.newPassword')}
@@ -359,6 +394,8 @@ const styles = StyleSheet.create({
         borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     },
     divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
+    switchBtn: { paddingHorizontal: 16, paddingBottom: 12 },
+    switchText: { fontSize: 12, color: '#7cce06', lineHeight: 17 },
 
     strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
     strengthBars: { flex: 1, flexDirection: 'row', gap: 4 },
