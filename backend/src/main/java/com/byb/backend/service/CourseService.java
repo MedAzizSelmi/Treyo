@@ -1,5 +1,6 @@
 package com.byb.backend.service;
 
+import com.byb.backend.model.Levels;
 import com.byb.backend.dto.course.CreateCourseRequest;
 import com.byb.backend.dto.course.CourseResponse;
 import com.byb.backend.model.Course;
@@ -43,9 +44,10 @@ public class CourseService {
         course.setDescription(request.getDescription());
         course.setDomain(request.getDomain());
         course.setSpecificTopic(request.getSpecificTopic());
-        course.setLevel(request.getLevel());
+        course.setLevel(Levels.normalize(request.getLevel()));
         course.setDurationHours(request.getDurationHours());
-        course.setLanguage(request.getLanguage());
+        course.setLanguage(request.getLanguage() == null || request.getLanguage().isBlank()
+                ? "French" : request.getLanguage().trim());
         course.setFormat(request.getFormat());
         course.setPrerequisites(request.getPrerequisites());
         course.setLearningOutcomes(request.getLearningOutcomes());
@@ -115,7 +117,8 @@ public class CourseService {
         Trainer trainer = trainerRepository.findByTrainerId(trainerId)
                 .orElseThrow(() -> new IllegalArgumentException("Trainer not found"));
         if (request.getModuleId() == null || request.getModuleId().isBlank()) {
-            throw new IllegalArgumentException("moduleId is required — pick a module for this course.");
+            // Shown to the trainer as is: "domain" is the word users see for a module.
+            throw new IllegalArgumentException("Pick a domain for this course.");
         }
 
         Course course = new Course();
@@ -171,9 +174,10 @@ public class CourseService {
         course.setDescription(request.getDescription());
         course.setDomain(request.getDomain());
         course.setSpecificTopic(request.getSpecificTopic());
-        course.setLevel(request.getLevel());
+        course.setLevel(Levels.normalize(request.getLevel()));
         course.setDurationHours(request.getDurationHours());
-        course.setLanguage(request.getLanguage());
+        course.setLanguage(request.getLanguage() == null || request.getLanguage().isBlank()
+                ? "French" : request.getLanguage().trim());
         course.setFormat(request.getFormat());
         course.setPrerequisites(request.getPrerequisites());
         course.setLearningOutcomes(request.getLearningOutcomes());
@@ -235,7 +239,7 @@ public class CourseService {
         if (request.getDescription() != null) course.setDescription(request.getDescription());
         if (request.getDomain() != null) course.setDomain(request.getDomain());
         if (request.getSpecificTopic() != null) course.setSpecificTopic(request.getSpecificTopic());
-        if (request.getLevel() != null) course.setLevel(request.getLevel());
+        if (request.getLevel() != null) course.setLevel(Levels.normalize(request.getLevel()));
         if (request.getDurationHours() != null) course.setDurationHours(request.getDurationHours());
         if (request.getLanguage() != null) course.setLanguage(request.getLanguage());
         if (request.getFormat() != null) course.setFormat(request.getFormat());

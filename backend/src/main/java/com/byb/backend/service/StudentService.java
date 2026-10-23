@@ -1,5 +1,6 @@
 package com.byb.backend.service;
 
+import com.byb.backend.model.Levels;
 import com.byb.backend.dto.student.StudentProfileResponse;
 import com.byb.backend.dto.student.UpdateBasicProfileRequest;
 import com.byb.backend.dto.student.UpdateInterestsRequest;
@@ -50,7 +51,7 @@ public class StudentService {
 
         student.setPrimaryDomains(request.getPrimaryDomains());
         student.setSpecificInterests(request.getSpecificInterests());
-        student.setExperienceLevel(request.getExperienceLevel());
+        student.setExperienceLevel(Levels.normalize(request.getExperienceLevel()));
 
         student = studentRepository.save(student);
 
@@ -140,7 +141,7 @@ public class StudentService {
 
         student.setPrimaryDomains(request.getPrimaryDomains());
         student.setSpecificInterests(request.getSpecificInterests());
-        student.setExperienceLevel(request.getExperienceLevel());
+        student.setExperienceLevel(Levels.normalize(request.getExperienceLevel()));
 
         student = studentRepository.save(student);
 

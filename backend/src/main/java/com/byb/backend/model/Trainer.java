@@ -153,6 +153,8 @@ public class Trainer extends BaseEntity {
      *  currency when the trainer creates a new course and as the label
      *  when the app shows earnings or revenue on their side. */
     @Column(name = "preferred_currency", length = 8)
+    // Unused since October 2026: the setting and its endpoints were
+    // removed (see TrainerController). Kept so the column still maps.
     private String preferredCurrency = "TND";
 
     // Transient field for role

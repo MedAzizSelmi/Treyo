@@ -81,8 +81,21 @@ public class GroupController {
         }).collect(Collectors.toList()));
     }
 
+    /**
+     * A trainer's upcoming groups, for their home screen.
+     *
+     * Listed: every running group with a session still ahead, dated and
+     * sorted by that next session (nextSessionAt), then groups not yet
+     * scheduled, which the trainer has to act on. Not listed: groups whose
+     * sessions are all over.
+     *
+     * It used to filter on startDate, which is the group's FIRST session,
+     * so a group dropped off this list the moment its first class had
+     * passed — while its learners, whose list is built session by session,
+     * still saw every class still to come.
+     */
     @GetMapping("/trainer/{trainerId}/upcoming")
-    @Operation(summary = "Upcoming sessions for a trainer (forming + active groups starting now or later)")
+    @Operation(summary = "Upcoming groups for a trainer: those with a session ahead, then unscheduled ones")
     public ResponseEntity<List<Map<String, Object>>> getUpcomingSessions(@PathVariable String trainerId) {
         // Carries meeting links, which are as good as an invitation.
         callerGuard.selfOrAdmin(trainerId);
@@ -95,7 +108,8 @@ public class GroupController {
         groupRepository.findByTrainerId(trainerId)
                 .forEach(courseLifecycleService::checkAndCompleteOne);
 
-        List<Group> groups = groupRepository.findByTrainerId(trainerId).stream()
+        record Upcoming(Group group, LocalDateTime next) {}
+        List<Upcoming> groups = groupRepository.findByTrainerId(trainerId).stream()
                 .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
                 .filter(g -> {
                     String status = g.getGroupStatus();
@@ -104,15 +118,23 @@ public class GroupController {
                             || status.equalsIgnoreCase("ready")
                             || status.equalsIgnoreCase("active");
                 })
-                .filter(g -> g.getStartDate() == null || !g.getStartDate().isBefore(now))
-                .sorted(Comparator.comparing(
-                        Group::getStartDate,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                ))
+                .map(g -> {
+                    List<LocalDateTime> sessions = sessionTimes(g);
+                    LocalDateTime next = sessions.stream()
+                            .filter(t -> !t.isBefore(now))
+                            .min(Comparator.naturalOrder())
+                            .orElse(null);
+                    // Scheduled and all in the past: not upcoming.
+                    return !sessions.isEmpty() && next == null ? null : new Upcoming(g, next);
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted(Comparator.comparing(Upcoming::next,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
                 .limit(10)
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(groups.stream().map(g -> {
+        return ResponseEntity.ok(groups.stream().map(u -> {
+            Group g = u.group();
             Map<String, Object> m = new HashMap<>();
             m.put("groupId", g.getGroupId());
             m.put("groupName", g.getGroupName());
@@ -123,6 +145,8 @@ public class GroupController {
             m.put("groupStatus", g.getGroupStatus());
             m.put("startDate", g.getStartDate());
             m.put("endDate", g.getEndDate());
+            // The date to show: the next session, null when unscheduled.
+            m.put("nextSessionAt", u.next());
             m.put("meetingSchedule", g.getMeetingSchedule());
             m.put("meetingLink", g.getMeetingLink());
             m.put("meetingLocation", g.getMeetingLocation());
@@ -135,6 +159,35 @@ public class GroupController {
 
             return m;
         }).collect(Collectors.toList()));
+    }
+
+    /**
+     * Every session time in a group's saved schedule, in no particular
+     * order; empty when it has none or it cannot be read. The schedule is
+     * stored as {"sessions": [{"date": "2026-06-02", "time": "18:00"}]}.
+     */
+    private List<LocalDateTime> sessionTimes(Group g) {
+        String json = g.getMeetingSchedule();
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            Object raw = parsed.get("sessions");
+            if (!(raw instanceof List<?> list)) return List.of();
+            List<LocalDateTime> out = new ArrayList<>();
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> s) || s.get("date") == null || s.get("time") == null) continue;
+                String time = String.valueOf(s.get("time"));
+                if (time.length() == 5) time = time + ":00";
+                try {
+                    out.add(LocalDateTime.parse(s.get("date") + "T" + time));
+                } catch (Exception ignored) {
+                    // One malformed entry should not hide the rest.
+                }
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     /**

@@ -8,8 +8,11 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { Plus, Pencil, Archive, RotateCcw, FolderTree, X } from 'lucide-react';
 
 /**
- * Modules admin — the categories trainers pick from when creating a
- * course. Sits above Courses in the sidebar because it's the source
+ * Domains admin — the categories trainers pick from when creating a
+ * course. Called "modules" in the code, the API (/api/modules) and the
+ * database; "Domain" is the word users see, chosen at the October 2026
+ * review. The chosen name also becomes the course's `domain`.
+ * Sits above Courses in the sidebar because it's the source
  * of truth for how courses get grouped.
  *
  * Actions: create, edit inline via modal, archive (soft-delete),
@@ -49,7 +52,7 @@ export default function ModulesPage() {
   return (
     <div>
       <PageHeader
-        title="Modules"
+        title="Domains"
         subtitle="Course categories trainers pick from when creating a new course"
       />
 
@@ -58,7 +61,7 @@ export default function ModulesPage() {
           onClick={() => setCreating(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-black font-semibold text-sm hover:bg-accent/90 transition"
         >
-          <Plus className="w-4 h-4" /> New module
+          <Plus className="w-4 h-4" /> New domain
         </button>
       </div>
 
@@ -67,8 +70,8 @@ export default function ModulesPage() {
       ) : modules.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <FolderTree className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-sm text-foreground font-semibold mb-1">No modules yet</p>
-          <p className="text-xs text-muted">Create your first module so trainers can start submitting courses.</p>
+          <p className="text-sm text-foreground font-semibold mb-1">No domains yet</p>
+          <p className="text-xs text-muted">Create your first domain so trainers can start submitting courses.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -156,7 +159,7 @@ function ModuleFormModal({
       else await createModule(payload);
       onSaved();
     } catch (e: any) {
-      setError(e?.response?.data?.error || 'Could not save the module.');
+      setError(e?.response?.data?.error || 'Could not save the domain.');
     } finally {
       setSaving(false);
     }
@@ -176,7 +179,7 @@ function ModuleFormModal({
         </button>
 
         <h2 className="text-xl font-bold text-white mb-4">
-          {mod ? 'Edit module' : 'New module'}
+          {mod ? 'Edit domain' : 'New domain'}
         </h2>
 
         <div className="space-y-3">

@@ -163,9 +163,16 @@ public class TrainerController {
      *     total: <sum>,
      *     days: [ { date, courseId, courseTitle, amount }, ... ]
      *   }
-     * If any course involved has no trainerDailyRevenue set, its sessions
-     * are skipped. Currency assumes courses share a currency — takes the
-     * first non-null one it sees.
+     * Only sessions that have already started count: a schedule laid out
+     * for the rest of the month is not money earned yet. They used to all
+     * count, so a rate set mid-month paid the trainer for classes not yet
+     * given.
+     *
+     * A course with no trainerDailyRevenue cannot be paid, and its
+     * sessions used to be skipped without a word — a trainer who had
+     * taught came out at 0 with nothing saying why. They are now counted
+     * in unratedSessions so the app can say the rate is missing. Currency
+     * assumes courses share a currency — takes the first non-null one.
      */
     @GetMapping("/{trainerId}/earnings")
     public ResponseEntity<Map<String, Object>> getEarnings(
@@ -179,6 +186,8 @@ public class TrainerController {
         java.util.List<Map<String, Object>> days = new java.util.ArrayList<>();
         java.math.BigDecimal total = java.math.BigDecimal.ZERO;
         String currency = null;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.util.Set<String> unrated = new java.util.HashSet<>();
 
         for (Group g : groupRepository.findByTrainerId(trainerId)) {
             String scheduleJson = g.getMeetingSchedule();
@@ -195,7 +204,7 @@ public class TrainerController {
             if (sessions == null || sessions.isEmpty()) continue;
 
             Course course = courseRepository.findByCourseId(g.getCourseId()).orElse(null);
-            if (course == null || course.getTrainerDailyRevenue() == null) continue;
+            if (course == null) continue;
             if (currency == null && course.getCurrency() != null) currency = course.getCurrency();
 
             for (Map<String, Object> s : sessions) {
@@ -208,7 +217,19 @@ public class TrainerController {
                 catch (Exception e) { continue; }
                 if (d.getYear() != year || d.getMonthValue() != month) continue;
 
+                // Not held yet: not earned yet.
+                java.time.LocalTime startTime;
+                try {
+                    String tm = String.valueOf(s.get("time"));
+                    startTime = java.time.LocalTime.parse(tm.length() == 5 ? tm + ":00" : tm);
+                } catch (Exception e) { startTime = java.time.LocalTime.MIDNIGHT; }
+                if (d.atTime(startTime).isAfter(now)) continue;
+
                 String key = date + "|" + course.getCourseId();
+                if (course.getTrainerDailyRevenue() == null) {
+                    unrated.add(key);
+                    continue;
+                }
                 if (!seen.add(key)) continue;
 
                 java.math.BigDecimal amount = course.getTrainerDailyRevenue();
@@ -231,43 +252,15 @@ public class TrainerController {
         result.put("currency", currency == null ? "TND" : currency);
         result.put("total", total);
         result.put("days", days);
+        // Days taught on a course the admin has not given a rate to.
+        result.put("unratedSessions", unrated.size());
         return ResponseEntity.ok(result);
     }
 
-    /**
-     * Read the trainer's preferred display currency (ISO-4217). Used
-     * by the mobile settings screen to render the current selection
-     * and by the course-create form to pre-fill the default currency.
-     */
-    @GetMapping("/{trainerId}/currency")
-    public ResponseEntity<Map<String, String>> getCurrency(@PathVariable String trainerId) {
-        return trainerRepository.findById(trainerId).map(t -> {
-            String value = t.getPreferredCurrency();
-            if (value == null || value.isBlank()) value = "TND";
-            return ResponseEntity.ok(Map.of("currency", value));
-        }).orElse(ResponseEntity.notFound().build());
-    }
-
-    /**
-     * Trainer sets their preferred currency. Accepts any code but
-     * normalizes to upper-case; the mobile picker restricts to a
-     * curated whitelist.
-     */
-    @PutMapping("/{trainerId}/currency")
-    public ResponseEntity<Map<String, String>> setCurrency(
-            @PathVariable String trainerId,
-            @RequestBody Map<String, String> body
-    ) {
-        callerGuard.self(trainerId);
-        String currency = body == null ? null : body.get("currency");
-        if (currency == null || currency.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        return trainerRepository.findById(trainerId).map(t -> {
-            String normalized = currency.trim().toUpperCase();
-            t.setPreferredCurrency(normalized);
-            trainerRepository.save(t);
-            return ResponseEntity.ok(Map.of("currency", normalized));
-        }).orElse(ResponseEntity.notFound().build());
-    }
+    // The trainer's "preferred currency" endpoints were removed in October
+    // 2026 with the app screen that used them. The setting no longer set
+    // anything — the admin prices courses, and earnings are shown in the
+    // courses' own currency — so all it did was relabel one figure on the
+    // trainer's home screen without converting it. Trainer.preferredCurrency
+    // is left in the table, unused.
 }

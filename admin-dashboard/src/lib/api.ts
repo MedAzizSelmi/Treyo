@@ -186,7 +186,8 @@ export const approveTrainerCourse = (
   courseId: string,
   price: number,
   currency: string,
-) => api.put(`/admin/courses/${courseId}/approve-trainer`, { price, currency });
+  trainerDailyRevenue: number,
+) => api.put(`/admin/courses/${courseId}/approve-trainer`, { price, currency, trainerDailyRevenue });
 export const rejectTrainerCourse = (courseId: string, note?: string) =>
   api.put(`/admin/courses/${courseId}/reject-trainer`, note ? { note } : {});
 

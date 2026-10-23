@@ -1,5 +1,6 @@
 package com.byb.backend.service;
 
+import com.byb.backend.model.Levels;
 import com.byb.backend.dto.admin.AssignTrainersRequest;
 import com.byb.backend.dto.admin.CourseTemplateRequest;
 import com.byb.backend.dto.admin.CourseTemplateResponse;
@@ -174,7 +175,7 @@ public class CourseTemplateService {
         if (isCreate || r.getDescription() != null) t.setDescription(r.getDescription());
         if (isCreate || r.getDomain() != null) t.setDomain(r.getDomain());
         if (isCreate || r.getSpecificTopic() != null) t.setSpecificTopic(r.getSpecificTopic());
-        if (isCreate || r.getLevel() != null) t.setLevel(r.getLevel());
+        if (isCreate || r.getLevel() != null) t.setLevel(Levels.normalize(r.getLevel()));
         if (isCreate || r.getDurationHours() != null) t.setDurationHours(r.getDurationHours());
         if (isCreate || r.getLanguage() != null) t.setLanguage(r.getLanguage());
         if (isCreate || r.getFormat() != null) t.setFormat(r.getFormat());

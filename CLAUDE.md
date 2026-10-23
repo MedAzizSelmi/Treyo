@@ -121,7 +121,11 @@ Commit messages explain **why**, in prose, not bullet lists of what changed.
 End with `Co-Authored-By: Claude <noreply@anthropic.com>`. Commit and push only
 when asked.
 
-Mobile strings go in all four locales (`treyo-mobile/i18n/locales/`). Diagrams
+Mobile strings go in all four locales (`treyo-mobile/i18n/locales/`).
+The admin-created course categories are **"Domain"** on screen and `module`
+in code, API (`/api/modules`) and database — the word "module" was dropped
+at the October 2026 review. A course's `domain` field holds the chosen
+domain's name. Diagrams
 for the report are portrait. The user wants complete files, not fragments.
 
 ## State, October 2026

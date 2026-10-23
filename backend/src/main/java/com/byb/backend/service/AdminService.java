@@ -250,9 +250,13 @@ public class AdminService {
      * will still overwrite.
      */
     @Transactional
-    public void approveTrainerCourse(String courseId, java.math.BigDecimal price, String currency) {
+    public void approveTrainerCourse(String courseId, java.math.BigDecimal price, String currency,
+                                     java.math.BigDecimal trainerDailyRevenue) {
         if (price == null || price.signum() < 0) {
             throw new IllegalArgumentException("Price is required and must be non-negative.");
+        }
+        if (trainerDailyRevenue == null || trainerDailyRevenue.signum() < 0) {
+            throw new IllegalArgumentException("The trainer's daily rate is required and must be non-negative.");
         }
         if (currency == null || currency.isBlank()) {
             throw new IllegalArgumentException("Currency is required.");
@@ -261,6 +265,7 @@ public class AdminService {
         courseRepository.findByCourseId(courseId).ifPresent(c -> {
             c.setPrice(price);
             c.setCurrency(normalized);
+            c.setTrainerDailyRevenue(trainerDailyRevenue);
             c.setApprovalStatus("APPROVED");
             c.setApprovalNote(null);
             c.setApprovalDecidedAt(java.time.LocalDateTime.now());

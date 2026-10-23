@@ -31,6 +31,9 @@ export default function PendingCoursesPage() {
   const [busy, setBusy] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [price, setPrice] = useState('');
+  // The trainer's pay per day taught. Asked for here because a course
+  // approved without one paid its trainer nothing, silently.
+  const [dailyRate, setDailyRate] = useState('');
   const [priceCurrency, setPriceCurrency] = useState<string>('TND');
   const [defaultCurrency, setDefaultCurrency] = useState<string>('TND');
   const [priceError, setPriceError] = useState('');
@@ -68,13 +71,19 @@ export default function PendingCoursesPage() {
       setPriceError('Enter a valid non-negative price before approving.');
       return;
     }
+    const rateNum = Number(dailyRate);
+    if (!dailyRate.trim() || !Number.isFinite(rateNum) || rateNum < 0) {
+      setPriceError("Enter the trainer's daily rate before approving.");
+      return;
+    }
     setPriceError('');
     setBusy(true);
     try {
-      await approveTrainerCourse(reviewing.courseId, priceNum, priceCurrency);
+      await approveTrainerCourse(reviewing.courseId, priceNum, priceCurrency, rateNum);
       setReviewing(null);
       setRejectNote('');
       setPrice('');
+      setDailyRate('');
       setPriceCurrency(defaultCurrency);
       await load();
     } catch (e: any) {
@@ -120,7 +129,7 @@ export default function PendingCoursesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
-            placeholder="Search title, module, topic, trainer..."
+            placeholder="Search title, domain, topic, trainer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
@@ -150,6 +159,7 @@ export default function PendingCoursesPage() {
               onClick={() => {
                 setRejectNote('');
                 setPrice('');
+                setDailyRate('');
                 setPriceCurrency(defaultCurrency);
                 setPriceError('');
                 setReviewing(c);
@@ -286,6 +296,18 @@ export default function PendingCoursesPage() {
                       ))}
                     </select>
                   </div>
+                  <label className="block text-xs text-muted mt-4 mb-1.5">
+                    Trainer&apos;s daily rate ({priceCurrency}) — what the trainer is paid for each day they teach this course
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={dailyRate}
+                    onChange={(e) => { setDailyRate(e.target.value); setPriceError(''); }}
+                    placeholder="e.g. 150"
+                    className="w-full rounded-lg bg-card-hover border border-border p-2.5 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
+                  />
                   {priceError && <p className="text-xs text-danger mt-2">{priceError}</p>}
                 </div>
               </div>

@@ -27,7 +27,7 @@ import { useState } from 'react';
 const NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Users', href: '/dashboard/users', icon: Users },
-  { label: 'Modules', href: '/dashboard/modules', icon: FileText },
+  { label: 'Domains', href: '/dashboard/modules', icon: FileText },
   { label: 'Courses', href: '/dashboard/courses', icon: BookOpen },
   { label: 'Pending Courses', href: '/dashboard/pending-courses', icon: Clock },
   { label: 'Requests', href: '/dashboard/requests', icon: Mail },

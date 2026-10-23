@@ -135,7 +135,7 @@ public class AdminController {
     }
 
     @PutMapping("/courses/{courseId}/approve-trainer")
-    @Operation(summary = "Approve a trainer-submitted course and set its price")
+    @Operation(summary = "Approve a trainer-submitted course and set its price and the trainer's daily rate")
     public ResponseEntity<Map<String, String>> approveTrainerCourse(
             @PathVariable String courseId,
             @RequestBody Map<String, Object> body) {
@@ -148,8 +148,18 @@ public class AdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "Price is required."));
         }
         String currency = rawCurrency == null ? null : String.valueOf(rawCurrency);
+        // Required with the price: a course approved without a daily rate
+        // paid its trainer nothing for every session they taught, and
+        // nothing said so until they asked.
+        Object rawRate = body == null ? null : body.get("trainerDailyRevenue");
+        java.math.BigDecimal dailyRate;
         try {
-            adminService.approveTrainerCourse(courseId, price, currency);
+            dailyRate = new java.math.BigDecimal(String.valueOf(rawRate));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "The trainer's daily rate is required."));
+        }
+        try {
+            adminService.approveTrainerCourse(courseId, price, currency, dailyRate);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

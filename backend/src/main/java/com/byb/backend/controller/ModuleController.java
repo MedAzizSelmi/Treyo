@@ -85,7 +85,7 @@ public class ModuleController {
         try {
             moduleRepository.save(m);
         } catch (Exception e) {
-            return ResponseEntity.status(400).body(Map.of("error", "Module name already exists"));
+            return ResponseEntity.status(400).body(Map.of("error", "A domain with that name already exists"));
         }
         return ResponseEntity.ok(toMap(m));
     }

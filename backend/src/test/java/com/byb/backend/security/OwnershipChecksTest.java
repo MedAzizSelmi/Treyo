@@ -68,14 +68,6 @@ class OwnershipChecksTest {
     }
 
     @Test
-    void cannotSetAnotherTrainersCurrency() throws Exception {
-        mvc.perform(put("/api/trainers/" + OTHER_TRAINER + "/currency")
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"currency\":\"EUR\"}")
-                        .with(trainer()))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
     void cannotReadAnotherTrainersEarnings() throws Exception {
         mvc.perform(get("/api/trainers/" + OTHER_TRAINER + "/earnings")
                         .param("year", "2026").param("month", "10").with(trainer()))
