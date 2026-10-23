@@ -120,6 +120,12 @@ public class CourseService {
             // Shown to the trainer as is: "domain" is the word users see for a module.
             throw new IllegalArgumentException("Pick a domain for this course.");
         }
+        // The admin decides on the plan, so a course is not submitted
+        // without one (October 2026 review). Edits keep the plan already
+        // attached unless a new one is sent.
+        if (request.getMaterialUrl() == null || request.getMaterialUrl().isBlank()) {
+            throw new IllegalArgumentException("Attach the course plan.");
+        }
 
         Course course = new Course();
         course.setCourseId("CRS_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());

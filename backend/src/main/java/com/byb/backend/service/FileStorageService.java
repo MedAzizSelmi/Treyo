@@ -60,10 +60,33 @@ public class FileStorageService {
     }
 
     /**
-     * Store course material
+     * The document types a course plan may be: PDF, Word or PowerPoint.
+     *
+     * Since the October 2026 review a trainer attaches the course's plan —
+     * its outline and schedule, for the admin to review — not the course
+     * itself, so archives, images and videos are no longer accepted.
+     * PowerPoint is accepted on purpose: a plan is often a slide deck, and
+     * the app's file picker offered it while this server refused it.
+     */
+    private static final java.util.List<String> COURSE_PLAN_TYPES = java.util.List.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+
+    /**
+     * Store a course's plan (the "material" fields in the code and API).
      */
     public String storeCourseMaterial(MultipartFile file, String courseId) {
-        validateFile(file, fileStorageProperties.getMaxDocumentSize());
+        if (file.getSize() > fileStorageProperties.getMaxDocumentSize()) {
+            throw new FileStorageException("File size exceeds maximum allowed size: "
+                    + (fileStorageProperties.getMaxDocumentSize() / 1048576) + "MB");
+        }
+        if (file.getContentType() == null || !COURSE_PLAN_TYPES.contains(file.getContentType())) {
+            throw new FileStorageException("The course plan must be a PDF, Word or PowerPoint document.");
+        }
 
         String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
         String safeFilename = sanitizeFilename(originalFilename);

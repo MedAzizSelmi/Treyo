@@ -18,7 +18,7 @@ import { ShieldCheck, ShieldX, FileText, Clock, User, Layers, X, Loader2, Coins,
  * Pending course review queue.
  *
  * Each row is a course a trainer submitted. Admin opens the review
- * modal, reads the fields + opens the attached material, then hits
+ * modal, reads the fields + opens the attached course plan, then hits
  * Approve or Reject. Rejection accepts an optional note that goes
  * into the email verbatim.
  */
@@ -243,7 +243,9 @@ export default function PendingCoursesPage() {
               </Section>
             )}
 
-            <Section title="Training material">
+            {/* The course plan (outline and schedule) since the October 2026
+                review, not the course itself; "material" in the code and API. */}
+            <Section title="Course plan">
               {reviewing.materialUrl ? (
                 <button
                   type="button"
@@ -252,14 +254,14 @@ export default function PendingCoursesPage() {
                       ? reviewing.materialUrl
                       : `${API_BASE_URL}${reviewing.materialUrl}`;
                     openProtectedFile(url, reviewing.materialName)
-                      .catch(() => alert('Could not open the material.'));
+                      .catch(() => alert('Could not open the course plan.'));
                   }}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-black text-sm font-semibold hover:bg-accent/90"
                 >
-                  <FileText className="w-4 h-4" /> Open {reviewing.materialName || 'material'}
+                  <FileText className="w-4 h-4" /> Open {reviewing.materialName || 'course plan'}
                 </button>
               ) : (
-                <p className="text-sm text-muted italic">No material attached.</p>
+                <p className="text-sm text-muted italic">No course plan attached.</p>
               )}
             </Section>
 

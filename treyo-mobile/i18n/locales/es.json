@@ -651,8 +651,8 @@
         "prerequisites": "Requisitos previos (opcional)",
         "prerequisitesPlaceholder": "p. ej. JavaScript básico",
         "certificate": "Incluir certificado de finalización",
-        "material": "Material de formación (PDF / PPT / ZIP)",
-        "materialHint": "El administrador lo revisa antes de aprobar.",
+        "material": "Plan del curso (PDF / Word / PowerPoint)",
+        "materialHint": "El temario y la planificación de tu curso, no el curso en sí. El administrador lo revisa antes de aprobar.",
         "chooseFile": "Elegir un archivo",
         "uploading": "Subiendo…",
         "submitting": "Enviando…",
@@ -660,12 +660,13 @@
         "pickerFailed": "No se pudo abrir el selector de archivos.",
         "requiredFields": "El título, la descripción y el tema específico son obligatorios.",
         "minDuration": "La duración debe ser de al menos 1 hora.",
-        "uploadFailed": "No se pudo subir el material. Inténtalo de nuevo.",
+        "uploadFailed": "No se pudo subir el plan del curso. Inténtalo de nuevo.",
         "submittedTitle": "Curso enviado",
         "submittedBody": "Tu curso se envió para revisión. Recibirás un correo cuando se tome una decisión.",
         "submitFailed": "No se pudo enviar el curso.",
         "language": "Idioma del curso",
-        "languageHint": "El idioma en que se imparte el curso."
+        "languageHint": "El idioma en que se imparte el curso.",
+        "planRequired": "Adjunta el plan de tu curso."
     },
     "levels": {
         "beginner": "Principiante",

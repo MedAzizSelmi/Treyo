@@ -20,9 +20,11 @@ import { COURSE_LANGUAGES, CourseLanguage, defaultCourseLanguage } from '../util
  *   1. Trainer picks a domain (admin-created category) from the picker.
  *      "Domain" is the word users see; the code and API call it a module.
  *   2. Fills the course fields (title, description, hours, price, ...).
- *   3. Attaches the training material — PDF / PPT / ZIP. Optional but
- *      strongly encouraged, since the admin uses it to decide.
- *   4. Hits Submit → uploads the file first (if picked), then POSTs
+ *   3. Attaches the course plan — its outline and schedule, as PDF, Word
+ *      or PowerPoint. Required: the admin decides on it. Since the October
+ *      2026 review trainers no longer upload the course itself (it used
+ *      to take ZIP archives too); the code still calls it "material".
+ *   4. Hits Submit → uploads the plan first, then POSTs
  *      the course. Backend flags it as PENDING; admin gets it in the
  *      review queue. Trainer sees a success alert and lands back on
  *      their courses list.
@@ -69,17 +71,17 @@ export default function TrainerCourseCreateScreen() {
         })();
     }, []);
 
-    /** Prompt the OS document picker. PDF + PPT are the common cases;
-     *  ZIP too since some trainers bundle multiple files. */
+    /** Prompt the OS document picker for the course plan. The same
+     *  types the server accepts (FileStorageService.COURSE_PLAN_TYPES). */
     const handlePickMaterial = async () => {
         try {
             const res = await DocumentPicker.getDocumentAsync({
                 type: [
                     'application/pdf',
+                    'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'application/vnd.ms-powerpoint',
                     'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    'application/zip',
-                    'application/x-zip-compressed',
                 ],
                 copyToCacheDirectory: true,
             });
@@ -112,12 +114,16 @@ export default function TrainerCourseCreateScreen() {
             Alert.alert(t('common.error'), t('courseCreate.minDuration'));
             return;
         }
+        if (!material) {
+            Alert.alert(t('common.error'), t('courseCreate.planRequired'));
+            return;
+        }
         setSubmitting(true);
         try {
             let materialUrl: string | undefined;
             let materialName: string | undefined;
 
-            // Upload material first (if provided). Failures roll back
+            // Upload the plan first. Failures roll back
             // to a form-still-editable state — we don't want the
             // trainer to lose all their typing.
             if (material) {
@@ -316,7 +322,7 @@ export default function TrainerCourseCreateScreen() {
                         <Text style={styles.certText}>{t('courseCreate.certificate')}</Text>
                     </TouchableOpacity>
 
-                    {/* Material upload */}
+                    {/* Course plan upload */}
                     <SectionLabel text={t('courseCreate.material')} />
                     <Text style={styles.hint}>{t('courseCreate.materialHint')}</Text>
                     <TouchableOpacity

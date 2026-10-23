@@ -651,8 +651,8 @@
         "prerequisites": "المتطلبات المسبقة (اختياري)",
         "prerequisitesPlaceholder": "مثال: أساسيات JavaScript",
         "certificate": "تضمين شهادة إتمام",
-        "material": "المادة التدريبية (PDF / PPT / ZIP)",
-        "materialHint": "يراجعها المسؤول قبل الموافقة.",
+        "material": "مخطط الدورة (PDF / Word / PowerPoint)",
+        "materialHint": "محتوى دورتك ومخططها الزمني، وليس الدورة نفسها. يراجعه المسؤول قبل الموافقة.",
         "chooseFile": "اختر ملفًا",
         "uploading": "جارٍ الرفع…",
         "submitting": "جارٍ الإرسال…",
@@ -660,12 +660,13 @@
         "pickerFailed": "تعذّر فتح منتقي الملفات.",
         "requiredFields": "العنوان والوصف والموضوع المحدد حقول مطلوبة.",
         "minDuration": "يجب ألا تقل المدة عن ساعة واحدة.",
-        "uploadFailed": "تعذّر رفع المادة. حاول مرة أخرى.",
+        "uploadFailed": "تعذّر رفع مخطط الدورة. حاول مرة أخرى.",
         "submittedTitle": "تم إرسال الدورة",
         "submittedBody": "تم إرسال دورتك لمراجعة المسؤول. ستتلقى بريدًا إلكترونيًا بمجرد اتخاذ القرار.",
         "submitFailed": "تعذّر إرسال الدورة.",
         "language": "لغة الدورة",
-        "languageHint": "اللغة التي تُقدَّم بها الدورة."
+        "languageHint": "اللغة التي تُقدَّم بها الدورة.",
+        "planRequired": "أرفق مخطط دورتك."
     },
     "levels": {
         "beginner": "مبتدئ",

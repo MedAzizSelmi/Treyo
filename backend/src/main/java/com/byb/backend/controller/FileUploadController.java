@@ -110,7 +110,8 @@ public class FileUploadController {
     }
 
     /**
-     * v2: Upload a course material file before the course row exists.
+     * v2: Upload the course plan before the course row exists — the plan
+     * (outline and schedule) since October 2026, not the course content.
      * Trainer's create-course flow uploads the PDF/PPT first to get a
      * URL, then submits the course with that URL attached. Uses the
      * trainerId as the storage grouping key since the material doesn't
@@ -145,24 +146,10 @@ public class FileUploadController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Upload course material
-     */
-    @PostMapping("/upload/course-material")
-    @Operation(summary = "Upload course material")
-    public ResponseEntity<Map<String, String>> uploadCourseMaterial(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("courseId") String courseId
-    ) {
-        String filePath = fileStorageService.storeCourseMaterial(file, courseId);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Course material uploaded successfully");
-        response.put("filePath", filePath);
-        response.put("fileUrl", "/api/files/download/" + filePath.replace("/", "$"));
-
-        return ResponseEntity.ok(response);
-    }
+    // POST /upload/course-material was removed in October 2026. No client
+    // used it — the app uploads through /upload/pending-material above —
+    // and it checked nothing: any signed-in account could write a file into
+    // any course's folder.
 
     /**
      * Upload message attachment

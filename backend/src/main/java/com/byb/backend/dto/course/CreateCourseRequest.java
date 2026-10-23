@@ -57,7 +57,9 @@ public class CreateCourseRequest {
      *  in {@link com.byb.backend.service.CourseService#createTrainerCourse}. */
     private String moduleId;
 
-    /** v2: URL of the uploaded course material (PDF / PPT / ZIP). */
+    /** URL of the uploaded course plan (PDF / Word / PowerPoint). Required
+     *  when a trainer submits a course. Named "material" from before the
+     *  October 2026 review, when trainers uploaded the course itself. */
     private String materialUrl;
 
     /** v2: original filename of the material for a friendlier download link. */

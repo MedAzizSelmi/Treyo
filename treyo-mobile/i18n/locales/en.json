@@ -651,8 +651,8 @@
         "prerequisites": "Prerequisites (optional)",
         "prerequisitesPlaceholder": "e.g. Basic JavaScript",
         "certificate": "Include certificate of completion",
-        "material": "Training material (PDF / PPT / ZIP)",
-        "materialHint": "The admin reviews this before approving.",
+        "material": "Course plan (PDF / Word / PowerPoint)",
+        "materialHint": "The outline and schedule of your course, not the course itself. The admin reviews it before approving.",
         "chooseFile": "Choose a file",
         "uploading": "Uploading…",
         "submitting": "Submitting…",
@@ -660,12 +660,13 @@
         "pickerFailed": "Could not open the file picker.",
         "requiredFields": "Title, description and specific topic are required.",
         "minDuration": "Duration must be at least 1 hour.",
-        "uploadFailed": "Could not upload the material. Try again.",
+        "uploadFailed": "Could not upload the course plan. Try again.",
         "submittedTitle": "Course submitted",
         "submittedBody": "Your course was sent for admin review. You'll get an email once a decision is made.",
         "submitFailed": "Could not submit the course.",
         "language": "Course language",
-        "languageHint": "The language the course is taught in."
+        "languageHint": "The language the course is taught in.",
+        "planRequired": "Attach your course plan."
     },
     "levels": {
         "beginner": "Beginner",
