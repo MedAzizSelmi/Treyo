@@ -3,10 +3,11 @@ import {
     ActivityIndicator, Alert, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar } from 'react-native-calendars';
+import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 import { groupService } from '../services/api';
 
 /**
@@ -34,6 +35,33 @@ const DEFAULT_SESSION_HOURS = 2;
 const ACCENT = '#7cce06';
 
 const pad = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * The calendar's month and day names, in the app's language. The library
+ * ships English only and reads them from a global; they are generated here
+ * by the runtime's date formatting rather than kept as four hand-written
+ * lists. 2023-01-01 was a Sunday, which is index 0 for the library.
+ */
+function useCalendarLocale(lang: string) {
+    useEffect(() => {
+        const months = (style: 'long' | 'short') =>
+            Array.from({ length: 12 }, (_, m) => new Date(2023, m, 1).toLocaleDateString(lang, { month: style }));
+        const days = (style: 'long' | 'short') =>
+            Array.from({ length: 7 }, (_, d) => new Date(2023, 0, 1 + d).toLocaleDateString(lang, { weekday: style }));
+        try {
+            LocaleConfig.locales[lang] = {
+                monthNames: months('long'),
+                monthNamesShort: months('short'),
+                dayNames: days('long'),
+                dayNamesShort: days('short'),
+                today: '',
+            };
+            LocaleConfig.defaultLocale = lang;
+        } catch (_) {
+            // Fall back to the library's English rather than break the screen.
+        }
+    }, [lang]);
+}
 
 /** Local "today" as YYYY-MM-DD. */
 function todayDateStr(): string {
@@ -66,6 +94,8 @@ function nextValidSlotToday(): string {
 
 export default function ScheduleSessionsScreen() {
     const router = useRouter();
+    const { t, i18n } = useTranslation();
+    useCalendarLocale(i18n.language);
     const { groupId } = useLocalSearchParams<{ groupId: string }>();
 
     const [loading, setLoading] = useState(true);
@@ -185,19 +215,19 @@ export default function ScheduleSessionsScreen() {
         const past = sortedSessions.find(s => isTimeInPast(s.date, s.time));
         if (past) {
             Alert.alert(
-                'Time has passed',
-                `Session on ${fmtDate(past.date)} at ${past.time} is in the past. Please pick a later time.`,
+                t('scheduleSessions.timePassedTitle'),
+                t('scheduleSessions.timePassedBody', { date: fmtDate(past.date), time: past.time }),
             );
             return;
         }
         setSaving(true);
         try {
             await groupService.saveGroupSchedule(groupId, { sessions: sortedSessions });
-            Alert.alert('Schedule saved', 'Your session schedule has been saved.', [
-                { text: 'OK', onPress: () => router.back() },
+            Alert.alert(t('scheduleSessions.savedTitle'), t('scheduleSessions.savedBody'), [
+                { text: t('common.ok'), onPress: () => router.back() },
             ]);
         } catch (e: any) {
-            Alert.alert('Could not save', e?.response?.data?.error || 'Please try again.');
+            Alert.alert(t('scheduleSessions.saveFailedTitle'), e?.response?.data?.error || t('scheduleSessions.tryAgain'));
         } finally {
             setSaving(false);
         }
@@ -205,23 +235,23 @@ export default function ScheduleSessionsScreen() {
 
     const fmtDate = (ds: string) => {
         const d = new Date(ds + 'T00:00:00');
-        return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        return d.toLocaleDateString(i18n.language, { weekday: 'short', month: 'short', day: 'numeric' });
     };
 
     // Tally banner state — drives colour + wording.
     const tallyExact = remaining === 0 && sessions.length > 0;
     const tallyOver = remaining < 0;
     const tallyText = tallyExact
-        ? `${totalScheduled}h of ${durationHours}h scheduled`
+        ? t('scheduleSessions.tallyExact', { done: totalScheduled, total: durationHours })
         : tallyOver
-            ? `${totalScheduled}h of ${durationHours}h — remove ${-remaining}h`
-            : `${totalScheduled}h of ${durationHours}h — ${remaining}h left`;
+            ? t('scheduleSessions.tallyOver', { done: totalScheduled, total: durationHours, extra: -remaining })
+            : t('scheduleSessions.tallyLeft', { done: totalScheduled, total: durationHours, left: remaining });
 
     const saveLabel = tallyExact
-        ? 'Save Schedule'
+        ? t('scheduleSessions.save')
         : tallyOver
-            ? `Remove ${-remaining}h to save`
-            : `Allocate ${remaining}h more`;
+            ? t('scheduleSessions.removeToSave', { extra: -remaining })
+            : t('scheduleSessions.allocateMore', { left: remaining });
 
     if (loading) {
         return (
@@ -246,9 +276,9 @@ export default function ScheduleSessionsScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Schedule Sessions</Text>
+                        <Text style={styles.headerTitle}>{t('scheduleSessions.title')}</Text>
                         <Text style={styles.headerSubtitle} numberOfLines={1}>
-                            {group?.courseTitle || group?.groupName || 'Course'}
+                            {group?.courseTitle || group?.groupName || t('home.course')}
                         </Text>
                     </View>
                 </View>
@@ -287,7 +317,7 @@ export default function ScheduleSessionsScreen() {
                         }}
                     />
                     <Text style={styles.calendarHint}>
-                        Tap a date to add a session · tap again to remove it
+                        {t('scheduleSessions.calendarHint')}
                     </Text>
                 </View>
 
@@ -295,7 +325,7 @@ export default function ScheduleSessionsScreen() {
                 {sortedSessions.length > 0 && (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>
-                            Sessions ({sortedSessions.length})
+                            {t('scheduleSessions.sessionsCount', { count: sortedSessions.length })}
                         </Text>
                         {sortedSessions.map((s, i) => (
                             <View key={s.date} style={styles.sessionRow}>
@@ -400,6 +430,7 @@ function TimePickerModal({
     onClose: () => void;
     onPick: (time: string) => void;
 }) {
+    const { t } = useTranslation();
     const [hour, setHour] = useState(18);
     const [minute, setMinute] = useState(0);
 
@@ -468,10 +499,10 @@ function TimePickerModal({
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
             <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
                 <TouchableOpacity activeOpacity={1} style={styles.modalCard}>
-                    <Text style={styles.modalTitle}>Start time</Text>
+                    <Text style={styles.modalTitle}>{t('scheduleSessions.startTime')}</Text>
                     <Text style={styles.modalPreview}>{pad(hour)}:{pad(minute)}</Text>
 
-                    <Text style={styles.modalLabel}>Hour</Text>
+                    <Text style={styles.modalLabel}>{t('scheduleSessions.hour')}</Text>
                     <View style={styles.hourGrid}>
                         {Array.from({ length: 24 }, (_, h) => {
                             const disabled = hourDisabled(h);
@@ -498,7 +529,7 @@ function TimePickerModal({
                         })}
                     </View>
 
-                    <Text style={styles.modalLabel}>Minute</Text>
+                    <Text style={styles.modalLabel}>{t('scheduleSessions.minute')}</Text>
                     <View style={styles.minuteRow}>
                         {[0, 15, 30, 45].map(m => {
                             const disabled = minuteDisabled(m);
@@ -531,7 +562,7 @@ function TimePickerModal({
                         onPress={() => onPick(`${pad(hour)}:${pad(minute)}`)}
                     >
                         <Text style={styles.modalConfirmText}>
-                            {selectionInPast ? 'Pick a later time' : 'Set time'}
+                            {selectionInPast ? t('scheduleSessions.pickLater') : t('scheduleSessions.setTime')}
                         </Text>
                     </TouchableOpacity>
                 </TouchableOpacity>

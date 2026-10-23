@@ -4,6 +4,7 @@ import { BlurView } from 'expo-blur';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 import { enrollmentService, groupService, API_BASE_URL } from '../services/api';
 
 type Tab = 'students' | 'groups';
@@ -26,6 +27,7 @@ const GROUP_STATUS_COLOR: Record<string, string> = {
 
 export default function TrainerCourseManageScreen() {
     const router = useRouter();
+    const { t, i18n } = useTranslation();
     const { courseId, courseTitle } = useLocalSearchParams<{ courseId: string; courseTitle: string }>();
     const [tab, setTab] = useState<Tab>('students');
     const [students, setStudents] = useState<any[]>([]);
@@ -57,22 +59,27 @@ export default function TrainerCourseManageScreen() {
     const enrollmentStatusLabel = (status: string) => {
         const s = (status || '').toUpperCase();
         switch (s) {
-            case 'CONFIRMED': return 'Confirmed';
-            case 'ACTIVE': return 'Active';
-            case 'COMPLETED': return 'Completed';
-            case 'CANCELLED': return 'Cancelled';
-            default: return status || 'Pending';
+            case 'CONFIRMED':
+            case 'ACTIVE':
+            case 'COMPLETED':
+            case 'CANCELLED':
+            case 'DROPPED':
+            case 'PENDING':
+                return t(`enrollmentStatus.${s.toLowerCase()}`);
+            default: return status || t('enrollmentStatus.pending');
         }
     };
 
     const groupStatusLabel = (status: string) => {
-        if (!status) return 'Unknown';
-        return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+        const s = (status || '').toLowerCase();
+        return ['forming', 'ready', 'active', 'completed', 'cancelled'].includes(s)
+            ? t(`groupStatus.${s}`)
+            : (status || t('groupStatus.unknown'));
     };
 
     const formatDate = (dateStr: string | null) => {
-        if (!dateStr) return 'TBD';
-        return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (!dateStr) return t('trainerCourseManage.tbd');
+        return new Date(dateStr).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     return (
@@ -83,8 +90,8 @@ export default function TrainerCourseManageScreen() {
                     <Ionicons name="arrow-back" size={22} color="#ffffff" />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle} numberOfLines={1}>{courseTitle || 'Course'}</Text>
-                    <Text style={styles.headerSub}>Course Management</Text>
+                    <Text style={styles.headerTitle} numberOfLines={1}>{courseTitle || t('home.course')}</Text>
+                    <Text style={styles.headerSub}>{t('trainerCourseManage.subtitle')}</Text>
                 </View>
             </View>
 
@@ -92,11 +99,11 @@ export default function TrainerCourseManageScreen() {
             <View style={styles.summaryRow}>
                 <View style={styles.summaryPill}>
                     <Ionicons name="people" size={15} color="#7cce06" />
-                    <Text style={styles.summaryText}>{students.length} students</Text>
+                    <Text style={styles.summaryText}>{t('trainerCourses.studentsCount', { count: students.length })}</Text>
                 </View>
                 <View style={styles.summaryPill}>
                     <Ionicons name="git-branch" size={15} color="#3b5bdb" />
-                    <Text style={styles.summaryText}>{groups.length} groups</Text>
+                    <Text style={styles.summaryText}>{t('trainerCourses.groupsCount', { count: groups.length })}</Text>
                 </View>
             </View>
 
@@ -104,11 +111,11 @@ export default function TrainerCourseManageScreen() {
             <View style={styles.tabRow}>
                 <TouchableOpacity style={[styles.tabBtn, tab === 'students' && styles.tabBtnActive]} onPress={() => setTab('students')} activeOpacity={0.8}>
                     <Ionicons name="people-outline" size={16} color={tab === 'students' ? '#7cce06' : 'rgba(255,255,255,0.4)'} />
-                    <Text style={[styles.tabText, tab === 'students' && styles.tabTextActive]}>Students</Text>
+                    <Text style={[styles.tabText, tab === 'students' && styles.tabTextActive]}>{t('trainerCourseManage.tabStudents')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.tabBtn, tab === 'groups' && styles.tabBtnActive]} onPress={() => setTab('groups')} activeOpacity={0.8}>
                     <Ionicons name="git-branch-outline" size={16} color={tab === 'groups' ? '#7cce06' : 'rgba(255,255,255,0.4)'} />
-                    <Text style={[styles.tabText, tab === 'groups' && styles.tabTextActive]}>Groups</Text>
+                    <Text style={[styles.tabText, tab === 'groups' && styles.tabTextActive]}>{t('trainerCourseManage.tabGroups')}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -125,7 +132,7 @@ export default function TrainerCourseManageScreen() {
                 >
                     {tab === 'students' ? (
                         students.length === 0 ? (
-                            <EmptyState icon="people-outline" title="No students yet" subtitle="Students who enroll will appear here." />
+                            <EmptyState icon="people-outline" title={t('trainerCourseManage.noStudents')} subtitle={t('trainerCourseManage.noStudentsBody')} />
                         ) : (
                             students.map((s: any) => {
                                 const statusKey = (s.enrollmentStatus || '').toUpperCase();
@@ -145,10 +152,14 @@ export default function TrainerCourseManageScreen() {
                                                 </View>
                                             )}
                                             <View style={{ flex: 1 }}>
-                                                <Text style={styles.studentName}>{s.studentName || 'Student'}</Text>
+                                                <Text style={styles.studentName}>{s.studentName || t('home.studentFallback')}</Text>
                                                 <Text style={styles.studentMeta}>
-                                                    Enrolled {s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-                                                    {s.groupId ? '  ·  Has group' : ''}
+                                                    {t('trainerCourseManage.enrolledOn', {
+                                                        date: s.enrolledAt
+                                                            ? new Date(s.enrolledAt).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' })
+                                                            : '—',
+                                                    })}
+                                                    {s.groupId ? `  ·  ${t('trainerCourseManage.hasGroup')}` : ''}
                                                 </Text>
                                             </View>
                                             <View style={[styles.statusBadge, { backgroundColor: color + '20', borderColor: color + '50' }]}>
@@ -169,7 +180,9 @@ export default function TrainerCourseManageScreen() {
                         )
                     ) : (
                         groups.length === 0 ? (
-                            <EmptyState icon="git-branch-outline" title="No groups yet" subtitle="Groups will be created automatically as students enroll." />
+                            /* Groups are formed by the admin from interested learners, not
+                               automatically — the old text said otherwise. */
+                            <EmptyState icon="git-branch-outline" title={t('trainerCourseManage.noGroups')} subtitle={t('trainerCourseManage.noGroupsBody')} />
                         ) : (
                             groups.map((g: any) => {
                                 const statusKey = (g.groupStatus || '').toLowerCase();
@@ -184,8 +197,8 @@ export default function TrainerCourseManageScreen() {
                                                 <Ionicons name="people" size={20} color="#7cce06" />
                                             </View>
                                             <View style={{ flex: 1 }}>
-                                                <Text style={styles.groupName}>{g.groupName || 'Group'}</Text>
-                                                <Text style={styles.groupMeta}>{g.isOnline ? 'Online' : g.meetingLocation || 'In-person'}</Text>
+                                                <Text style={styles.groupName}>{g.groupName || t('trainerCourseManage.groupFallback')}</Text>
+                                                <Text style={styles.groupMeta}>{g.isOnline ? t('common.online') : g.meetingLocation || t('common.onSite')}</Text>
                                             </View>
                                             <View style={[styles.statusBadge, { backgroundColor: color + '20', borderColor: color + '50' }]}>
                                                 <Text style={[styles.statusText, { color }]}>{groupStatusLabel(g.groupStatus)}</Text>
@@ -195,7 +208,7 @@ export default function TrainerCourseManageScreen() {
                                         <View style={styles.groupStats}>
                                             <View style={styles.groupStat}>
                                                 <Ionicons name="people-outline" size={14} color="#aaaaaa" />
-                                                <Text style={styles.groupStatText}>{g.currentSize}/{g.maxSize} members</Text>
+                                                <Text style={styles.groupStatText}>{t('trainerCourseManage.members', { current: g.currentSize, max: g.maxSize })}</Text>
                                             </View>
                                             <View style={styles.groupStat}>
                                                 <Ionicons name="calendar-outline" size={14} color="#aaaaaa" />
@@ -207,7 +220,7 @@ export default function TrainerCourseManageScreen() {
                                             <View style={styles.progressBar}>
                                                 <View style={[styles.progressFill, { width: `${fillPct}%` as any, backgroundColor: color }]} />
                                             </View>
-                                            <Text style={styles.progressLabel}>{spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} left` : 'Full'}</Text>
+                                            <Text style={styles.progressLabel}>{spotsLeft > 0 ? t('trainerCourseManage.spotsLeft', { count: spotsLeft }) : t('trainerCourseManage.full')}</Text>
                                         </View>
                                     </View>
                                 );

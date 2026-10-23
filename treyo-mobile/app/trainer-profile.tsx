@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { ReviewsList } from '../components/ReviewsList';
 import { formatAmount, isPricedExclVat } from '../utils/price';
+import { levelLabel } from '../utils/courseLabels';
 import ReportTrainerModal from '../components/ReportTrainerModal';
 import { trainerService, courseService, authService, API_BASE_URL } from '../services/api';
 
@@ -228,7 +229,7 @@ export default function TrainerProfileScreen() {
                                         <Text style={styles.courseTitle} numberOfLines={2}>{course.title || 'Untitled'}</Text>
                                         <View style={styles.courseMeta}>
                                             {!!course.level && (
-                                                <Text style={styles.courseMetaText}>{course.level}</Text>
+                                                <Text style={styles.courseMetaText}>{levelLabel(t, course.level)}</Text>
                                             )}
                                             {!!course.domain && (
                                                 <Text style={styles.courseMetaText}>· {course.domain}</Text>

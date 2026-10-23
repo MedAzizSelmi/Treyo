@@ -133,18 +133,6 @@ export default function SettingsPrivacyScreen() {
                 </View>
 
                 {/* ── Earnings (trainers only) ── */}
-                {isTrainer && (
-                    <>
-                        <Text style={styles.sectionLabel}>EARNINGS</Text>
-                        <View style={styles.card}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <Row icon="cash-outline" title="Revenue currency"
-                                 subtitle="Default currency for the courses you create"
-                                 onPress={() => router.push('/settings-currency' as any)} />
-                        </View>
-                    </>
-                )}
-
                 {/* ── Billing (students only) ── */}
                 {isStudent && (
                     <>

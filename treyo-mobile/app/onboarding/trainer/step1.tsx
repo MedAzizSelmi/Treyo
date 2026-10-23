@@ -6,9 +6,11 @@ import { useState } from 'react';
 import { authService } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 
 export default function TrainerOnboardingStep1() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [phone, setPhone] = useState('');
     const [address, setAddress] = useState('');
     const [town, setTown] = useState('');
@@ -23,7 +25,7 @@ export default function TrainerOnboardingStep1() {
 
     const handleNext = async () => {
         if (!phone || !address || !town || !state || !postCode) {
-            Alert.alert('Error', 'Please fill in all required fields');
+            Alert.alert(t('common.error'), t('trainerOnboarding.fillRequired'));
             return;
         }
 
@@ -31,7 +33,7 @@ export default function TrainerOnboardingStep1() {
         try {
             const user = await authService.getCurrentUser();
             if (!user || !user.userId) {
-                Alert.alert('Error', 'User not found. Please login again.');
+                Alert.alert(t('common.error'), t('trainerOnboarding.userNotFound'));
                 router.replace('/login' as any);
                 return;
             }
@@ -50,7 +52,7 @@ export default function TrainerOnboardingStep1() {
             });
         } catch (error) {
             console.error('Error saving contact info:', error);
-            Alert.alert('Error', 'Failed to save. Please try again.');
+            Alert.alert(t('common.error'), t('trainerOnboarding.saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -74,13 +76,13 @@ export default function TrainerOnboardingStep1() {
                         screen. */}
                     <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
                         <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.7)" />
-                        <Text style={styles.signOutText}>Sign out</Text>
+                        <Text style={styles.signOutText}>{t('trainerOnboarding.signOut')}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.header}>
-                        <Text style={styles.title}>Contact Information</Text>
-                        <Text style={styles.subtitle}>Help students reach you</Text>
-                        <Text style={styles.step}>Step 1 of 3</Text>
+                        <Text style={styles.title}>{t('trainerOnboarding.contactTitle')}</Text>
+                        <Text style={styles.subtitle}>{t('trainerOnboarding.contactSubtitle')}</Text>
+                        <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 1 })}</Text>
                     </View>
 
                     <View style={styles.progressContainer}>
@@ -92,7 +94,7 @@ export default function TrainerOnboardingStep1() {
                         <BlurView intensity={22} tint="light" style={StyleSheet.absoluteFill} />
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Phone Number *</Text>
+                            <Text style={styles.label}>{t('trainerOnboarding.phone')}</Text>
                             <View style={styles.inputContainer}>
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <Ionicons name="call-outline" size={20} color="#666" style={styles.inputIcon} />
@@ -108,13 +110,13 @@ export default function TrainerOnboardingStep1() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Home Address *</Text>
+                            <Text style={styles.label}>{t('trainerOnboarding.address')}</Text>
                             <View style={styles.inputContainer}>
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <Ionicons name="home-outline" size={20} color="#666" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Street address"
+                                    placeholder={t('trainerOnboarding.addressPh')}
                                     placeholderTextColor="#555"
                                     value={address}
                                     onChangeText={setAddress}
@@ -123,13 +125,13 @@ export default function TrainerOnboardingStep1() {
                         </View>
 
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Town *</Text>
+                            <Text style={styles.label}>{t('trainerOnboarding.town')}</Text>
                             <View style={styles.inputContainer}>
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <Ionicons name="location-outline" size={20} color="#666" style={styles.inputIcon} />
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Town/City"
+                                    placeholder={t('trainerOnboarding.townPh')}
                                     placeholderTextColor="#555"
                                     value={town}
                                     onChangeText={setTown}
@@ -139,12 +141,12 @@ export default function TrainerOnboardingStep1() {
 
                         <View style={styles.row}>
                             <View style={[styles.inputGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>State *</Text>
+                                <Text style={styles.label}>{t('trainerOnboarding.state')}</Text>
                                 <View style={styles.inputContainer}>
                                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="State"
+                                        placeholder={t('trainerOnboarding.statePh')}
                                         placeholderTextColor="#555"
                                         value={state}
                                         onChangeText={setState}
@@ -153,7 +155,7 @@ export default function TrainerOnboardingStep1() {
                             </View>
 
                             <View style={[styles.inputGroup, { flex: 1 }]}>
-                                <Text style={styles.label}>Post Code *</Text>
+                                <Text style={styles.label}>{t('trainerOnboarding.postCode')}</Text>
                                 <View style={styles.inputContainer}>
                                     <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                     <TextInput
@@ -176,7 +178,7 @@ export default function TrainerOnboardingStep1() {
                             activeOpacity={0.85}
                         >
                             <Text style={styles.continueButtonText}>
-                                {loading ? 'Saving...' : 'Continue'}
+                                {loading ? t('trainerOnboarding.saving') : t('trainerOnboarding.continue')}
                             </Text>
                         </TouchableOpacity>
                     </View>

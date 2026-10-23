@@ -5,15 +5,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { authService, trainerService, fetchUpload, API_BASE_URL } from '../services/api';
 import api from '../services/api';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 
 export default function TrainerEditProfileScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
 
     // Form state
     const [bio, setBio] = useState('');
@@ -29,6 +31,18 @@ export default function TrainerEditProfileScreen() {
     const [education, setEducation] = useState('');
     const [specializationInput, setSpecializationInput] = useState('');
     const [skillInput, setSkillInput] = useState('');
+
+    // Professional fields this screen shows but does not edit. The save
+    // endpoint replaces the whole professional section, so they are sent
+    // back exactly as loaded — they used to be sent as null, which wiped
+    // the trainer's CV link and professional experience on every save.
+    const kept = useRef<{ cvUrl: string | null; professionalExperience: string | null; githubUrl: string | null }>(
+        { cvUrl: null, professionalExperience: null, githubUrl: null });
+    // The professional section as loaded, to tell whether it was edited.
+    const loadedProfessional = useRef('');
+    const professionalSnapshot = () => JSON.stringify([
+        specializations, skills, experienceYears, education.trim(), linkedinUrl.trim(), portfolioUrl.trim(),
+    ]);
 
     const [trainerId, setTrainerId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -52,6 +66,16 @@ export default function TrainerEditProfileScreen() {
             setSkills(p.skills || []);
             setExperienceYears(p.experienceYears ? String(p.experienceYears) : '');
             setEducation(p.education || '');
+            kept.current = {
+                cvUrl: p.cvUrl ?? null,
+                professionalExperience: p.professionalExperience ?? null,
+                githubUrl: p.githubUrl ?? null,
+            };
+            loadedProfessional.current = JSON.stringify([
+                p.specializations || [], p.skills || [],
+                p.experienceYears ? String(p.experienceYears) : '', (p.education || '').trim(),
+                (p.linkedinUrl || '').trim(), (p.portfolioUrl || '').trim(),
+            ]);
         } catch (e) {
             console.log('Load trainer profile error', e);
         }
@@ -63,11 +87,11 @@ export default function TrainerEditProfileScreen() {
             let result;
             if (source === 'camera') {
                 const perm = await ImagePicker.requestCameraPermissionsAsync();
-                if (!perm.granted) { Alert.alert('Permission needed', 'Camera access is required.'); return; }
+                if (!perm.granted) { Alert.alert(t('trainerEditProfile.permissionNeeded'), t('trainerEditProfile.cameraRequired')); return; }
                 result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
             } else {
                 const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (!perm.granted) { Alert.alert('Permission needed', 'Gallery access is required.'); return; }
+                if (!perm.granted) { Alert.alert(t('trainerEditProfile.permissionNeeded'), t('trainerEditProfile.galleryRequired')); return; }
                 result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
             }
             if (!result.canceled && result.assets?.[0]) {
@@ -111,7 +135,18 @@ export default function TrainerEditProfileScreen() {
 
     const handleSave = async () => {
         if (!trainerId) return;
-        if (!bio.trim()) { Alert.alert('Required', 'Please write a short bio.'); return; }
+        if (!bio.trim()) { Alert.alert(t('trainerEditProfile.required'), t('trainerEditProfile.bioRequired')); return; }
+
+        // The professional section is saved only when it changed, and only
+        // whole: the server requires specializations, skills and education.
+        // It used to be skipped quietly when one was empty — taking the
+        // LinkedIn and portfolio edits with it — while the screen still
+        // said "Saved". Now nothing is saved and the trainer is told why.
+        const professionalChanged = professionalSnapshot() !== loadedProfessional.current;
+        if (professionalChanged && !(specializations.length > 0 && skills.length > 0 && education.trim())) {
+            Alert.alert(t('trainerEditProfile.required'), t('trainerEditProfile.professionalIncomplete'));
+            return;
+        }
 
         setLoading(true);
         try {
@@ -126,7 +161,7 @@ export default function TrainerEditProfileScreen() {
                 profilePictureUrl: picUrl || undefined,
             });
 
-            if (specializations.length > 0 && skills.length > 0 && education.trim()) {
+            if (professionalChanged) {
                 await trainerService.updateTrainerPage2(trainerId, {
                     specializations,
                     skills,
@@ -134,18 +169,19 @@ export default function TrainerEditProfileScreen() {
                     experienceYears: parseInt(experienceYears) || 0,
                     linkedinUrl: linkedinUrl.trim() || null,
                     portfolioUrl: portfolioUrl.trim() || null,
-                    cvUrl: null,
-                    professionalExperience: null,
+                    cvUrl: kept.current.cvUrl,
+                    professionalExperience: kept.current.professionalExperience,
                     certificates: [],
-                    githubUrl: null,
+                    githubUrl: kept.current.githubUrl,
                 });
+                loadedProfessional.current = professionalSnapshot();
             }
 
-            Alert.alert('Saved', 'Your profile has been updated.', [
-                { text: 'OK', onPress: () => router.back() },
+            Alert.alert(t('editProfile.saved'), t('trainerEditProfile.savedBody'), [
+                { text: t('common.ok'), onPress: () => router.back() },
             ]);
         } catch (e: any) {
-            Alert.alert('Error', e?.response?.data?.message || 'Could not save changes.');
+            Alert.alert(t('common.error'), e?.response?.data?.message || t('editProfile.saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -170,7 +206,7 @@ export default function TrainerEditProfileScreen() {
                         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                             <Ionicons name="arrow-back" size={22} color="#ffffff" />
                         </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Edit Profile</Text>
+                        <Text style={styles.headerTitle}>{t('editProfile.title')}</Text>
                     </View>
 
                     {/* Avatar picker */}
@@ -187,19 +223,19 @@ export default function TrainerEditProfileScreen() {
                                 <Ionicons name="camera" size={18} color="#ffffff" />
                             </View>
                         </TouchableOpacity>
-                        <Text style={styles.avatarHint}>Tap to change photo</Text>
+                        <Text style={styles.avatarHint}>{t('trainerEditProfile.tapToChange')}</Text>
                     </View>
 
                     {/* Bio */}
                     <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Bio *</Text>
+                        <Text style={styles.fieldLabel}>{t('editProfile.bio')} *</Text>
                         <View style={styles.textAreaWrap}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <TextInput
                                 style={styles.textArea}
                                 value={bio}
                                 onChangeText={setBio}
-                                placeholder="Tell students about yourself..."
+                                placeholder={t('trainerEditProfile.bioPlaceholder')}
                                 placeholderTextColor="rgba(255,255,255,0.3)"
                                 multiline
                                 numberOfLines={4}
@@ -211,7 +247,7 @@ export default function TrainerEditProfileScreen() {
                     {/* Experience + Education */}
                     <View style={styles.row}>
                         <View style={[styles.fieldGroup, { flex: 1 }]}>
-                            <Text style={styles.fieldLabel}>Experience (years)</Text>
+                            <Text style={styles.fieldLabel}>{t('trainerEditProfile.experienceYears')}</Text>
                             <View style={styles.inputWrap}>
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <Ionicons name="briefcase-outline" size={16} color="rgba(255,255,255,0.4)" />
@@ -219,14 +255,14 @@ export default function TrainerEditProfileScreen() {
                                     style={styles.input}
                                     value={experienceYears}
                                     onChangeText={setExperienceYears}
-                                    placeholder="e.g. 5"
+                                    placeholder={t('trainerEditProfile.experienceExample')}
                                     placeholderTextColor="rgba(255,255,255,0.3)"
                                     keyboardType="number-pad"
                                 />
                             </View>
                         </View>
                         <View style={[styles.fieldGroup, { flex: 1 }]}>
-                            <Text style={styles.fieldLabel}>Education</Text>
+                            <Text style={styles.fieldLabel}>{t('trainerEditProfile.education')}</Text>
                             <View style={styles.inputWrap}>
                                 <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                                 <Ionicons name="school-outline" size={16} color="rgba(255,255,255,0.4)" />
@@ -234,7 +270,7 @@ export default function TrainerEditProfileScreen() {
                                     style={styles.input}
                                     value={education}
                                     onChangeText={setEducation}
-                                    placeholder="e.g. Master's"
+                                    placeholder={t('trainerEditProfile.educationExample')}
                                     placeholderTextColor="rgba(255,255,255,0.3)"
                                 />
                             </View>
@@ -243,14 +279,14 @@ export default function TrainerEditProfileScreen() {
 
                     {/* Specializations */}
                     <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Specializations</Text>
+                        <Text style={styles.fieldLabel}>{t('trainerEditProfile.specializations')}</Text>
                         <View style={styles.inputWrap}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <TextInput
                                 style={styles.input}
                                 value={specializationInput}
                                 onChangeText={setSpecializationInput}
-                                placeholder="Type and press +"
+                                placeholder={t('trainerEditProfile.typeAndAdd')}
                                 placeholderTextColor="rgba(255,255,255,0.3)"
                                 onSubmitEditing={() => addTag(specializationInput, specializations, setSpecializations, setSpecializationInput)}
                                 returnKeyType="done"
@@ -280,14 +316,14 @@ export default function TrainerEditProfileScreen() {
 
                     {/* Skills */}
                     <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Skills</Text>
+                        <Text style={styles.fieldLabel}>{t('trainerEditProfile.skills')}</Text>
                         <View style={styles.inputWrap}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <TextInput
                                 style={styles.input}
                                 value={skillInput}
                                 onChangeText={setSkillInput}
-                                placeholder="Type and press +"
+                                placeholder={t('trainerEditProfile.typeAndAdd')}
                                 placeholderTextColor="rgba(255,255,255,0.3)"
                                 onSubmitEditing={() => addTag(skillInput, skills, setSkills, setSkillInput)}
                                 returnKeyType="done"
@@ -318,8 +354,8 @@ export default function TrainerEditProfileScreen() {
                     {/* LinkedIn */}
                     <View style={styles.fieldGroup}>
                         <View style={styles.fieldLabelRow}>
-                            <Text style={styles.fieldLabel}>LinkedIn URL</Text>
-                            <View style={styles.optionalTag}><Text style={styles.optionalText}>Optional</Text></View>
+                            <Text style={styles.fieldLabel}>{t('editProfile.linkedinUrl')}</Text>
+                            <View style={styles.optionalTag}><Text style={styles.optionalText}>{t('editProfile.optional')}</Text></View>
                         </View>
                         <View style={styles.inputWrap}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -339,8 +375,8 @@ export default function TrainerEditProfileScreen() {
                     {/* Portfolio */}
                     <View style={styles.fieldGroup}>
                         <View style={styles.fieldLabelRow}>
-                            <Text style={styles.fieldLabel}>Portfolio URL</Text>
-                            <View style={styles.optionalTag}><Text style={styles.optionalText}>Optional</Text></View>
+                            <Text style={styles.fieldLabel}>{t('editProfile.portfolioUrl')}</Text>
+                            <View style={styles.optionalTag}><Text style={styles.optionalText}>{t('editProfile.optional')}</Text></View>
                         </View>
                         <View style={styles.inputWrap}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -367,7 +403,7 @@ export default function TrainerEditProfileScreen() {
                         {loading ? (
                             <ActivityIndicator size="small" color="#000" />
                         ) : (
-                            <Text style={styles.saveBtnText}>Save Changes</Text>
+                            <Text style={styles.saveBtnText}>{t('editProfile.saveChanges')}</Text>
                         )}
                     </TouchableOpacity>
                 </ScrollView>
@@ -379,20 +415,20 @@ export default function TrainerEditProfileScreen() {
                 <View style={styles.modalSheet}>
                     <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.modalHandle} />
-                    <Text style={styles.modalTitle}>Change Photo</Text>
+                    <Text style={styles.modalTitle}>{t('editProfile.changePhoto')}</Text>
 
                     <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('camera')}>
                         <Ionicons name="camera-outline" size={22} color="#7cce06" />
-                        <Text style={styles.modalOptionText}>Take Photo</Text>
+                        <Text style={styles.modalOptionText}>{t('trainerEditProfile.takePhoto')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('gallery')}>
                         <Ionicons name="images-outline" size={22} color="#7cce06" />
-                        <Text style={styles.modalOptionText}>Choose from Gallery</Text>
+                        <Text style={styles.modalOptionText}>{t('trainerEditProfile.chooseGallery')}</Text>
                     </TouchableOpacity>
                     {displayPic && (
                         <TouchableOpacity style={styles.modalOption} onPress={() => { setLocalPicUri(null); setProfilePic(null); setShowPicModal(false); }}>
                             <Ionicons name="trash-outline" size={22} color="#ff4444" />
-                            <Text style={[styles.modalOptionText, { color: '#ff4444' }]}>Remove Photo</Text>
+                            <Text style={[styles.modalOptionText, { color: '#ff4444' }]}>{t('trainerEditProfile.removePhoto')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>

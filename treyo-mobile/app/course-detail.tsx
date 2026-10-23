@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { ReviewsList } from '../components/ReviewsList';
 import { formatAmount, isPricedExclVat } from '../utils/price';
+import { languageLabel, levelLabel } from '../utils/courseLabels';
 import {
     courseService, trainerService, enrollmentService,
     interactionService, authService, groupService, API_BASE_URL,
@@ -283,7 +284,7 @@ export default function CourseDetailScreen() {
                         {course.level && (
                             <View style={styles.levelBadge}>
                                 <Ionicons name="bar-chart-outline" size={11} color="#aaaaaa" />
-                                <Text style={styles.levelText}>{course.level}</Text>
+                                <Text style={styles.levelText}>{levelLabel(t, course.level)}</Text>
                             </View>
                         )}
                         {course.hasCertificate && (
@@ -393,7 +394,7 @@ export default function CourseDetailScreen() {
                             <DetailChip icon="layers-outline" label={t('course.format')} value={course.format} />
                         )}
                         {course.language && (
-                            <DetailChip icon="language-outline" label={t('course.language')} value={course.language} />
+                            <DetailChip icon="language-outline" label={t('course.language')} value={languageLabel(t, course.language)} />
                         )}
                         {course.maxStudentsPerGroup && (
                             <DetailChip icon="people-outline" label={t('course.groupSize')} value={t('course.maxStudents', { count: course.maxStudentsPerGroup })} />

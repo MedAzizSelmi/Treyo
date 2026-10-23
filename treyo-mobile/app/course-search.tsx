@@ -7,8 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService, courseService, searchLogService } from '../services/api';
 import { HISTORY_LIMIT, loadSearchHistory, saveSearchHistory } from '../utils/searchHistory';
+import { COURSE_LEVELS, levelLabel, normalizeLevel } from '../utils/courseLabels';
 
-const LEVELS = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'];
+// The backend's vocabulary. This used to be BEGINNER / INTERMEDIATE /
+// ADVANCED, and no course is ever saved as "advanced", so the Advanced
+// filter matched nothing and expert courses could not be found by level.
+const LEVELS = COURSE_LEVELS;
 
 export default function CourseSearchScreen() {
     const { t } = useTranslation();
@@ -107,7 +111,7 @@ export default function CourseSearchScreen() {
             const matchesQuery = !q || [c.title, c.description, c.trainerName, c.domain, c.specificTopic]
                 .filter(Boolean)
                 .some(v => String(v).toLowerCase().includes(q));
-            const matchesLevel = !selectedLevel || (c.level || '').toUpperCase() === selectedLevel;
+            const matchesLevel = !selectedLevel || normalizeLevel(c.level) === selectedLevel;
             const matchesDomain = !selectedDomain || c.domain === selectedDomain;
             return matchesQuery && matchesLevel && matchesDomain;
         });
@@ -163,7 +167,7 @@ export default function CourseSearchScreen() {
                     <View style={styles.activeFilterRow}>
                         {selectedLevel && (
                             <TouchableOpacity style={styles.activeChip} onPress={() => setSelectedLevel(null)}>
-                                <Text style={styles.activeChipText}>{selectedLevel}</Text>
+                                <Text style={styles.activeChipText}>{levelLabel(t, selectedLevel)}</Text>
                                 <Ionicons name="close" size={14} color="#7cce06" />
                             </TouchableOpacity>
                         )}
@@ -256,7 +260,7 @@ export default function CourseSearchScreen() {
                                             {c.level && (
                                                 <View style={styles.metaChip}>
                                                     <Ionicons name="bar-chart-outline" size={12} color="#aaaaaa" />
-                                                    <Text style={styles.metaText}>{c.level}</Text>
+                                                    <Text style={styles.metaText}>{levelLabel(t, c.level)}</Text>
                                                 </View>
                                             )}
                                             {c.domain && (
@@ -304,7 +308,7 @@ export default function CourseSearchScreen() {
                                     style={[styles.filterChip, active && styles.filterChipActive]}
                                     onPress={() => setSelectedLevel(active ? null : level)}
                                 >
-                                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{level}</Text>
+                                    <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{levelLabel(t, level)}</Text>
                                 </TouchableOpacity>
                             );
                         })}

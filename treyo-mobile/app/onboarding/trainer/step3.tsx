@@ -7,9 +7,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { authService, fetchUpload, API_BASE_URL } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 
 export default function TrainerOnboardingStep3() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [bio, setBio] = useState('');
     const [loading, setLoading] = useState(false);
     const [localPicUri, setLocalPicUri] = useState<string | null>(null);
@@ -22,11 +24,11 @@ export default function TrainerOnboardingStep3() {
             let result;
             if (source === 'camera') {
                 const perm = await ImagePicker.requestCameraPermissionsAsync();
-                if (!perm.granted) { Alert.alert('Permission needed', 'Camera permission is required.'); return; }
+                if (!perm.granted) { Alert.alert(t('trainerEditProfile.permissionNeeded'), t('trainerEditProfile.cameraRequired')); return; }
                 result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
             } else {
                 const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (!perm.granted) { Alert.alert('Permission needed', 'Gallery permission is required.'); return; }
+                if (!perm.granted) { Alert.alert(t('trainerEditProfile.permissionNeeded'), t('trainerEditProfile.galleryRequired')); return; }
                 result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.8 });
             }
             if (!result.canceled && result.assets?.[0]) {
@@ -39,7 +41,7 @@ export default function TrainerOnboardingStep3() {
 
     const handleNext = async () => {
         if (!bio || bio.length < 50) {
-            Alert.alert('Error', 'Please write a bio (minimum 50 characters)');
+            Alert.alert(t('common.error'), t('trainerOnboarding.bioMin'));
             return;
         }
 
@@ -47,7 +49,7 @@ export default function TrainerOnboardingStep3() {
         try {
             const user = await authService.getCurrentUser();
             if (!user || !user.userId) {
-                Alert.alert('Error', 'User not found.');
+                Alert.alert(t('common.error'), t('trainerOnboarding.userNotFound'));
                 router.replace('/login' as any);
                 return;
             }
@@ -70,7 +72,7 @@ export default function TrainerOnboardingStep3() {
                     profilePictureUrl = API_BASE_URL + uploadData.fileUrl;
                 } catch (uploadErr) {
                     console.log('Picture upload failed', uploadErr);
-                    Alert.alert('Upload failed', 'Could not upload your profile picture. You can add one later from your profile.');
+                    Alert.alert(t('trainerOnboarding.uploadFailedTitle'), t('trainerOnboarding.uploadFailedBody'));
                     // Continue without the picture rather than blocking onboarding
                 } finally {
                     setUploading(false);
@@ -91,7 +93,7 @@ export default function TrainerOnboardingStep3() {
             router.replace('/trainer-pending' as any);
         } catch (error) {
             console.error('Error:', error);
-            Alert.alert('Error', 'Failed to save.');
+            Alert.alert(t('common.error'), t('trainerOnboarding.saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -105,9 +107,9 @@ export default function TrainerOnboardingStep3() {
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
-                    <Text style={styles.title}>Your Profile</Text>
-                    <Text style={styles.subtitle}>Tell students about yourself</Text>
-                    <Text style={styles.step}>Step 3 of 3 — Final Step! 🎉</Text>
+                    <Text style={styles.title}>{t('trainerOnboarding.profileTitle')}</Text>
+                    <Text style={styles.subtitle}>{t('trainerOnboarding.profileSubtitle')}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.finalStep')}</Text>
                 </View>
 
                 <View style={styles.progressContainer}>
@@ -131,8 +133,8 @@ export default function TrainerOnboardingStep3() {
                         <View style={styles.placeholder}>
                             <BlurView intensity={25} tint="light" style={StyleSheet.absoluteFill} />
                             <Ionicons name="camera" size={40} color="#666" />
-                            <Text style={styles.placeholderText}>Add Profile Picture</Text>
-                            <Text style={styles.placeholderSubtext}>(Optional)</Text>
+                            <Text style={styles.placeholderText}>{t('trainerOnboarding.addPicture')}</Text>
+                            <Text style={styles.placeholderSubtext}>{t('trainerOnboarding.optionalParen')}</Text>
                         </View>
                     )}
                 </TouchableOpacity>
@@ -142,12 +144,12 @@ export default function TrainerOnboardingStep3() {
                     <BlurView intensity={22} tint="light" style={StyleSheet.absoluteFill} />
 
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Bio *</Text>
+                        <Text style={styles.label}>{t('editProfile.bio')} *</Text>
                         <View style={styles.inputContainer}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <TextInput
                                 style={[styles.input, styles.textArea]}
-                                placeholder="Tell students about your experience, teaching style, and what makes you a great trainer... (min 50 characters)"
+                                placeholder={t('trainerOnboarding.bioPh')}
                                 placeholderTextColor="#555"
                                 value={bio}
                                 onChangeText={setBio}
@@ -168,7 +170,7 @@ export default function TrainerOnboardingStep3() {
                         {(loading || uploading) ? (
                             <ActivityIndicator size="small" color="#1a1a1a" />
                         ) : (
-                            <Text style={styles.continueButtonText}>Continue</Text>
+                            <Text style={styles.continueButtonText}>{t('trainerOnboarding.continue')}</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -180,20 +182,20 @@ export default function TrainerOnboardingStep3() {
                 <View style={styles.modalSheet}>
                     <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.modalHandle} />
-                    <Text style={styles.modalTitle}>Add profile picture</Text>
+                    <Text style={styles.modalTitle}>{t('trainerOnboarding.addPicture')}</Text>
 
                     <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('camera')} activeOpacity={0.7}>
                         <View style={styles.modalIconWrap}>
                             <Ionicons name="camera" size={20} color="#7cce06" />
                         </View>
-                        <Text style={styles.modalOptionText}>Take a photo</Text>
+                        <Text style={styles.modalOptionText}>{t('trainerEditProfile.takePhoto')}</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity style={styles.modalOption} onPress={() => handlePickImage('gallery')} activeOpacity={0.7}>
                         <View style={styles.modalIconWrap}>
                             <Ionicons name="images" size={20} color="#7cce06" />
                         </View>
-                        <Text style={styles.modalOptionText}>Choose from gallery</Text>
+                        <Text style={styles.modalOptionText}>{t('trainerEditProfile.chooseGallery')}</Text>
                     </TouchableOpacity>
 
                     {localPicUri && (
@@ -205,12 +207,12 @@ export default function TrainerOnboardingStep3() {
                             <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(255,84,84,0.12)' }]}>
                                 <Ionicons name="trash-outline" size={20} color="#ff5454" />
                             </View>
-                            <Text style={[styles.modalOptionText, { color: '#ff7070' }]}>Remove picture</Text>
+                            <Text style={[styles.modalOptionText, { color: '#ff7070' }]}>{t('trainerEditProfile.removePhoto')}</Text>
                         </TouchableOpacity>
                     )}
 
                     <TouchableOpacity style={styles.modalCancel} onPress={() => setShowPicModal(false)} activeOpacity={0.7}>
-                        <Text style={styles.modalCancelText}>Cancel</Text>
+                        <Text style={styles.modalCancelText}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                 </View>
             </Modal>

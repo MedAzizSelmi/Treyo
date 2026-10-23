@@ -136,7 +136,7 @@ export default function TrainerMessagesScreen() {
                         style={styles.searchInput}
                         value={search}
                         onChangeText={setSearch}
-                        placeholder="Search conversations..."
+                        placeholder={t('messages.searchPlaceholder')}
                         placeholderTextColor="rgba(255,255,255,0.35)"
                         autoCorrect={false}
                         returnKeyType="search"
@@ -190,7 +190,7 @@ export default function TrainerMessagesScreen() {
                                     <View style={styles.convInfo}>
                                         <View style={styles.convTopRow}>
                                             <Text style={[styles.convName, (conv.unreadCount || 0) > 0 && styles.convNameUnread]} numberOfLines={1}>
-                                                {conv.otherUserName || 'Unknown'}
+                                                {conv.otherUserName || t('messages.unknown')}
                                                 {isGroup && conv.memberCount != null && ` · ${conv.memberCount}`}
                                             </Text>
                                             <Text style={[styles.convTime, (conv.unreadCount || 0) > 0 && styles.convTimeUnread]}>
@@ -199,7 +199,7 @@ export default function TrainerMessagesScreen() {
                                         </View>
                                         <View style={styles.convBottomRow}>
                                             <Text style={[styles.convMessage, (conv.unreadCount || 0) > 0 && styles.convMessageUnread]} numberOfLines={1}>
-                                                {conv.lastMessage || 'No messages yet'}
+                                                {conv.lastMessage || t('messages.noMessagesYet')}
                                             </Text>
                                             {(conv.unreadCount || 0) > 0 && (
                                                 <View style={styles.unreadBadge}>
@@ -218,7 +218,8 @@ export default function TrainerMessagesScreen() {
                             <Ionicons name="chatbubbles-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
                         <Text style={styles.emptyTitle}>{t('messages.noConversations')}</Text>
-                        <Text style={styles.emptySubtitle}>Start a conversation with your students.</Text>
+                        {/* Chats are group-only: there is nothing to start. */}
+                        <Text style={styles.emptySubtitle}>{t('messages.trainerEmptyBody')}</Text>
                     </View>
                 )}
             </ScrollView>

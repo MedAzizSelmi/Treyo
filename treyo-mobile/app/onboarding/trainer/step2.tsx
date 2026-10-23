@@ -8,15 +8,9 @@ import { authService, fetchUpload } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
 import { extractCvLinks } from '../../../utils/cvLinks';
+import { useTranslation } from 'react-i18next';
+import { EDUCATION_LEVELS, educationLabel } from '../../../utils/educationLevels';
 
-const EDUCATION_LEVELS = [
-    "High School",
-    "Bachelor's Degree",
-    "Master's Degree",
-    "PhD",
-    "Professional Certification",
-    "Other",
-];
 
 // Maps Affinda education data to our dropdown options
 function mapEducationLevel(edu: any): string {
@@ -38,6 +32,7 @@ function mapEducationLevel(edu: any): string {
 
 export default function TrainerOnboardingStep2() {
     const router = useRouter();
+    const { t } = useTranslation();
     const params = useLocalSearchParams();
 
     const [cvFile, setCvFile] = useState<any>(null);
@@ -123,11 +118,11 @@ export default function TrainerOnboardingStep2() {
         // The administrator decides on a trainer's application from the CV,
         // so a trainer cannot continue without one.
         if (!cvFile) {
-            Alert.alert('CV required', 'Please upload your CV to continue.');
+            Alert.alert(t('trainerOnboarding.cvRequiredTitle'), t('trainerOnboarding.cvRequiredBody'));
             return;
         }
         if (!professionalExperience || !keySkills || !educationLevel) {
-            Alert.alert('Required Fields', 'Please fill in all required fields');
+            Alert.alert(t('trainerOnboarding.requiredFields'), t('trainerOnboarding.fillRequired'));
             return;
         }
 
@@ -135,7 +130,7 @@ export default function TrainerOnboardingStep2() {
         try {
             const user = await authService.getCurrentUser();
             if (!user?.userId) {
-                Alert.alert('Error', 'User not found. Please login again.');
+                Alert.alert(t('common.error'), t('trainerOnboarding.userNotFound'));
                 return;
             }
 
@@ -173,7 +168,7 @@ export default function TrainerOnboardingStep2() {
                 },
             });
         } catch (error) {
-            Alert.alert('Error', 'Failed to save. Please try again.');
+            Alert.alert(t('common.error'), t('trainerOnboarding.saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -188,8 +183,8 @@ export default function TrainerOnboardingStep2() {
             >
                 {/* Header */}
                 <View style={styles.header}>
-                    <Text style={styles.title}>Upload your resume</Text>
-                    <Text style={styles.step}>Step 2 of 3</Text>
+                    <Text style={styles.title}>{t('trainerOnboarding.uploadTitle')}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 2 })}</Text>
                 </View>
 
                 <View style={styles.progressContainer}>
@@ -206,22 +201,22 @@ export default function TrainerOnboardingStep2() {
                     {parsing ? (
                         <>
                             <Ionicons name="sync" size={44} color="#7cce06" />
-                            <Text style={styles.uploadText}>Parsing your CV...</Text>
-                            <Text style={styles.uploadSubtext}>Fields will fill automatically</Text>
+                            <Text style={styles.uploadText}>{t('trainerOnboarding.parsing')}</Text>
+                            <Text style={styles.uploadSubtext}>{t('trainerOnboarding.autoFill')}</Text>
                         </>
                     ) : cvFile ? (
                         <>
                             <Ionicons name="document-text" size={44} color="#7cce06" />
                             <Text style={styles.uploadText} numberOfLines={1}>{cvFile.name}</Text>
-                            <Text style={styles.uploadSubtext}>Tap to change</Text>
+                            <Text style={styles.uploadSubtext}>{t('trainerOnboarding.tapToChange')}</Text>
                         </>
                     ) : (
                         <>
                             <View style={styles.uploadIconWrapper}>
                                 <Ionicons name="cloud-upload-outline" size={44} color="#ffffff" />
                             </View>
-                            <Text style={styles.uploadText}>Select CV / Resume</Text>
-                            <Text style={styles.uploadSubtext}>Required · PDF or Word — fields auto-fill</Text>
+                            <Text style={styles.uploadText}>{t('trainerOnboarding.selectCv')}</Text>
+                            <Text style={styles.uploadSubtext}>{t('trainerOnboarding.cvHint')}</Text>
                         </>
                     )}
                 </TouchableOpacity>
@@ -233,8 +228,8 @@ export default function TrainerOnboardingStep2() {
                     {/* Card Header */}
                     <View style={styles.cardHeader}>
                         <View style={styles.cardTitleRow}>
-                            <Text style={styles.cardTitle}>Required CV Fields</Text>
-                            <Text style={styles.nonSkippable}> (Non-Skippable)</Text>
+                            <Text style={styles.cardTitle}>{t('trainerOnboarding.cvFieldsTitle')}</Text>
+                            <Text style={styles.nonSkippable}>{t('trainerOnboarding.nonSkippable')}</Text>
                         </View>
                         <TouchableOpacity
                             onPress={() => setCvFile(null)}
@@ -247,12 +242,12 @@ export default function TrainerOnboardingStep2() {
 
                     {/* Professional Experience */}
                     <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Professional Experience</Text>
+                        <Text style={styles.fieldLabel}>{t('editProfile.professionalExperience')}</Text>
                         <View style={styles.inputContainer}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <TextInput
                                 style={styles.input}
-                                placeholder="e.g. 5 years in web development, led teams of 10..."
+                                placeholder={t('trainerOnboarding.experiencePh')}
                                 placeholderTextColor="#555"
                                 value={professionalExperience}
                                 onChangeText={(t) => setProfessionalExperience(t.slice(0, 120))}
@@ -264,12 +259,12 @@ export default function TrainerOnboardingStep2() {
 
                     {/* Key Skills */}
                     <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Key Skills</Text>
+                        <Text style={styles.fieldLabel}>{t('editProfile.keySkills')}</Text>
                         <View style={styles.inputContainer}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <TextInput
                                 style={styles.input}
-                                placeholder="e.g. React, Node.js, Python, Figma..."
+                                placeholder={t('trainerOnboarding.skillsPh')}
                                 placeholderTextColor="#555"
                                 value={keySkills}
                                 onChangeText={(t) => setKeySkills(t.slice(0, 120))}
@@ -281,7 +276,7 @@ export default function TrainerOnboardingStep2() {
 
                     {/* Education Level */}
                     <View style={styles.fieldGroup}>
-                        <Text style={styles.fieldLabel}>Education Level</Text>
+                        <Text style={styles.fieldLabel}>{t('editProfile.educationLevel')}</Text>
                         <TouchableOpacity
                             style={styles.dropdownContainer}
                             onPress={() => setShowEduPicker(true)}
@@ -289,7 +284,7 @@ export default function TrainerOnboardingStep2() {
                         >
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                             <Text style={[styles.dropdownText, !educationLevel && styles.dropdownPlaceholder]}>
-                                {educationLevel || 'Select your education level'}
+                                {educationLevel ? educationLabel(t, educationLevel) : t('trainerOnboarding.selectEducation')}
                             </Text>
                             <Ionicons name="chevron-down" size={20} color="#aaaaaa" />
                         </TouchableOpacity>
@@ -299,7 +294,7 @@ export default function TrainerOnboardingStep2() {
                     <View style={styles.fieldGroup}>
                         <View style={styles.optionalLabelRow}>
                             <Text style={styles.fieldLabel}>LinkedIn</Text>
-                            <Text style={styles.optionalTag}>Optional</Text>
+                            <Text style={styles.optionalTag}>{t('editProfile.optional')}</Text>
                         </View>
                         <View style={styles.urlInputContainer}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -321,7 +316,7 @@ export default function TrainerOnboardingStep2() {
                     <View style={styles.fieldGroup}>
                         <View style={styles.optionalLabelRow}>
                             <Text style={styles.fieldLabel}>Portfolio</Text>
-                            <Text style={styles.optionalTag}>Optional</Text>
+                            <Text style={styles.optionalTag}>{t('editProfile.optional')}</Text>
                         </View>
                         <View style={styles.urlInputContainer}>
                             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -347,7 +342,7 @@ export default function TrainerOnboardingStep2() {
                         activeOpacity={0.85}
                     >
                         <Text style={styles.continueButtonText}>
-                            {loading ? 'Saving...' : 'Continue'}
+                            {loading ? t('trainerOnboarding.saving') : t('trainerOnboarding.continue')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -361,7 +356,7 @@ export default function TrainerOnboardingStep2() {
                     onPress={() => setShowEduPicker(false)}
                 >
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Education Level</Text>
+                        <Text style={styles.modalTitle}>{t('editProfile.educationLevel')}</Text>
                         {EDUCATION_LEVELS.map((level) => (
                             <TouchableOpacity
                                 key={level}
@@ -369,7 +364,7 @@ export default function TrainerOnboardingStep2() {
                                 onPress={() => { setEducationLevel(level); setShowEduPicker(false); }}
                             >
                                 <Text style={[styles.modalOptionText, educationLevel === level && styles.modalOptionTextSelected]}>
-                                    {level}
+                                    {educationLabel(t, level)}
                                 </Text>
                                 {educationLevel === level && (
                                     <Ionicons name="checkmark" size={18} color="#7cce06" />

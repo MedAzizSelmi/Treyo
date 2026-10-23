@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState } from 'react';
 import { ScreenBackground } from '../../../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 import { authService } from '../../../services/api';
 
 const FIELDS = [
@@ -19,6 +20,7 @@ const FIELDS = [
 
 export default function StudentOnboardingStep1() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [selectedFields, setSelectedFields] = useState<string[]>([]);
 
     const toggleField = (fieldId: string) => {
@@ -34,7 +36,7 @@ export default function StudentOnboardingStep1() {
 
     const handleNext = () => {
         if (selectedFields.length === 0) {
-            alert('Please select at least one field');
+            alert(t('studentOnboarding.pickField'));
             return;
         }
         router.replace({ pathname: '/onboarding/student/step2' as any, params: { fields: selectedFields.join(',') } });
@@ -54,13 +56,13 @@ export default function StudentOnboardingStep1() {
                     all. Signing out returns to the welcome screen. */}
                 <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
                     <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.signOutText}>Sign out</Text>
+                    <Text style={styles.signOutText}>{t('trainerOnboarding.signOut')}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.header}>
-                    <Text style={styles.title}>What interests you?</Text>
-                    <Text style={styles.subtitle}>Select fields you want to learn</Text>
-                    <Text style={styles.step}>Step 1 of 3</Text>
+                    <Text style={styles.title}>{t('studentOnboarding.fieldsTitle')}</Text>
+                    <Text style={styles.subtitle}>{t('studentOnboarding.fieldsSubtitle')}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 1 })}</Text>
                 </View>
 
                 <View style={styles.progressTrack}>
@@ -87,7 +89,7 @@ export default function StudentOnboardingStep1() {
                                     />
                                     <Text style={styles.fieldIcon}>{field.icon}</Text>
                                     <Text style={[styles.fieldName, selected && styles.fieldNameSelected]}>
-                                        {field.name}
+                                        {t(`interestFields.${field.id}`, { defaultValue: field.name })}
                                     </Text>
                                     {selected && (
                                         <View style={styles.checkmark}>
@@ -107,7 +109,7 @@ export default function StudentOnboardingStep1() {
                         activeOpacity={0.85}
                     >
                         <Text style={styles.continueButtonText}>
-                            Next ({selectedFields.length} selected)
+                            {t('studentOnboarding.nextSelected', { count: selectedFields.length })}
                         </Text>
                     </TouchableOpacity>
                 </View>

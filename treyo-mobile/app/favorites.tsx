@@ -6,6 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { useTranslation } from 'react-i18next';
 import { authService, interactionService } from '../services/api';
+import { levelLabel } from '../utils/courseLabels';
 
 /**
  * Favourites screen — list of courses the student has saved via the heart
@@ -167,7 +168,7 @@ export default function FavoritesScreen() {
                                     {course.level && (
                                         <View style={styles.metaChip}>
                                             <Ionicons name="bar-chart-outline" size={12} color="#aaaaaa" />
-                                            <Text style={styles.metaText}>{course.level}</Text>
+                                            <Text style={styles.metaText}>{levelLabel(t, course.level)}</Text>
                                         </View>
                                     )}
                                     {course.durationHours != null && (

@@ -1115,13 +1115,6 @@ export const trainerService = {
         return response.data;
     },
 
-    /** Read the trainer's preferred display currency. Falls back to
-     *  TND when the backend has no value stored. */
-    getCurrency: async (trainerId: string): Promise<{ currency: string }> => {
-        const response = await api.get(`/trainers/${trainerId}/currency`);
-        return response.data;
-    },
-
     /** Earnings breakdown for a given month. Backend returns the
      *  currency alongside so the client doesn't have to look it up
      *  separately. Days come sorted newest-first. */
@@ -1135,15 +1128,10 @@ export const trainerService = {
         currency: string;
         total: number;
         days: { date: string; courseId: string; courseTitle: string; amount: number }[];
+        /** Days taught on a course the admin has not given a daily rate. */
+        unratedSessions?: number;
     }> => {
         const response = await api.get(`/trainers/${trainerId}/earnings`, { params: { year, month } });
-        return response.data;
-    },
-
-    /** Persist a new preferred currency for this trainer. Also
-     *  becomes the default when creating a new course. */
-    setCurrency: async (trainerId: string, currency: string): Promise<{ currency: string }> => {
-        const response = await api.put(`/trainers/${trainerId}/currency`, { currency });
         return response.data;
     },
 

@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { useState } from 'react';
 import api, { authService } from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 
 const SPECIFIC_INTERESTS: Record<string, string[]> = {
     informatique: ['React', 'Java', 'Python', 'JavaScript', 'Node.js', 'Angular', 'Vue.js', 'TypeScript', 'PHP', 'C++', 'Mobile Development', 'Web Development'],
@@ -19,6 +20,7 @@ const SPECIFIC_INTERESTS: Record<string, string[]> = {
 
 export default function StudentOnboardingStep2() {
     const router = useRouter();
+    const { t } = useTranslation();
     const params = useLocalSearchParams();
     const selectedFields = (params.fields as string)?.split(',') || [];
 
@@ -37,7 +39,7 @@ export default function StudentOnboardingStep2() {
 
     const handleNext = async () => {
         if (selectedInterests.length === 0) {
-            Alert.alert('Error', 'Please select at least one specific interest');
+            Alert.alert(t('common.error'), t('studentOnboarding.pickInterest'));
             return;
         }
 
@@ -45,7 +47,7 @@ export default function StudentOnboardingStep2() {
         try {
             const user = await authService.getCurrentUser();
             if (!user || !user.userId) {
-                Alert.alert('Error', 'User not found. Please login again.');
+                Alert.alert(t('common.error'), t('trainerOnboarding.userNotFound'));
                 return;
             }
 
@@ -61,7 +63,7 @@ export default function StudentOnboardingStep2() {
             });
         } catch (error) {
             console.error('Error saving interests:', error);
-            Alert.alert('Error', 'Failed to save interests. Please try again.');
+            Alert.alert(t('common.error'), t('studentOnboarding.interestsSaveFailed'));
         } finally {
             setLoading(false);
         }
@@ -75,9 +77,9 @@ export default function StudentOnboardingStep2() {
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.header}>
-                    <Text style={styles.title}>What specifically?</Text>
-                    <Text style={styles.subtitle}>Select your specific interests</Text>
-                    <Text style={styles.step}>Step 2 of 3</Text>
+                    <Text style={styles.title}>{t('studentOnboarding.interestsTitle')}</Text>
+                    <Text style={styles.subtitle}>{t('studentOnboarding.interestsSubtitle')}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 2 })}</Text>
                 </View>
 
                 <View style={styles.progressContainer}>
@@ -86,7 +88,7 @@ export default function StudentOnboardingStep2() {
 
                 <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={20} color="#aaaaaa" />
-                    <Text style={styles.backText}>Back</Text>
+                    <Text style={styles.backText}>{t('common.back')}</Text>
                 </TouchableOpacity>
 
                 {/* Glass card wrapping chips and button */}
@@ -122,7 +124,7 @@ export default function StudentOnboardingStep2() {
                         activeOpacity={0.85}
                     >
                         <Text style={styles.continueButtonText}>
-                            {loading ? 'Saving...' : `Next (${selectedInterests.length} selected)`}
+                            {loading ? t('trainerOnboarding.saving') : t('studentOnboarding.nextSelected', { count: selectedInterests.length })}
                         </Text>
                     </TouchableOpacity>
                 </View>

@@ -6,6 +6,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { authService, courseService, notificationService } from '../../services/api';
 import api from '../../services/api';
+import { useTranslation } from 'react-i18next';
+import { levelLabel } from '../../utils/courseLabels';
 
 // Drafts were removed — every course is born live the moment the admin
 // assigns a template to this trainer. "Completed" was dropped too
@@ -16,6 +18,7 @@ import api from '../../services/api';
 
 export default function TrainerCoursesScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [userName, setUserName] = useState('');
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
@@ -116,12 +119,12 @@ export default function TrainerCoursesScreen() {
                 {/* ── Title (no Add — courses are now assigned by admin) ── */}
                 <View style={styles.titleRow}>
                     <View>
-                        <Text style={styles.pageTitle}>My Courses</Text>
+                        <Text style={styles.pageTitle}>{t('trainerManage.myCourses')}</Text>
                         <Text style={styles.pageSubtitle}>
-                            {courses.length} course{courses.length === 1 ? '' : 's'} you created
+                            {t('trainerCourses.createdCount', { count: courses.length })}
                         </Text>
                     </View>
-                    {/* Trainer creates courses under the admin's modules
+                    {/* Trainer creates courses under the admin's domains (modules in code)
                         and submits them for admin review. The "+" jumps
                         into the create screen. */}
                     <TouchableOpacity
@@ -130,7 +133,7 @@ export default function TrainerCoursesScreen() {
                         activeOpacity={0.85}
                     >
                         <Ionicons name="add" size={18} color="#000" />
-                        <Text style={styles.createBtnText}>New course</Text>
+                        <Text style={styles.createBtnText}>{t('trainerCourses.newCourse')}</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -143,7 +146,7 @@ export default function TrainerCoursesScreen() {
                             style={[styles.filterChip, activeFilter === f && styles.filterChipActive]}
                             activeOpacity={0.7}
                         >
-                            <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>{f}</Text>
+                            <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>{t(`courseStatus.${f.toLowerCase()}`)}</Text>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
@@ -170,15 +173,15 @@ export default function TrainerCoursesScreen() {
                                     <Ionicons name="book" size={24} color="#7cce06" />
                                 </View>
                                 <View style={[styles.statusBadge, { backgroundColor: statusColor(status) + '20', borderColor: statusColor(status) + '50' }]}>
-                                    <Text style={[styles.statusText, { color: statusColor(status) }]}>{status}</Text>
+                                    <Text style={[styles.statusText, { color: statusColor(status) }]}>{t(`courseStatus.${status.toLowerCase()}`)}</Text>
                                 </View>
                             </View>
 
-                            <Text style={styles.courseTitle}>{course.title || 'Untitled course'}</Text>
+                            <Text style={styles.courseTitle}>{course.title || t('trainerCourses.untitledCourse')}</Text>
                             {!!course.level && (
                                 <View style={styles.levelChip}>
                                     <Ionicons name="layers-outline" size={12} color="#aaaaaa" />
-                                    <Text style={styles.levelText}>{course.level}</Text>
+                                    <Text style={styles.levelText}>{levelLabel(t, course.level)}</Text>
                                 </View>
                             )}
 
@@ -188,24 +191,26 @@ export default function TrainerCoursesScreen() {
                                 <View style={styles.cardStat}>
                                     <Ionicons name="people-outline" size={14} color="#7cce06" />
                                     <Text style={styles.cardStatText}>
-                                        {course.activeStudentsCount
-                                            ?? course.enrolledCount
-                                            ?? course.students
-                                            ?? course.totalEnrolled
-                                            ?? 0} students
+                                        {t('trainerCourses.studentsCount', {
+                                            count: course.activeStudentsCount
+                                                ?? course.enrolledCount
+                                                ?? course.students
+                                                ?? course.totalEnrolled
+                                                ?? 0,
+                                        })}
                                     </Text>
                                 </View>
                                 <View style={styles.cardStat}>
                                     <Ionicons name="git-branch-outline" size={14} color="#7cce06" />
                                     <Text style={styles.cardStatText}>
-                                        {course.groupsCount ?? course.groups ?? course.currentGroupsCount ?? 0} groups
+                                        {t('trainerCourses.groupsCount', { count: course.groupsCount ?? course.groups ?? course.currentGroupsCount ?? 0 })}
                                     </Text>
                                 </View>
                                 <TouchableOpacity
                                     style={styles.manageBtn}
                                     onPress={(e) => { e.stopPropagation(); router.push({ pathname: '/trainer-course-manage' as any, params: { courseId: cId, courseTitle: course.title || '' } }); }}
                                 >
-                                    <Text style={styles.manageBtnText}>Manage</Text>
+                                    <Text style={styles.manageBtnText}>{t('trainerCourses.manage')}</Text>
                                     <Ionicons name="chevron-forward" size={13} color="#7cce06" />
                                 </TouchableOpacity>
                             </View>
@@ -217,10 +222,12 @@ export default function TrainerCoursesScreen() {
                             <Ionicons name="book-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
                         <Text style={styles.emptyTitle}>
-                            No {activeFilter !== 'All' ? activeFilter.toLowerCase() + ' ' : ''}courses
+                            {t(`trainerCourses.empty${activeFilter}`)}
                         </Text>
                         <Text style={styles.emptySubtitle}>
-                            You have no courses assigned yet. The admin will assign you to courses they create.
+                            {/* Used to say the admin assigns courses; trainers
+                                create and submit their own now. */}
+                            {t('trainerCourses.emptyBody')}
                         </Text>
                     </View>
                 )}

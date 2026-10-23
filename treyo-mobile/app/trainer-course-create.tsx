@@ -11,12 +11,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService, moduleService, trainerCourseService } from '../services/api';
+import { COURSE_LANGUAGES, CourseLanguage, defaultCourseLanguage } from '../utils/courseLabels';
 
 /**
  * Trainer's course-submission screen.
  *
  * Flow:
- *   1. Trainer picks a module (admin-created category) from the picker.
+ *   1. Trainer picks a domain (admin-created category) from the picker.
+ *      "Domain" is the word users see; the code and API call it a module.
  *   2. Fills the course fields (title, description, hours, price, ...).
  *   3. Attaches the training material — PDF / PPT / ZIP. Optional but
  *      strongly encouraged, since the admin uses it to decide.
@@ -27,7 +29,7 @@ import { authService, moduleService, trainerCourseService } from '../services/ap
  */
 export default function TrainerCourseCreateScreen() {
     const router = useRouter();
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
 
     const [trainerId, setTrainerId] = useState<string | null>(null);
     const [modules, setModules] = useState<any[]>([]);
@@ -38,12 +40,14 @@ export default function TrainerCourseCreateScreen() {
     const [specificTopic, setSpecificTopic] = useState('');
     const [level, setLevel] = useState<'beginner' | 'intermediate' | 'expert'>('beginner');
     const [durationHours, setDurationHours] = useState('10');
-    // Price is set by the admin at approval time — the trainer's
-    // create form no longer has a price field. Kept `currency` around
-    // because it still drives how the trainer's own earnings render
-    // on their home screen (see trainer home + settings-currency).
+    // Price and currency are set by the admin at approval time — the
+    // trainer's create form has no price field.
     const [prerequisites, setPrerequisites] = useState('');
     const [format, setFormat] = useState<'Face-to-face' | 'Online' | 'Hybrid'>('Online');
+    // The language the course is taught in. It used to be sent as a fixed
+    // 'French' for every course; the trainer's app language is the
+    // likeliest answer, so it starts there.
+    const [courseLanguage, setCourseLanguage] = useState<CourseLanguage>(() => defaultCourseLanguage(i18n.language));
     const [maxStudents, setMaxStudents] = useState('30');
     const [minStudents, setMinStudents] = useState('5');
     const [hasCertificate, setHasCertificate] = useState(false);
@@ -89,23 +93,23 @@ export default function TrainerCourseCreateScreen() {
                 });
             }
         } catch (_) {
-            Alert.alert(t('common.error'), 'Could not open the file picker.');
+            Alert.alert(t('common.error'), t('courseCreate.pickerFailed'));
         }
     };
 
     const handleSubmit = async () => {
         if (!trainerId) return;
         if (!moduleId) {
-            Alert.alert(t('common.error'), 'Please pick a module.');
+            Alert.alert(t('common.error'), t('courseCreate.pickDomain'));
             return;
         }
         if (!title.trim() || !description.trim() || !specificTopic.trim()) {
-            Alert.alert(t('common.error'), 'Title, description and specific topic are required.');
+            Alert.alert(t('common.error'), t('courseCreate.requiredFields'));
             return;
         }
         const hours = Number(durationHours);
         if (!Number.isFinite(hours) || hours < 1) {
-            Alert.alert(t('common.error'), 'Duration must be at least 1 hour.');
+            Alert.alert(t('common.error'), t('courseCreate.minDuration'));
             return;
         }
         setSubmitting(true);
@@ -127,7 +131,7 @@ export default function TrainerCourseCreateScreen() {
                     materialUrl = up.url;
                     materialName = up.name;
                 } catch (uploadErr: any) {
-                    Alert.alert(t('common.error'), 'Could not upload the material. Try again.');
+                    Alert.alert(t('common.error'), t('courseCreate.uploadFailed'));
                     setUploading(false);
                     setSubmitting(false);
                     return;
@@ -143,7 +147,7 @@ export default function TrainerCourseCreateScreen() {
                 specificTopic: specificTopic.trim(),
                 level,
                 durationHours: hours,
-                language: 'French',
+                language: courseLanguage,
                 format,
                 prerequisites: prerequisites.trim() || null,
                 learningOutcomes: [],
@@ -158,12 +162,12 @@ export default function TrainerCourseCreateScreen() {
             });
 
             Alert.alert(
-                'Course submitted',
-                'Your course was sent for admin review. You\'ll get an email once a decision is made.',
-                [{ text: 'OK', onPress: () => router.back() }],
+                t('courseCreate.submittedTitle'),
+                t('courseCreate.submittedBody'),
+                [{ text: t('common.ok'), onPress: () => router.back() }],
             );
         } catch (e: any) {
-            const msg = e?.response?.data?.error || 'Could not submit the course.';
+            const msg = e?.response?.data?.error || t('courseCreate.submitFailed');
             Alert.alert(t('common.error'), msg);
         } finally {
             setSubmitting(false);
@@ -185,7 +189,7 @@ export default function TrainerCourseCreateScreen() {
                         <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                         <Ionicons name="arrow-back" size={20} color="#ffffff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Create a course</Text>
+                    <Text style={styles.headerTitle}>{t('courseCreate.title')}</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -195,12 +199,12 @@ export default function TrainerCourseCreateScreen() {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Module picker */}
-                    <SectionLabel text="Module" />
-                    <Text style={styles.hint}>Pick the category this course belongs to.</Text>
+                    {/* Domain picker */}
+                    <SectionLabel text={t('courseCreate.domain')} />
+                    <Text style={styles.hint}>{t('courseCreate.domainHint')}</Text>
                     <View style={styles.chipRow}>
                         {modules.length === 0 && (
-                            <Text style={styles.emptyText}>No modules available yet. Ask an admin to create one.</Text>
+                            <Text style={styles.emptyText}>{t('courseCreate.noDomains')}</Text>
                         )}
                         {modules.map(m => {
                             const active = moduleId === m.moduleId;
@@ -217,59 +221,87 @@ export default function TrainerCourseCreateScreen() {
                         })}
                     </View>
 
-                    <SectionLabel text="Title" />
-                    <Input value={title} onChangeText={setTitle} placeholder="e.g. Introduction to Node.js" />
+                    <SectionLabel text={t('courseCreate.courseTitle')} />
+                    <Input value={title} onChangeText={setTitle} placeholder={t('courseCreate.titlePlaceholder')} />
 
-                    <SectionLabel text="Specific topic" />
-                    <Input value={specificTopic} onChangeText={setSpecificTopic} placeholder="e.g. Node.js, React" />
+                    <SectionLabel text={t('courseCreate.specificTopic')} />
+                    <Input value={specificTopic} onChangeText={setSpecificTopic} placeholder={t('courseCreate.topicPlaceholder')} />
 
-                    <SectionLabel text="Description" />
+                    <SectionLabel text={t('courseCreate.description')} />
                     <Input
                         value={description}
                         onChangeText={setDescription}
-                        placeholder="What will students learn?"
+                        placeholder={t('courseCreate.descriptionPlaceholder')}
                         multiline
                     />
 
-                    <SectionLabel text="Level" />
+                    <SectionLabel text={t('courseCreate.level')} />
                     <SegmentedRow
                         options={['beginner', 'intermediate', 'expert'] as const}
                         value={level}
                         onChange={setLevel}
-                        labels={{ beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert' }}
+                        labels={{
+                            beginner: t('levels.beginner'),
+                            intermediate: t('levels.intermediate'),
+                            expert: t('levels.expert'),
+                        }}
                     />
 
-                    <SectionLabel text="Format" />
+                    <SectionLabel text={t('course.format')} />
                     <SegmentedRow
                         options={['Face-to-face', 'Online', 'Hybrid'] as const}
                         value={format}
                         onChange={setFormat}
-                        labels={{ 'Face-to-face': 'On-site', Online: 'Online', Hybrid: 'Hybrid' }}
+                        labels={{
+                            'Face-to-face': t('common.onSite'),
+                            Online: t('common.online'),
+                            Hybrid: t('courseCreate.formatHybrid'),
+                        }}
                     />
 
-                    <SectionLabel text="Duration (hours)" />
+                    <SectionLabel text={t('courseCreate.language')} />
+                    <Text style={styles.hint}>{t('courseCreate.languageHint')}</Text>
+                    <View style={styles.chipRow}>
+                        {COURSE_LANGUAGES.map(lang => {
+                            const active = courseLanguage === lang;
+                            return (
+                                <TouchableOpacity
+                                    key={lang}
+                                    onPress={() => setCourseLanguage(lang)}
+                                    style={[styles.chip, active && styles.chipActive]}
+                                    activeOpacity={0.75}
+                                >
+                                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                                        {t(`courseLanguages.${lang.toLowerCase()}`)}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
+                    <SectionLabel text={t('courseCreate.durationHours')} />
                     <Input value={durationHours} onChangeText={setDurationHours} keyboardType="number-pad" />
 
                     {/* Pricing is handled by the admin at approval — no field here. */}
                     <View style={styles.infoBanner}>
                         <Text style={styles.infoBannerText}>
-                            The admin will set the price when they approve your course.
+                            {t('courseCreate.priceByAdmin')}
                         </Text>
                     </View>
 
                     <View style={styles.row}>
                         <View style={{ flex: 1, marginRight: 8 }}>
-                            <SectionLabel text="Min students" />
+                            <SectionLabel text={t('courseCreate.minStudents')} />
                             <Input value={minStudents} onChangeText={setMinStudents} keyboardType="number-pad" />
                         </View>
                         <View style={{ flex: 1, marginLeft: 8 }}>
-                            <SectionLabel text="Max per group" />
+                            <SectionLabel text={t('courseCreate.maxPerGroup')} />
                             <Input value={maxStudents} onChangeText={setMaxStudents} keyboardType="number-pad" />
                         </View>
                     </View>
 
-                    <SectionLabel text="Prerequisites (optional)" />
-                    <Input value={prerequisites} onChangeText={setPrerequisites} placeholder="e.g. Basic JavaScript" multiline />
+                    <SectionLabel text={t('courseCreate.prerequisites')} />
+                    <Input value={prerequisites} onChangeText={setPrerequisites} placeholder={t('courseCreate.prerequisitesPlaceholder')} multiline />
 
                     <TouchableOpacity
                         onPress={() => setHasCertificate(v => !v)}
@@ -281,12 +313,12 @@ export default function TrainerCourseCreateScreen() {
                             size={22}
                             color={hasCertificate ? '#7cce06' : 'rgba(255,255,255,0.4)'}
                         />
-                        <Text style={styles.certText}>Include certificate of completion</Text>
+                        <Text style={styles.certText}>{t('courseCreate.certificate')}</Text>
                     </TouchableOpacity>
 
                     {/* Material upload */}
-                    <SectionLabel text="Training material (PDF / PPT / ZIP)" />
-                    <Text style={styles.hint}>The admin reviews this before approving.</Text>
+                    <SectionLabel text={t('courseCreate.material')} />
+                    <Text style={styles.hint}>{t('courseCreate.materialHint')}</Text>
                     <TouchableOpacity
                         style={styles.uploadBox}
                         onPress={handlePickMaterial}
@@ -307,7 +339,7 @@ export default function TrainerCourseCreateScreen() {
                         ) : (
                             <View style={styles.filePickerRow}>
                                 <Ionicons name="cloud-upload-outline" size={24} color="#7cce06" />
-                                <Text style={styles.filePickerText}>Choose a file</Text>
+                                <Text style={styles.filePickerText}>{t('courseCreate.chooseFile')}</Text>
                             </View>
                         )}
                     </TouchableOpacity>
@@ -324,11 +356,11 @@ export default function TrainerCourseCreateScreen() {
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                     <ActivityIndicator size="small" color="#000" />
                                     <Text style={styles.submitText}>
-                                        {uploading ? 'Uploading…' : 'Submitting…'}
+                                        {uploading ? t('courseCreate.uploading') : t('courseCreate.submitting')}
                                     </Text>
                                 </View>
                             ) : (
-                                <Text style={styles.submitText}>Submit for review</Text>
+                                <Text style={styles.submitText}>{t('courseCreate.submit')}</Text>
                             )}
                         </LinearGradient>
                     </TouchableOpacity>

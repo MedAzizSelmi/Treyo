@@ -6,9 +6,12 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { authService, courseService, notificationService, groupService, trainerService } from '../../services/api';
 import api from '../../services/api';
 import { ScreenBackground } from '../../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 export default function TrainerHomeScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [user, setUser] = useState<any>(null);
     const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
     const [imageTs, setImageTs] = useState(Date.now());
@@ -81,15 +84,10 @@ export default function TrainerHomeScreen() {
                     setUnreadNotifCount(typeof count === 'number' ? count : 0);
                 } catch (_) {}
 
-                try {
-                    const res = await trainerService.getCurrency(currentUser.userId);
-                    if (res.currency) setCurrency(res.currency);
-                } catch (_) {}
-
                 // Current-month earnings — resets each month naturally
-                // since we always query {now.year, now.month}. Backend
-                // returns a currency too, which overrides the trainer's
-                // preferred display currency when set.
+                // since we always query {now.year, now.month}. The figure is
+                // shown in the currency of the courses it comes from, which
+                // the backend returns with it; TND until there is one.
                 try {
                     const now = new Date();
                     const earn = await trainerService.getEarnings(
@@ -120,7 +118,7 @@ export default function TrainerHomeScreen() {
         setRefreshing(false);
     };
 
-    const firstName = user?.name?.split(' ')[0] || 'Trainer';
+    const firstName = user?.name?.split(' ')[0] || t('trainerHome.trainerFallback');
 
     /**
      * Render revenue using the trainer's preferred currency (settings-
@@ -183,8 +181,8 @@ export default function TrainerHomeScreen() {
                     </View>
                 </View>
 
-                <Text style={styles.greeting}>Hello, {firstName}</Text>
-                <Text style={styles.subtitle}>Here's your dashboard</Text>
+                <Text style={styles.greeting}>{t('home.greeting', { name: firstName })}</Text>
+                <Text style={styles.subtitle}>{t('trainerHome.subtitle')}</Text>
 
                 {loading ? (
                     <View style={{ paddingTop: 60, alignItems: 'center' }}>
@@ -194,9 +192,9 @@ export default function TrainerHomeScreen() {
                     <>
                         {/* ── Stats Grid ── */}
                         <View style={styles.statsRow}>
-                            <StatCard title="Students" value={String(stats.students)} icon="people" color="#7cce06" />
+                            <StatCard title={t('trainerHome.statStudents')} value={String(stats.students)} icon="people" color="#7cce06" />
                             <StatCard
-                                title="Revenue"
+                                title={t('trainerHome.statRevenue')}
                                 value={formatRevenue(stats.revenue)}
                                 icon="cash-outline"
                                 color="#FFD700"
@@ -204,9 +202,9 @@ export default function TrainerHomeScreen() {
                             />
                         </View>
                         <View style={styles.statsRow}>
-                            <StatCard title="Courses" value={String(stats.courses || courses.length)} icon="book-outline" color="#FF6B6B" />
+                            <StatCard title={t('trainerHome.statCourses')} value={String(stats.courses || courses.length)} icon="book-outline" color="#FF6B6B" />
                             <StatCard
-                                title="Avg Rating"
+                                title={t('trainerHome.statRating')}
                                 value={stats.rating ? stats.rating.toFixed(1) : '—'}
                                 icon="star"
                                 color="#FFA500"
@@ -216,9 +214,9 @@ export default function TrainerHomeScreen() {
                         {/* ── Upcoming Sessions ── */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Upcoming Sessions</Text>
+                                <Text style={styles.sectionTitle}>{t('home.upcomingSessions')}</Text>
                                 <Text style={styles.sessionCount}>
-                                    {upcomingSessions.length > 0 ? `${upcomingSessions.length} scheduled` : ''}
+                                    {upcomingSessions.length > 0 ? t('trainerHome.scheduledCount', { count: upcomingSessions.length }) : ''}
                                 </Text>
                             </View>
                             {upcomingSessions.length > 0 ? (
@@ -232,9 +230,9 @@ export default function TrainerHomeScreen() {
                                         <Ionicons name="calendar-outline" size={28} color="rgba(124,206,6,0.5)" />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.sessionsEmptyTitle}>No sessions scheduled</Text>
+                                        <Text style={styles.sessionsEmptyTitle}>{t('schedule.noSessions')}</Text>
                                         <Text style={styles.sessionsEmptyText}>
-                                            You'll see upcoming groups here once enough students enroll in your courses.
+                                            {t('trainerHome.noSessionsBody')}
                                         </Text>
                                     </View>
                                 </View>
@@ -244,16 +242,16 @@ export default function TrainerHomeScreen() {
                         {/* ── My Courses ── */}
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>My Courses</Text>
+                                <Text style={styles.sectionTitle}>{t('trainerManage.myCourses')}</Text>
                                 <TouchableOpacity onPress={() => router.push('/(trainer-tabs)/courses' as any)}>
-                                    <Text style={styles.seeAll}>See All</Text>
+                                    <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
                                 </TouchableOpacity>
                             </View>
                             {activeCourses.length > 0 ? (
                                 activeCourses.slice(0, 3).map((c: any) => (
                                     <FormationCard
                                         key={c.courseId || c.id}
-                                        title={c.title || 'Untitled'}
+                                        title={c.title || t('trainerHome.untitled')}
                                         // Students currently in training — resets when
                                         // the group completes. Falls back through the
                                         // older fields for backwards compatibility.
@@ -271,7 +269,7 @@ export default function TrainerHomeScreen() {
                                 ))
                             ) : (
                                 <View style={styles.emptyInline}>
-                                    <Text style={styles.emptyInlineText}>No published courses yet.</Text>
+                                    <Text style={styles.emptyInlineText}>{t('trainerHome.noCourses')}</Text>
                                 </View>
                             )}
                         </View>
@@ -303,12 +301,12 @@ function StatCard({ title, value, icon, color, onPress }: any) {
     return <View style={styles.statCard}>{inner}</View>;
 }
 
-function formatSessionDate(iso: string | null | undefined): { day: string; time: string; relative: string } {
+function formatSessionDate(t: TFunction, iso: string | null | undefined): { day: string; time: string; relative: string } {
     // Short labels — these get rendered into a 64dp pill so anything
     // longer than ~6 chars wraps to a second line (the old "Forming"
     // and "Tomorrow" both did). Keeping each label ≤ 5 chars keeps the
     // pill on a single line for all states.
-    if (!iso) return { day: 'Date TBA', time: '', relative: 'Soon' };
+    if (!iso) return { day: t('trainerHome.dateTba'), time: '', relative: t('trainerHome.soon') };
     const d = new Date(iso);
     const now = new Date();
     const day = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -317,23 +315,26 @@ function formatSessionDate(iso: string | null | undefined): { day: string; time:
     const diffMs = d.getTime() - now.getTime();
     const diffDays = Math.floor(diffMs / 86400000);
     let relative: string;
-    if (diffDays < 0) relative = 'Now';
-    else if (diffDays === 0) relative = 'Today';
-    else if (diffDays === 1) relative = 'Tmrw';
-    else if (diffDays < 7) relative = `In ${diffDays}d`;
+    if (diffDays < 0) relative = t('trainerHome.now');
+    else if (diffDays === 0) relative = t('trainerHome.today');
+    else if (diffDays === 1) relative = t('trainerHome.tomorrow');
+    else if (diffDays < 7) relative = t('trainerHome.inDays', { count: diffDays });
     else relative = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     return { day, time, relative };
 }
 
 function SessionCard({ session }: { session: any }) {
     const router = useRouter();
-    const { day, time, relative } = formatSessionDate(session.startDate);
+    const { t } = useTranslation();
+    // The next session, not the group's first: once the first class has
+    // passed, startDate is in the past while sessions remain ahead.
+    const { day, time, relative } = formatSessionDate(t, session.nextSessionAt ?? session.startDate);
     const status = (session.groupStatus || '').toLowerCase();
     const statusColor = status === 'active' ? '#7cce06' : status === 'ready' ? '#FFA500' : '#888';
     const studentRatio = `${session.currentSize ?? 0}/${session.maxSize ?? 0}`;
     const locationLabel = session.isOnline
-        ? (session.meetingLink ? 'Online · Link ready' : 'Online')
-        : (session.meetingLocation || 'Location TBA');
+        ? (session.meetingLink ? t('trainerHome.onlineLinkReady') : t('common.online'))
+        : (session.meetingLocation || t('trainerHome.locationTba'));
 
     return (
         <TouchableOpacity
@@ -357,7 +358,7 @@ function SessionCard({ session }: { session: any }) {
             {/* Body */}
             <View style={styles.sessionBody}>
                 <Text style={styles.sessionTitle} numberOfLines={1}>
-                    {session.courseTitle || session.groupName || 'Session'}
+                    {session.courseTitle || session.groupName || t('home.session')}
                 </Text>
                 {!!session.groupName && session.courseTitle && (
                     <Text style={styles.sessionSubtitle} numberOfLines={1}>{session.groupName}</Text>
@@ -381,6 +382,7 @@ function SessionCard({ session }: { session: any }) {
 }
 
 function FormationCard({ title, students, groups, status, statusColor = '#7cce06' }: any) {
+    const { t } = useTranslation();
     return (
         <TouchableOpacity style={styles.formationCard} activeOpacity={0.85}>
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
@@ -389,10 +391,10 @@ function FormationCard({ title, students, groups, status, statusColor = '#7cce06
             </View>
             <View style={styles.formationInfo}>
                 <Text style={styles.formationTitle}>{title}</Text>
-                <Text style={styles.formationStat}>{students} students • {groups} groups</Text>
+                <Text style={styles.formationStat}>{t('trainerHome.studentsGroups', { students, groups })}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor + '50' }]}>
-                <Text style={[styles.statusText, { color: statusColor }]}>{status}</Text>
+                <Text style={[styles.statusText, { color: statusColor }]}>{t(`courseStatus.${String(status).toLowerCase()}`)}</Text>
             </View>
         </TouchableOpacity>
     );

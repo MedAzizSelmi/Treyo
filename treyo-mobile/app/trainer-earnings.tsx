@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 import { authService, trainerService } from '../services/api';
 
 /**
@@ -20,11 +21,13 @@ import { authService, trainerService } from '../services/api';
  * history with a small month picker.
  */
 
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'];
+// Month and weekday names come from the app's language (formatted by the
+// runtime), not a hard-coded English list.
 
 export default function TrainerEarningsScreen() {
     const router = useRouter();
+    const { t, i18n } = useTranslation();
+    const lang = i18n.language;
     const now = new Date();
     const [year, setYear] = useState(now.getFullYear());
     const [month, setMonth] = useState(now.getMonth() + 1); // 1-12
@@ -34,6 +37,9 @@ export default function TrainerEarningsScreen() {
     const [total, setTotal] = useState(0);
     const [currency, setCurrency] = useState('TND');
     const [days, setDays] = useState<{ date: string; courseId: string; courseTitle: string; amount: number }[]>([]);
+    // Days taught on a course with no daily rate: the server reports them
+    // instead of silently leaving them out, so a 0 can be explained.
+    const [unrated, setUnrated] = useState(0);
 
     // Resolve the trainer id once. Subsequent loads read from state.
     useEffect(() => {
@@ -49,8 +55,10 @@ export default function TrainerEarningsScreen() {
             setTotal(Number(res.total) || 0);
             setCurrency(res.currency || 'TND');
             setDays(Array.isArray(res.days) ? res.days : []);
+            setUnrated(Number(res.unratedSessions) || 0);
         } catch (_) {
             setTotal(0);
+            setUnrated(0);
             setDays([]);
         } finally {
             setLoading(false);
@@ -96,8 +104,8 @@ export default function TrainerEarningsScreen() {
                     <Ionicons name="arrow-back" size={20} color="#ffffff" />
                 </TouchableOpacity>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.headerTitle}>Earnings</Text>
-                    <Text style={styles.headerSubtitle}>Your daily training revenue, month by month</Text>
+                    <Text style={styles.headerTitle}>{t('trainerEarnings.title')}</Text>
+                    <Text style={styles.headerSubtitle}>{t('trainerEarnings.subtitle')}</Text>
                 </View>
             </View>
 
@@ -108,7 +116,9 @@ export default function TrainerEarningsScreen() {
                     <Ionicons name="chevron-back" size={20} color="#ffffff" />
                 </TouchableOpacity>
                 <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={styles.monthLabel}>{MONTH_NAMES[month - 1]} {year}</Text>
+                    <Text style={styles.monthLabel}>
+                        {new Date(year, month - 1, 1).toLocaleDateString(lang, { month: 'long', year: 'numeric' })}
+                    </Text>
                 </View>
                 <TouchableOpacity
                     onPress={() => !isCurrentMonth && stepMonth(1)}
@@ -126,10 +136,17 @@ export default function TrainerEarningsScreen() {
                     <Ionicons name="cash-outline" size={22} color="#FFD700" />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.totalLabel}>Total this month</Text>
-                    <Text style={styles.totalValue}>{formatMoney(total, currency)}</Text>
+                    <Text style={styles.totalLabel}>{t('trainerEarnings.totalMonth')}</Text>
+                    <Text style={styles.totalValue}>{formatMoney(total, currency, lang)}</Text>
                 </View>
             </View>
+
+            {unrated > 0 && (
+                <View style={styles.unratedCard}>
+                    <Ionicons name="alert-circle-outline" size={18} color="#FFA500" />
+                    <Text style={styles.unratedText}>{t('trainerEarnings.unratedNotice', { count: unrated })}</Text>
+                </View>
+            )}
 
             <ScrollView
                 style={styles.list}
@@ -143,11 +160,11 @@ export default function TrainerEarningsScreen() {
                 ) : days.length === 0 ? (
                     <View style={styles.empty}>
                         <Ionicons name="cash-outline" size={40} color="rgba(255,255,255,0.25)" />
-                        <Text style={styles.emptyTitle}>Nothing yet</Text>
+                        <Text style={styles.emptyTitle}>{t('trainerEarnings.nothingYet')}</Text>
                         <Text style={styles.emptyBody}>
                             {isCurrentMonth
-                                ? "You haven't taught a session this month yet, or the admin hasn't set a daily rate for your courses."
-                                : "No sessions were taught this month."}
+                                ? t('trainerEarnings.emptyCurrent')
+                                : t('trainerEarnings.emptyPast')}
                         </Text>
                     </View>
                 ) : (
@@ -156,13 +173,13 @@ export default function TrainerEarningsScreen() {
                             <BlurView intensity={15} tint="dark" style={StyleSheet.absoluteFill} />
                             <View style={styles.rowDate}>
                                 <Text style={styles.rowDateDay}>{formatDay(d.date)}</Text>
-                                <Text style={styles.rowDateWeekday}>{formatWeekday(d.date)}</Text>
+                                <Text style={styles.rowDateWeekday}>{formatWeekday(d.date, lang)}</Text>
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.rowCourse} numberOfLines={1}>{d.courseTitle || '—'}</Text>
-                                <Text style={styles.rowMeta}>Daily rate</Text>
+                                <Text style={styles.rowMeta}>{t('trainerEarnings.dailyRate')}</Text>
                             </View>
-                            <Text style={styles.rowAmount}>+ {formatMoney(d.amount, currency)}</Text>
+                            <Text style={styles.rowAmount}>+ {formatMoney(d.amount, currency, lang)}</Text>
                         </View>
                     ))
                 )}
@@ -171,9 +188,9 @@ export default function TrainerEarningsScreen() {
     );
 }
 
-function formatMoney(v: number, currency: string): string {
+function formatMoney(v: number, currency: string, lang: string): string {
     const n = Number(v) || 0;
-    return `${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
+    return `${n.toLocaleString(lang, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
 }
 
 function formatDay(iso: string): string {
@@ -183,10 +200,10 @@ function formatDay(iso: string): string {
     return String(d.getDate());
 }
 
-function formatWeekday(iso: string): string {
+function formatWeekday(iso: string, lang: string): string {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+    return d.toLocaleDateString(lang, { weekday: 'short' });
 }
 
 const styles = StyleSheet.create({
@@ -243,6 +260,12 @@ const styles = StyleSheet.create({
     rowAmount: { fontSize: 14, fontWeight: '700', color: '#7cce06' },
 
     empty: { paddingTop: 60, alignItems: 'center', paddingHorizontal: 30 },
+    unratedCard: {
+        flexDirection: 'row', gap: 10, alignItems: 'flex-start',
+        marginHorizontal: 20, marginBottom: 14, padding: 12, borderRadius: 12,
+        borderWidth: 1, borderColor: 'rgba(255,165,0,0.35)', backgroundColor: 'rgba(255,165,0,0.08)',
+    },
+    unratedText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: 'rgba(255,255,255,0.85)' },
     emptyTitle: { fontSize: 16, fontWeight: '700', color: '#ffffff', marginTop: 12 },
     emptyBody: { fontSize: 12, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 6, lineHeight: 18 },
 });

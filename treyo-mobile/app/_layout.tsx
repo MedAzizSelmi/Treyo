@@ -109,7 +109,6 @@ export default function RootLayout() {
                 <Stack.Screen name="recommended-courses" />
                 <Stack.Screen name="settings-privacy" />
                 <Stack.Screen name="settings-language" />
-                <Stack.Screen name="settings-currency" />
                 <Stack.Screen name="trainer-earnings" />
                 <Stack.Screen name="legal-terms" />
                 <Stack.Screen name="legal-privacy" />
