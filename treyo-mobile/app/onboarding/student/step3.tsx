@@ -10,6 +10,9 @@ import { ScreenBackground } from '../../../components/ScreenBackground';
 import { extractCvLinks } from '../../../utils/cvLinks';
 import { useTranslation } from 'react-i18next';
 import { EDUCATION_LEVELS, educationLabel } from '../../../utils/educationLevels';
+import { ExperienceEditor } from '../../../components/ExperienceEditor';
+import { SkillPicker, skillsFromCv } from '../../../components/SkillPicker';
+import { ExperienceEntry, entryProblem, fromAffinda } from '../../../utils/experience';
 
 
 // Maps Affinda education data to our dropdown options
@@ -33,8 +36,10 @@ export default function StudentOnboardingStep3() {
 
     const [cvFile, setCvFile] = useState<any>(null);
     const [parsing, setParsing] = useState(false);
-    const [professionalExperience, setProfessionalExperience] = useState('');
-    const [keySkills, setKeySkills] = useState('');
+    const [experience, setExperience] = useState<ExperienceEntry[]>([]);
+    // A learner may have no work history yet; saying so stands in for entries.
+    const [noExperience, setNoExperience] = useState(false);
+    const [keySkills, setKeySkills] = useState<string[]>([]);
     const [educationLevel, setEducationLevel] = useState('');
     const [linkedinUrl, setLinkedinUrl] = useState('');
     const [portfolioUrl, setPortfolioUrl] = useState('');
@@ -78,20 +83,17 @@ export default function StudentOnboardingStep3() {
             const parsed = await fetchUpload('/cv/parse', formData);
             if (!parsed || Object.keys(parsed).length === 0) return;
 
-            // Professional experience — prefer summary, fallback to work history
-            if (parsed.summary) {
-                setProfessionalExperience(parsed.summary.substring(0, 120));
-            } else if (parsed.workExperience?.length > 0) {
-                const exp = parsed.workExperience
-                    .map((w: any) => [w.jobTitle, w.organization].filter(Boolean).join(' at '))
-                    .join(', ');
-                setProfessionalExperience(exp.substring(0, 120));
+            // Work history as entries — organisation, position, dates — for
+            // the person to check rather than retype.
+            const entries = fromAffinda(parsed.workExperience);
+            if (entries.length > 0) {
+                setExperience(entries);
+                setNoExperience(false);
             }
 
-            // Key skills
+            // Skills, under the Skills list's own names where they match one.
             if (parsed.skills?.length > 0) {
-                const skills = parsed.skills.map((s: any) => s.name).filter(Boolean).join(', ');
-                setKeySkills(skills.substring(0, 120));
+                setKeySkills(await skillsFromCv(parsed.skills.map((s: any) => s?.name)));
             }
 
             // Education level — pass the full education object for field matching
@@ -111,9 +113,20 @@ export default function StudentOnboardingStep3() {
     };
 
     const handleContinue = async () => {
-        if (!professionalExperience || !keySkills || !educationLevel) {
+        if (keySkills.length === 0 || !educationLevel) {
             Alert.alert(t('trainerOnboarding.requiredFields'), t('trainerOnboarding.fillRequired'));
             return;
+        }
+        if (!noExperience) {
+            if (experience.length === 0) {
+                Alert.alert(t('trainerOnboarding.requiredFields'), t('experience.addOneOrNone'));
+                return;
+            }
+            const problem = experience.map(entryProblem).find(Boolean);
+            if (problem) {
+                Alert.alert(t('trainerOnboarding.requiredFields'), t(problem));
+                return;
+            }
         }
 
         setLoading(true);
@@ -126,8 +139,9 @@ export default function StudentOnboardingStep3() {
 
             await api.put(`/students/me/profile?studentId=${user.userId}`, {
                 cvUrl: cvFile?.uri || null,
-                professionalExperience,
-                keySkills: keySkills.split(',').map((s: string) => s.trim()).filter(Boolean),
+                // The server writes the readable text from the entries.
+                experienceEntries: noExperience ? [] : experience,
+                keySkills,
                 educationLevel,
                 trainingDomain: null,
                 linkedinUrl: linkedinUrl.trim() || null,
@@ -214,38 +228,30 @@ export default function StudentOnboardingStep3() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Professional Experience */}
+                    {/* Professional Experience — one entry at a time, not a
+                        paragraph to write (October 2026). */}
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>{t('editProfile.professionalExperience')}</Text>
-                        <View style={styles.inputContainer}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder={t('studentOnboarding.experiencePh')}
-                                placeholderTextColor="#555"
-                                value={professionalExperience}
-                                onChangeText={(t) => setProfessionalExperience(t.slice(0, 120))}
-                                multiline
-                            />
-                            <Text style={styles.charCount}>{professionalExperience.length}/120</Text>
-                        </View>
+                        {/* A learner may not have worked yet; a trainer must have. */}
+                        <TouchableOpacity
+                            style={styles.noExpRow}
+                            onPress={() => setNoExperience(v => !v)}
+                            activeOpacity={0.8}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: noExperience }}
+                        >
+                            <View style={[styles.noExpBox, noExperience && styles.noExpBoxOn]}>
+                                {noExperience && <Ionicons name="checkmark" size={14} color="#000" />}
+                            </View>
+                            <Text style={styles.noExpText}>{t('experience.none')}</Text>
+                        </TouchableOpacity>
+                        {!noExperience && <ExperienceEditor value={experience} onChange={setExperience} />}
                     </View>
 
-                    {/* Key Skills */}
+                    {/* Key Skills — suggested from the Skills list as one types. */}
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>{t('editProfile.keySkills')}</Text>
-                        <View style={styles.inputContainer}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder={t('studentOnboarding.skillsPh')}
-                                placeholderTextColor="#555"
-                                value={keySkills}
-                                onChangeText={(t) => setKeySkills(t.slice(0, 120))}
-                                multiline
-                            />
-                            <Text style={styles.charCount}>{keySkills.length}/120</Text>
-                        </View>
+                        <SkillPicker value={keySkills} onChange={setKeySkills} />
                     </View>
 
                     {/* Education Level */}
@@ -353,6 +359,14 @@ export default function StudentOnboardingStep3() {
 }
 
 const styles = StyleSheet.create({
+    noExpRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+    noExpBox: {
+        width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    noExpBoxOn: { backgroundColor: '#7cce06', borderColor: '#7cce06' },
+    noExpText: { flex: 1, color: '#dddddd', fontSize: 14 },
+
     scrollContent: { flexGrow: 1, paddingTop: 60, paddingBottom: 40, paddingHorizontal: 20 },
 
     header: { marginBottom: 20 },

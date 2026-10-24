@@ -891,6 +891,27 @@ export const feedService = {
 // ══════════════════════════════════════════════
 // Search log — records queries for the ML recommendation engine
 // ══════════════════════════════════════════════
+/** A skill learners can choose at onboarding, from the administrators'
+ *  list. `name` is what the profile stores; the others are how to show it. */
+export type SkillOption = {
+    skillId: string; field: string; name: string;
+    nameFr?: string | null; nameAr?: string | null; nameEs?: string | null;
+};
+
+export const skillService = {
+    /** Every offered skill, to suggest while someone types their CV skills. */
+    suggestions: async (): Promise<SkillOption[]> => {
+        const response = await api.get('/skills/suggestions');
+        return Array.isArray(response.data) ? response.data : [];
+    },
+
+    /** The skills offered under these onboarding fields. */
+    forFields: async (fields: string[]): Promise<SkillOption[]> => {
+        const response = await api.get('/skills', { params: { fields: fields.join(',') } });
+        return Array.isArray(response.data) ? response.data : [];
+    },
+};
+
 /** Courses learners asked for and did not find. Every call acts as the
  *  signed-in learner; none names a user. */
 export const courseSuggestionService = {

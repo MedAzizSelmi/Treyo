@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { useTranslation } from 'react-i18next';
 import { studentService, trainerService, API_BASE_URL } from '../services/api';
 
 /**
@@ -26,6 +27,7 @@ import { studentService, trainerService, API_BASE_URL } from '../services/api';
  */
 export default function UserProfileScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const { userId, userType, userName } =
         useLocalSearchParams<{ userId: string; userType: string; userName?: string }>();
 
@@ -86,7 +88,7 @@ export default function UserProfileScreen() {
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Profile</Text>
+                    <Text style={styles.headerTitle}>{t('userProfile.title')}</Text>
                 </View>
 
                 {loading ? (
@@ -96,7 +98,7 @@ export default function UserProfileScreen() {
                 ) : !profile ? (
                     <View style={styles.empty}>
                         <Ionicons name="alert-circle-outline" size={48} color="rgba(255,255,255,0.3)" />
-                        <Text style={styles.emptyText}>Couldn&apos;t load this profile.</Text>
+                        <Text style={styles.emptyText}>{t('userProfile.loadFailed')}</Text>
                     </View>
                 ) : (
                     <>
@@ -117,7 +119,7 @@ export default function UserProfileScreen() {
                                     </View>
                                 )}
                             </View>
-                            <Text style={styles.name}>{profile.name || 'Unknown user'}</Text>
+                            <Text style={styles.name}>{profile.name || t('userProfile.unknown')}</Text>
                             <View style={styles.roleBadge}>
                                 <Ionicons
                                     name={
@@ -128,9 +130,9 @@ export default function UserProfileScreen() {
                                     size={12} color="#7cce06"
                                 />
                                 <Text style={styles.roleText}>
-                                    {userType === 'trainer' ? 'Trainer'
-                                        : userType === 'admin' ? 'Admin'
-                                            : 'Student'}
+                                    {userType === 'trainer' ? t('userProfile.trainer')
+                                        : userType === 'admin' ? t('userProfile.admin')
+                                            : t('userProfile.learner')}
                                 </Text>
                             </View>
                         </View>
@@ -145,14 +147,14 @@ export default function UserProfileScreen() {
                                     params: { trainerId: profile.trainerId },
                                 })}
                             >
-                                <Text style={styles.viewFullText}>See full trainer profile</Text>
+                                <Text style={styles.viewFullText}>{t('userProfile.seeFull')}</Text>
                                 <Ionicons name="arrow-forward" size={16} color="#7cce06" />
                             </TouchableOpacity>
                         )}
 
                         {!!profile.bio && (
                             <View style={styles.card}>
-                                <Text style={styles.cardLabel}>About</Text>
+                                <Text style={styles.cardLabel}>{t('userProfile.about')}</Text>
                                 <Text style={styles.cardBody}>{profile.bio}</Text>
                             </View>
                         )}
@@ -160,7 +162,7 @@ export default function UserProfileScreen() {
                         {domains.length > 0 && (
                             <View style={styles.card}>
                                 <Text style={styles.cardLabel}>
-                                    {userType === 'trainer' ? 'Specializations' : 'Domains'}
+                                    {userType === 'trainer' ? t('userProfile.specializations') : t('userProfile.trainingFields')}
                                 </Text>
                                 <View style={styles.chipRow}>
                                     {domains.map((d, i) => (
@@ -175,7 +177,7 @@ export default function UserProfileScreen() {
                         {interests.length > 0 && (
                             <View style={styles.card}>
                                 <Text style={styles.cardLabel}>
-                                    {userType === 'trainer' ? 'Skills' : 'Interests'}
+                                    {userType === 'trainer' ? t('userProfile.skills') : t('userProfile.trainingGoals')}
                                 </Text>
                                 <View style={styles.chipRow}>
                                     {interests.map((d, i) => (

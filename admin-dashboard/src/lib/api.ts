@@ -172,6 +172,13 @@ export const publishCourseSuggestion = (id: string, courseId: string) =>
 export const getMissedSearches = () => api.get('/admin/missed-searches');
 export const hideMissedSearch = (term: string) => api.post('/admin/missed-searches/hide', { term });
 
+// ── Skills learners choose at onboarding (backend SkillOptionService) ──
+type SkillBody = { field?: string; name?: string; nameFr?: string; nameAr?: string; nameEs?: string; isActive?: boolean };
+export const getSkills = () => api.get('/admin/skills');
+export const createSkill = (body: SkillBody) => api.post('/admin/skills', body);
+export const updateSkill = (id: string, body: SkillBody) => api.put(`/admin/skills/${id}`, body);
+export const deleteSkill = (id: string) => api.delete(`/admin/skills/${id}`);
+
 // ── Promote to Admin ──
 export const promoteToAdmin = (userId: string, userType: string) =>
   api.post(`/admin/users/${userId}/promote-to-admin`, null, { params: { userType } });

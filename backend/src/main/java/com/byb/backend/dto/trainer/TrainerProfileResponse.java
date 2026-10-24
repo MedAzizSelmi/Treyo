@@ -25,6 +25,7 @@ public class TrainerProfileResponse {
     private String bio;
     private String cvUrl;
     private String professionalExperience;
+    private java.util.List<com.byb.backend.util.ExperienceEntries.Entry> experienceEntries;
     private String[] specializations;
     private String[] skills;
     private Integer experienceYears;

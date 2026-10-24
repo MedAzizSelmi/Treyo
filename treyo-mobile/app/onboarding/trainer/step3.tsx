@@ -8,6 +8,7 @@ import { authService, fetchUpload, API_BASE_URL } from '../../../services/api';
 import api from '../../../services/api';
 import { ScreenBackground } from '../../../components/ScreenBackground';
 import { useTranslation } from 'react-i18next';
+import { TRAINER_BIO_MIN } from '../../../constants/profile';
 
 export default function TrainerOnboardingStep3() {
     const router = useRouter();
@@ -40,8 +41,8 @@ export default function TrainerOnboardingStep3() {
     };
 
     const handleNext = async () => {
-        if (!bio || bio.length < 50) {
-            Alert.alert(t('common.error'), t('trainerOnboarding.bioMin'));
+        if (bio.trim().length < TRAINER_BIO_MIN) {
+            Alert.alert(t('common.error'), t('trainerOnboarding.bioMin', { min: TRAINER_BIO_MIN }));
             return;
         }
 
@@ -157,7 +158,11 @@ export default function TrainerOnboardingStep3() {
                                 numberOfLines={8}
                             />
                         </View>
-                        <Text style={styles.hint}>{bio.length}/500 characters</Text>
+                        <Text style={[styles.hint, bio.trim().length >= TRAINER_BIO_MIN && { color: '#7cce06' }]}>
+                            {bio.trim().length >= TRAINER_BIO_MIN
+                                ? t('trainerOnboarding.bioCountDone', { count: bio.trim().length })
+                                : t('trainerOnboarding.bioCount', { count: bio.trim().length, min: TRAINER_BIO_MIN })}
+                        </Text>
                     </View>
 
                     {/* Continue Button inside card */}

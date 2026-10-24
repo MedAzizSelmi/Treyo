@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
+import { ExperienceList } from '../../components/ExperienceList';
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -131,9 +132,11 @@ export default function ProfileScreen() {
                             {/* Professional Experience */}
                             <View style={styles.overviewCell}>
                                 <Text style={styles.overviewTitle}>{t('profile.professionalExperience')}</Text>
-                                <Text style={styles.overviewValue}>
-                                    {profile?.professionalExperience || t('profile.notProvided')}
-                                </Text>
+                                <ExperienceList
+                                    entries={profile?.experienceEntries}
+                                    fallback={profile?.professionalExperience}
+                                    textStyle={styles.overviewValue}
+                                />
                             </View>
 
                             {/* Key Skills */}
@@ -144,7 +147,7 @@ export default function ProfileScreen() {
                                         <Text key={i} style={styles.overviewBullet}>{'\u2022'} {skill}</Text>
                                     ))
                                 ) : (
-                                    <Text style={styles.overviewValue}>Not provided yet</Text>
+                                    <Text style={styles.overviewValue}>{t('profile.notProvided')}</Text>
                                 )}
                             </View>
 
@@ -156,15 +159,17 @@ export default function ProfileScreen() {
                                 </Text>
                             </View>
 
-                            {/* Training Domains / Interests */}
+                            {/* Training goals: the skills chosen at onboarding, or
+                                their fields when none was picked. Not "interests" —
+                                the October 2026 review found it sounded like a hobby. */}
                             <View style={styles.overviewCell}>
-                                <Text style={styles.overviewTitle}>{t('profile.trainingDomains')}</Text>
+                                <Text style={styles.overviewTitle}>{t('profile.trainingGoalsCaps')}</Text>
                                 {domains.length > 0 ? (
                                     domains.slice(0, 5).map((d: string, i: number) => (
                                         <Text key={i} style={styles.overviewBullet}>{'\u2022'} {d}</Text>
                                     ))
                                 ) : (
-                                    <Text style={styles.overviewValue}>Not provided yet</Text>
+                                    <Text style={styles.overviewValue}>{t('profile.notProvided')}</Text>
                                 )}
                             </View>
                         </View>

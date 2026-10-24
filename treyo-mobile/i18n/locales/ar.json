@@ -308,7 +308,8 @@
         "maxGroupsBody": "تتوقف التوصيات عند بلوغك هذا العدد؛ تُتاح الأماكن عند انتهاء المجموعات",
         "savedAvailability": "تم تحديث التوفر",
         "suggestCourse": "اقترح دورة",
-        "suggestCourseSubtitle": "اطلب دورة غير موجودة بعد"
+        "suggestCourseSubtitle": "اطلب دورة غير موجودة بعد",
+        "trainingGoalsCaps": "أهداف التكوين"
     },
     "search": {
         "title": "بحث",
@@ -453,7 +454,8 @@
         "keySkills": "المهارات الرئيسية",
         "addSkill": "أضف مهارة...",
         "linkedinUrl": "رابط LinkedIn",
-        "portfolioUrl": "رابط الموقع الشخصي"
+        "portfolioUrl": "رابط الموقع الشخصي",
+        "nameRequired": "الاسم مطلوب."
     },
     "groups": {
         "formingNow": "مجموعات قيد التكوين",
@@ -892,14 +894,16 @@
         "experiencePh": "مثال: 5 سنوات في تطوير الويب، قدت فرقًا من 10 أشخاص…",
         "skillsPh": "مثال: React، Node.js، Python، Figma…",
         "selectEducation": "اختر مستواك التعليمي",
-        "bioMin": "يرجى كتابة نبذة (50 حرفًا على الأقل).",
+        "bioMin": "يرجى كتابة نبذة لا تقل عن {{min}} حرفًا.",
         "uploadFailedTitle": "فشل الرفع",
         "uploadFailedBody": "تعذّر رفع صورة ملفك الشخصي. يمكنك إضافتها لاحقًا من ملفك الشخصي.",
         "profileTitle": "ملفك الشخصي",
         "profileSubtitle": "عرّف المتعلمين بنفسك",
         "addPicture": "إضافة صورة الملف الشخصي",
         "optionalParen": "(اختياري)",
-        "bioPh": "حدّث المتعلمين عن خبرتك وأسلوبك في التدريس وما يجعلك مدرّبًا متميزًا… (50 حرفًا على الأقل)"
+        "bioPh": "حدّث المتعلمين عن خبرتك وأسلوبك في التدريس وما يجعلك مدرّبًا متميزًا… (100 حرف على الأقل)",
+        "bioCount": "{{count}} / {{min}} حرفًا كحد أدنى",
+        "bioCountDone": "{{count}} حرفًا"
     },
     "interestFields": {
         "informatique": "الإعلامية",
@@ -913,19 +917,23 @@
     },
     "studentOnboarding": {
         "pickField": "يرجى اختيار مجال واحد على الأقل.",
-        "fieldsTitle": "ما الذي يهمك؟",
-        "fieldsSubtitle": "اختر المجالات التي تريد تعلّمها",
+        "fieldsTitle": "في أي مجالات تريد التكوّن؟",
+        "fieldsSubtitle": "اختر المجالات التي تريد التكوّن فيها",
         "nextSelected": "التالي ({{count}} محدد)",
-        "pickInterest": "يرجى اختيار اهتمام محدد واحد على الأقل.",
-        "interestsSaveFailed": "تعذّر حفظ اهتماماتك. يرجى المحاولة مجددًا.",
-        "interestsTitle": "ما تحديدًا؟",
-        "interestsSubtitle": "اختر اهتماماتك المحددة",
+        "pickInterest": "اختر مهارة واحدة على الأقل لتطويرها.",
+        "interestsSaveFailed": "تعذّر حفظ مهاراتك. يرجى المحاولة مجددًا.",
+        "interestsTitle": "ما المهارات التي تريد تطويرها؟",
+        "interestsSubtitle": "اختر المهارات المفيدة لعملك",
         "cvHint": "PDF أو Word — تُملأ الحقول تلقائيًا",
         "experiencePh": "مثال: سنتان من دراسة علم البيانات، تدريب لدى…",
         "skillsPh": "مثال: Python، SQL، التواصل، Excel…",
         "finish": "إنهاء",
         "done": "تم الرفع بنجاح",
-        "contactSubtitle": "حتى نتمكن من التواصل معك بشأن مجموعاتك"
+        "contactSubtitle": "حتى نتمكن من التواصل معك بشأن مجموعاتك",
+        "consent": "أؤكد أن هذه هي المهارات التي أرغب في تطويرها حاليًا.",
+        "confirmRequired": "يرجى تأكيد أن هذه هي المهارات التي تريد تطويرها.",
+        "skillsLoadFailed": "تعذّر تحميل المهارات. تحقّق من اتصالك وحاول مجددًا.",
+        "noSkills": "لا توجد مهارات لهذه المجالات بعد. عُد واختر مجالًا آخر."
     },
     "groupOffer": {
         "kicker": "مجموعتك مفتوحة",
@@ -1020,5 +1028,56 @@
         "withdrawBody": "سنتوقف عن البحث عن مدرّب لهذه الدورة.",
         "unsupportTitle": "إزالة نفسك؟",
         "unsupportBody": "لن يتم إعلامك عندما تصبح هذه الدورة متاحة."
+    },
+    "recommended": {
+        "subtitle": "اختارها ذكاؤنا الاصطناعي وفق أهداف التكوين لديك",
+        "emptyTitle": "لا توجد توصيات بعد",
+        "emptyBody": "ستكون لدينا اقتراحات لك بعد تصفّح بعض الدورات أو إكمال التسجيل.",
+        "count_one": "{{count}} دورة لك",
+        "count_other": "{{count}} دورات لك",
+        "count": "{{count}} دورات لك"
+    },
+    "userProfile": {
+        "title": "الملف الشخصي",
+        "loadFailed": "تعذّر تحميل هذا الملف.",
+        "unknown": "مستخدم غير معروف",
+        "trainer": "مدرّب",
+        "admin": "مشرف",
+        "learner": "متعلّم",
+        "seeFull": "عرض الملف الكامل للمدرّب",
+        "about": "نبذة",
+        "specializations": "التخصصات",
+        "trainingFields": "مجالات التكوين",
+        "skills": "المهارات",
+        "trainingGoals": "أهداف التكوين"
+    },
+    "experience": {
+        "organization": "المؤسسة",
+        "organizationPh": "مثال: Vermeg",
+        "position": "المنصب",
+        "positionPh": "مثال: مطوّر متكامل",
+        "from": "من",
+        "to": "إلى",
+        "pick": "اختر",
+        "present": "حتى الآن",
+        "remove": "حذف هذه الخبرة",
+        "add": "إضافة خبرة",
+        "pickMonth": "اختر الشهر",
+        "stillThere": "ما زلت أعمل هنا",
+        "none": "ليست لديّ خبرة مهنية بعد",
+        "addOneOrNone": "أضف خبرة واحدة على الأقل، أو أشِر إلى أنه ليست لديك خبرة بعد.",
+        "needOrganization": "يجب ذكر المؤسسة لكل خبرة.",
+        "needPosition": "يجب ذكر المنصب لكل خبرة.",
+        "needFrom": "حدّد متى بدأت كل خبرة.",
+        "endBeforeStart": "لا يمكن أن تنتهي الخبرة قبل أن تبدأ.",
+        "earlierText": "ما كتبته سابقًا — أضف خبرات أدناه لاستبداله",
+        "years_one": "سنة واحدة",
+        "years_other": "{{count}} سنوات",
+        "years": "{{count}} سنوات"
+    },
+    "skillPicker": {
+        "placeholder": "اكتب مهارة — مثال: C#، التواصل",
+        "remove": "إزالة {{skill}}",
+        "addTyped": "إضافة «{{skill}}»"
     }
 }

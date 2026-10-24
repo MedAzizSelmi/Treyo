@@ -308,7 +308,8 @@
         "maxGroupsBody": "Les recommandations s'arrêtent quand vous atteignez ce nombre ; les places se libèrent à la fin d'un groupe",
         "savedAvailability": "Disponibilité mise à jour",
         "suggestCourse": "Suggérer un cours",
-        "suggestCourseSubtitle": "Demandez un cours qui n'existe pas encore"
+        "suggestCourseSubtitle": "Demandez un cours qui n'existe pas encore",
+        "trainingGoalsCaps": "OBJECTIFS DE FORMATION"
     },
     "search": {
         "title": "Rechercher",
@@ -453,7 +454,8 @@
         "keySkills": "Compétences clés",
         "addSkill": "Ajouter une compétence...",
         "linkedinUrl": "URL LinkedIn",
-        "portfolioUrl": "URL du portfolio"
+        "portfolioUrl": "URL du portfolio",
+        "nameRequired": "Votre nom est obligatoire."
     },
     "groups": {
         "formingNow": "Groupes en formation",
@@ -892,14 +894,16 @@
         "experiencePh": "ex. 5 ans en développement web, encadrement d'équipes de 10…",
         "skillsPh": "ex. React, Node.js, Python, Figma…",
         "selectEducation": "Sélectionnez votre niveau d'études",
-        "bioMin": "Veuillez rédiger une biographie (50 caractères minimum).",
+        "bioMin": "Veuillez rédiger une biographie d'au moins {{min}} caractères.",
         "uploadFailedTitle": "Échec de l'envoi",
         "uploadFailedBody": "Impossible d'envoyer votre photo de profil. Vous pourrez en ajouter une plus tard depuis votre profil.",
         "profileTitle": "Votre profil",
         "profileSubtitle": "Présentez-vous aux apprenants",
         "addPicture": "Ajouter une photo de profil",
         "optionalParen": "(Facultatif)",
-        "bioPh": "Parlez aux apprenants de votre expérience, de votre façon d'enseigner et de ce qui fait de vous un excellent formateur… (50 caractères min.)"
+        "bioPh": "Parlez aux apprenants de votre expérience, de votre façon d'enseigner et de ce qui fait de vous un excellent formateur… (100 caractères minimum)",
+        "bioCount": "{{count}} / {{min}} caractères minimum",
+        "bioCountDone": "{{count}} caractères"
     },
     "interestFields": {
         "informatique": "Informatique",
@@ -913,19 +917,23 @@
     },
     "studentOnboarding": {
         "pickField": "Veuillez choisir au moins un domaine.",
-        "fieldsTitle": "Qu'est-ce qui vous intéresse ?",
-        "fieldsSubtitle": "Choisissez les domaines que vous voulez apprendre",
+        "fieldsTitle": "Dans quels domaines voulez-vous vous former ?",
+        "fieldsSubtitle": "Choisissez les domaines dans lesquels vous voulez vous former",
         "nextSelected": "Suivant ({{count}} sélectionné(s))",
-        "pickInterest": "Veuillez choisir au moins un intérêt précis.",
-        "interestsSaveFailed": "Échec de l'enregistrement des intérêts. Veuillez réessayer.",
-        "interestsTitle": "Plus précisément ?",
-        "interestsSubtitle": "Choisissez vos intérêts précis",
+        "pickInterest": "Choisissez au moins une compétence à développer.",
+        "interestsSaveFailed": "Impossible d'enregistrer vos compétences. Veuillez réessayer.",
+        "interestsTitle": "Quelles compétences voulez-vous développer ?",
+        "interestsSubtitle": "Choisissez les compétences utiles à votre travail",
         "cvHint": "PDF ou Word — les champs se remplissent seuls",
         "experiencePh": "ex. 2 ans d'études en data science, stage chez…",
         "skillsPh": "ex. Python, SQL, Communication, Excel…",
         "finish": "Terminer",
         "done": "Téléversement réussi",
-        "contactSubtitle": "Pour pouvoir vous joindre au sujet de vos groupes"
+        "contactSubtitle": "Pour pouvoir vous joindre au sujet de vos groupes",
+        "consent": "Je confirme que ce sont les compétences que je souhaite développer en ce moment.",
+        "confirmRequired": "Veuillez confirmer que ce sont les compétences que vous souhaitez développer.",
+        "skillsLoadFailed": "Impossible de charger les compétences. Vérifiez votre connexion et réessayez.",
+        "noSkills": "Aucune compétence n'est encore proposée pour ces domaines. Revenez en arrière et choisissez-en un autre."
     },
     "groupOffer": {
         "kicker": "Votre groupe est ouvert",
@@ -1020,5 +1028,56 @@
         "withdrawBody": "Nous arrêterons de chercher un formateur pour ce cours.",
         "unsupportTitle": "Vous retirer ?",
         "unsupportBody": "Vous ne serez pas prévenu quand ce cours sera disponible."
+    },
+    "recommended": {
+        "subtitle": "Sélectionnés par notre IA selon vos objectifs de formation",
+        "emptyTitle": "Pas encore de recommandations",
+        "emptyBody": "Nous aurons des suggestions pour vous dès que vous aurez consulté quelques cours ou terminé l'inscription.",
+        "count_one": "{{count}} cours pour vous",
+        "count_other": "{{count}} cours pour vous",
+        "count": "{{count}} cours pour vous"
+    },
+    "userProfile": {
+        "title": "Profil",
+        "loadFailed": "Impossible de charger ce profil.",
+        "unknown": "Utilisateur inconnu",
+        "trainer": "Formateur",
+        "admin": "Administrateur",
+        "learner": "Apprenant",
+        "seeFull": "Voir le profil complet du formateur",
+        "about": "À propos",
+        "specializations": "Spécialisations",
+        "trainingFields": "Domaines de formation",
+        "skills": "Compétences",
+        "trainingGoals": "Objectifs de formation"
+    },
+    "experience": {
+        "organization": "Organisation",
+        "organizationPh": "ex. Vermeg",
+        "position": "Poste",
+        "positionPh": "ex. Développeur full-stack",
+        "from": "Du",
+        "to": "Au",
+        "pick": "Choisir",
+        "present": "Aujourd'hui",
+        "remove": "Supprimer cette expérience",
+        "add": "Ajouter une expérience",
+        "pickMonth": "Choisissez le mois",
+        "stillThere": "J'y travaille encore",
+        "none": "Je n'ai pas encore d'expérience professionnelle",
+        "addOneOrNone": "Ajoutez au moins une expérience, ou cochez que vous n'en avez pas encore.",
+        "needOrganization": "Chaque expérience doit indiquer l'organisation.",
+        "needPosition": "Chaque expérience doit indiquer le poste.",
+        "needFrom": "Indiquez quand chaque expérience a commencé.",
+        "endBeforeStart": "Une expérience ne peut pas se terminer avant d'avoir commencé.",
+        "earlierText": "Ce que vous aviez écrit — ajoutez des expériences ci-dessous pour le remplacer",
+        "years_one": "{{count}} an",
+        "years_other": "{{count}} ans",
+        "years": "{{count}} ans"
+    },
+    "skillPicker": {
+        "placeholder": "Tapez une compétence — ex. C#, Communication",
+        "remove": "Retirer {{skill}}",
+        "addTyped": "Ajouter « {{skill}} »"
     }
 }

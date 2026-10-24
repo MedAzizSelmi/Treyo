@@ -156,6 +156,36 @@ different learners made them. `TextMatch.java` and the app's
 `utils/textMatch.ts` are the same rules — change both. Showing the demand to
 trainers was deliberately left out for now.
 
+**Learners choose "skills to develop", from a list admins manage.** Never
+"interests" on screen — the boss read it as a hobby; the field is still
+`specificInterests` in code and `students.specific_interests` in the
+database. The skills live in `skill_options` (dashboard → Skills), seeded
+by `2026-10-25_skill_options.sql` with the list the app used to hard-code;
+seeded there, not at startup, so a deleted skill stays deleted. A profile
+stores the skill's English `name`, which the recommendation engine reads;
+`name_fr/ar/es` are display only. The server accepts only listed skills
+under the learner's fields — they show on the public profile. A skill
+learners chose can be hidden but not deleted. The eight onboarding fields
+themselves (`informatique`, `marketing`…) are still fixed, in
+`SkillOptionService.FIELDS` and the app's onboarding step 1; they are not
+the admins' course Domains. The learner ticks a box confirming these are
+the skills they want to develop now before going on.
+
+**Experience is entries, skills are picked — on the CV screens and edit
+profile.** Organisation, position, from/to months ("YYYY-MM", `to` null =
+present), one "+ Add experience" at a time, filled from Affinda's
+`workExperience` when a CV is parsed. Stored as JSON in
+`experience_entries`; `professional_experience` keeps a readable English
+text the server writes from them (and trainers' `experience_years`), so the
+dashboard and old readers still work — never write that text yourself when
+sending entries. A save that sends neither leaves the experience alone:
+learners who onboarded before this have only the text, and edit profile
+only sends entries once they are changed. Learners may tick "no experience
+yet"; trainers need at least one entry. The skills box suggests from the
+admins' Skills list only (all groups, plus a `general` group that is never
+offered at onboarding step 2), shows them in the app's language, saves the
+English name, and still accepts a typed skill — CV skills are open-ended.
+
 ## Conventions
 
 Commit messages explain **why**, in prose, not bullet lists of what changed.

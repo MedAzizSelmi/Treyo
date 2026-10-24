@@ -80,6 +80,11 @@ public class Student extends BaseEntity {
     @Column(name = "professional_experience", columnDefinition = "TEXT")
     private String professionalExperience;
 
+    /** Experience as entries, JSON (ExperienceEntries); professional_experience
+     *  holds the readable text made from them. */
+    @Column(name = "experience_entries", columnDefinition = "TEXT")
+    private String experienceEntries;
+
     @Column(name = "key_skills", columnDefinition = "text[]")
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.ARRAY)
     private String[] keySkills;

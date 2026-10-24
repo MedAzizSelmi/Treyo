@@ -11,6 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TrainerService {
 
+    /** The shortest bio a trainer may have; raised from 50 to 100 in October 2026. */
+    public static final int BIO_MIN = 100;
+
+
     private final TrainerRepository trainerRepository;
 
     public TrainerProfileResponse getProfile(String trainerId) {
@@ -52,9 +56,19 @@ public class TrainerService {
                 .orElseThrow(() -> new RuntimeException("Trainer not found"));
 
         trainer.setCvUrl(request.getCvUrl());
-        trainer.setProfessionalExperience(request.getProfessionalExperience());
+        if (request.getExperienceEntries() != null) {
+            // Entries, as the onboarding CV screen builds them: the text and
+            // the years of experience are made from them.
+            var now = java.time.YearMonth.now();
+            var entries = com.byb.backend.util.ExperienceEntries.clean(request.getExperienceEntries(), now);
+            trainer.setExperienceEntries(com.byb.backend.util.ExperienceEntries.toJson(entries));
+            trainer.setProfessionalExperience(com.byb.backend.util.ExperienceEntries.toText(entries));
+            trainer.setExperienceYears(com.byb.backend.util.ExperienceEntries.years(entries, now));
+        } else {
+            trainer.setProfessionalExperience(request.getProfessionalExperience());
+            trainer.setExperienceYears(request.getExperienceYears());
+        }
         trainer.setSpecializations(request.getSpecializations());
-        trainer.setExperienceYears(request.getExperienceYears());
         trainer.setEducation(request.getEducation());
         trainer.setSkills(request.getSkills());
         trainer.setLinkedinUrl(request.getLinkedinUrl());
@@ -70,8 +84,14 @@ public class TrainerService {
         Trainer trainer = trainerRepository.findByTrainerId(trainerId)
                 .orElseThrow(() -> new RuntimeException("Trainer not found"));
 
+        // The same minimum the app asks for, on onboarding and in edit
+        // profile (treyo-mobile constants/profile.ts).
+        String bio = request.getBio() == null ? "" : request.getBio().trim();
+        if (bio.length() < BIO_MIN) {
+            throw new IllegalArgumentException("The bio needs at least " + BIO_MIN + " characters.");
+        }
         trainer.setProfilePictureUrl(request.getProfilePictureUrl());
-        trainer.setBio(request.getBio());
+        trainer.setBio(bio);
 
         trainer = trainerRepository.save(trainer);
         return mapToProfileResponse(trainer);
@@ -137,6 +157,7 @@ public class TrainerService {
                 .bio(trainer.getBio())
                 .cvUrl(trainer.getCvUrl())
                 .professionalExperience(trainer.getProfessionalExperience())
+                .experienceEntries(com.byb.backend.util.ExperienceEntries.fromJson(trainer.getExperienceEntries()))
                 .specializations(trainer.getSpecializations())
                 .skills(trainer.getSkills())
                 .experienceYears(trainer.getExperienceYears())

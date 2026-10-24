@@ -10,6 +10,9 @@ import { ScreenBackground } from '../../../components/ScreenBackground';
 import { extractCvLinks } from '../../../utils/cvLinks';
 import { useTranslation } from 'react-i18next';
 import { EDUCATION_LEVELS, educationLabel } from '../../../utils/educationLevels';
+import { ExperienceEditor } from '../../../components/ExperienceEditor';
+import { SkillPicker, skillsFromCv } from '../../../components/SkillPicker';
+import { ExperienceEntry, entryProblem, fromAffinda } from '../../../utils/experience';
 
 
 // Maps Affinda education data to our dropdown options
@@ -37,8 +40,8 @@ export default function TrainerOnboardingStep2() {
 
     const [cvFile, setCvFile] = useState<any>(null);
     const [parsing, setParsing] = useState(false);
-    const [professionalExperience, setProfessionalExperience] = useState('');
-    const [keySkills, setKeySkills] = useState('');
+    const [experience, setExperience] = useState<ExperienceEntry[]>([]);
+    const [keySkills, setKeySkills] = useState<string[]>([]);
     const [educationLevel, setEducationLevel] = useState('');
     const [linkedinUrl, setLinkedinUrl] = useState('');
     const [portfolioUrl, setPortfolioUrl] = useState('');
@@ -82,20 +85,16 @@ export default function TrainerOnboardingStep2() {
             const parsed = await fetchUpload('/cv/parse', formData);
             if (!parsed || Object.keys(parsed).length === 0) return;
 
-            // Professional experience — prefer summary, fallback to work history
-            if (parsed.summary) {
-                setProfessionalExperience(parsed.summary.substring(0, 120));
-            } else if (parsed.workExperience?.length > 0) {
-                const exp = parsed.workExperience
-                    .map((w: any) => [w.jobTitle, w.organization].filter(Boolean).join(' at '))
-                    .join(', ');
-                setProfessionalExperience(exp.substring(0, 120));
+            // Work history as entries — organisation, position, dates — for
+            // the person to check rather than retype.
+            const entries = fromAffinda(parsed.workExperience);
+            if (entries.length > 0) {
+                setExperience(entries);
             }
 
-            // Key skills
+            // Skills, under the Skills list's own names where they match one.
             if (parsed.skills?.length > 0) {
-                const skills = parsed.skills.map((s: any) => s.name).filter(Boolean).join(', ');
-                setKeySkills(skills.substring(0, 120));
+                setKeySkills(await skillsFromCv(parsed.skills.map((s: any) => s?.name)));
             }
 
             // Education level — pass the full education object for field matching
@@ -121,8 +120,13 @@ export default function TrainerOnboardingStep2() {
             Alert.alert(t('trainerOnboarding.cvRequiredTitle'), t('trainerOnboarding.cvRequiredBody'));
             return;
         }
-        if (!professionalExperience || !keySkills || !educationLevel) {
+        if (experience.length === 0 || keySkills.length === 0 || !educationLevel) {
             Alert.alert(t('trainerOnboarding.requiredFields'), t('trainerOnboarding.fillRequired'));
+            return;
+        }
+        const problem = experience.map(entryProblem).find(Boolean);
+        if (problem) {
+            Alert.alert(t('trainerOnboarding.requiredFields'), t(problem));
             return;
         }
 
@@ -134,7 +138,7 @@ export default function TrainerOnboardingStep2() {
                 return;
             }
 
-            const skillsArray = keySkills.split(',').map((s: string) => s.trim()).filter(Boolean);
+            const skillsArray = keySkills;
 
             // Send the file itself to the server. cvFile.uri is a path on
             // this phone, which the administrator's dashboard cannot open.
@@ -148,7 +152,9 @@ export default function TrainerOnboardingStep2() {
 
             await api.put(`/trainers/me/profile/page2?trainerId=${user.userId}`, {
                 cvUrl: uploaded.fileUrl,
-                professionalExperience,
+                // The server writes the readable text and the years of
+                // experience from the entries.
+                experienceEntries: experience,
                 specializations: skillsArray.slice(0, 5),
                 experienceYears: 0,
                 education: educationLevel,
@@ -162,9 +168,7 @@ export default function TrainerOnboardingStep2() {
                 pathname: '/onboarding/trainer/step3' as any,
                 params: {
                     ...params,
-                    experience: professionalExperience,
                     education: educationLevel,
-                    skills: keySkills,
                 },
             });
         } catch (error) {
@@ -240,38 +244,17 @@ export default function TrainerOnboardingStep2() {
                         </TouchableOpacity>
                     </View>
 
-                    {/* Professional Experience */}
+                    {/* Professional Experience — one entry at a time, not a
+                        paragraph to write (October 2026). */}
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>{t('editProfile.professionalExperience')}</Text>
-                        <View style={styles.inputContainer}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder={t('trainerOnboarding.experiencePh')}
-                                placeholderTextColor="#555"
-                                value={professionalExperience}
-                                onChangeText={(t) => setProfessionalExperience(t.slice(0, 120))}
-                                multiline
-                            />
-                            <Text style={styles.charCount}>{professionalExperience.length}/120</Text>
-                        </View>
+                        <ExperienceEditor value={experience} onChange={setExperience} />
                     </View>
 
-                    {/* Key Skills */}
+                    {/* Key Skills — suggested from the Skills list as one types. */}
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>{t('editProfile.keySkills')}</Text>
-                        <View style={styles.inputContainer}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <TextInput
-                                style={styles.input}
-                                placeholder={t('trainerOnboarding.skillsPh')}
-                                placeholderTextColor="#555"
-                                value={keySkills}
-                                onChangeText={(t) => setKeySkills(t.slice(0, 120))}
-                                multiline
-                            />
-                            <Text style={styles.charCount}>{keySkills.length}/120</Text>
-                        </View>
+                        <SkillPicker value={keySkills} onChange={setKeySkills} />
                     </View>
 
                     {/* Education Level */}
@@ -379,6 +362,7 @@ export default function TrainerOnboardingStep2() {
 }
 
 const styles = StyleSheet.create({
+
     scrollContent: { flexGrow: 1, paddingTop: 60, paddingBottom: 40, paddingHorizontal: 20 },
 
     header: { marginBottom: 20 },

@@ -3,13 +3,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { levelLabel } from '../utils/courseLabels';
 import { courseService, authService } from '../services/api';
 
 const PAGE_SIZE = 30; // request a generous batch from the ML service
 
 export default function RecommendedCoursesScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -50,8 +53,8 @@ export default function RecommendedCoursesScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Recommended For You</Text>
-                        <Text style={styles.headerSubtitle}>Curated by our AI based on your interests</Text>
+                        <Text style={styles.headerTitle}>{t('home.recommended')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('recommended.subtitle')}</Text>
                     </View>
                 </View>
 
@@ -64,14 +67,12 @@ export default function RecommendedCoursesScreen() {
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="sparkles-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>No recommendations yet</Text>
-                        <Text style={styles.emptySubtitle}>
-                            We'll have suggestions for you once you've browsed a few courses or completed onboarding.
-                        </Text>
+                        <Text style={styles.emptyTitle}>{t('recommended.emptyTitle')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('recommended.emptyBody')}</Text>
                     </View>
                 ) : (
                     <>
-                        <Text style={styles.countLabel}>{recommendations.length} courses for you</Text>
+                        <Text style={styles.countLabel}>{t('recommended.count', { count: recommendations.length })}</Text>
                         {recommendations.map((course: any, idx: number) => (
                             <TouchableOpacity
                                 key={course.courseId || course.id || idx}
@@ -96,7 +97,7 @@ export default function RecommendedCoursesScreen() {
                                 <View style={styles.body}>
                                     <Text style={styles.title} numberOfLines={2}>{course.title}</Text>
                                     <Text style={styles.trainer} numberOfLines={1}>
-                                        {course.trainerName || course.trainer || 'Trainer'}
+                                        {course.trainerName || course.trainer || t('groupsForming.trainer')}
                                     </Text>
 
                                     <View style={styles.metaRow}>
@@ -119,7 +120,7 @@ export default function RecommendedCoursesScreen() {
                                         {course.level && (
                                             <View style={styles.metaChip}>
                                                 <Ionicons name="bar-chart-outline" size={13} color="#aaaaaa" />
-                                                <Text style={styles.metaText}>{course.level}</Text>
+                                                <Text style={styles.metaText}>{levelLabel(t, course.level)}</Text>
                                             </View>
                                         )}
                                     </View>

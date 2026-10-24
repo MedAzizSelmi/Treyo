@@ -9,6 +9,10 @@ import { useTranslation } from 'react-i18next';
 import { authService, fetchUpload, API_BASE_URL, enrollmentService } from '../services/api';
 import api from '../services/api';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { ExperienceEditor } from '../components/ExperienceEditor';
+import { SkillPicker } from '../components/SkillPicker';
+import { ExperienceEntry, entryProblem } from '../utils/experience';
+import { EDUCATION_LEVELS, educationLabel } from '../utils/educationLevels';
 
 export default function EditProfileScreen() {
     const router = useRouter();
@@ -21,9 +25,13 @@ export default function EditProfileScreen() {
 
     // Professional fields
     const [skills, setSkills] = useState<string[]>([]);
-    const [skillInput, setSkillInput] = useState('');
     const [educationLevel, setEducationLevel] = useState('');
-    const [professionalExperience, setProfessionalExperience] = useState('');
+    // Experience as entries, as onboarding builds it. Profiles from before
+    // October 2026 have only a paragraph: it is shown, and kept until the
+    // learner adds entries, since the experience is only sent once changed.
+    const [experience, setExperience] = useState<ExperienceEntry[]>([]);
+    const [experienceChanged, setExperienceChanged] = useState(false);
+    const [oldExperienceText, setOldExperienceText] = useState('');
     const [linkedinUrl, setLinkedinUrl] = useState('');
     const [portfolioUrl, setPortfolioUrl] = useState('');
 
@@ -39,7 +47,9 @@ export default function EditProfileScreen() {
             setProfilePic(p.profilePictureUrl || null);
             setSkills(Array.isArray(p.keySkills) ? p.keySkills : (p.keySkills ? [p.keySkills] : []));
             setEducationLevel(p.educationLevel || '');
-            setProfessionalExperience(p.professionalExperience || '');
+            const entries: ExperienceEntry[] = Array.isArray(p.experienceEntries) ? p.experienceEntries : [];
+            setExperience(entries);
+            setOldExperienceText(entries.length === 0 ? (p.professionalExperience || '') : '');
             setLinkedinUrl(p.linkedinUrl || '');
             setPortfolioUrl(p.portfolioUrl || '');
         } catch (e) {
@@ -47,17 +57,6 @@ export default function EditProfileScreen() {
         }
     };
 
-    const addSkill = () => {
-        const trimmed = skillInput.trim();
-        if (trimmed && !skills.includes(trimmed)) {
-            setSkills(prev => [...prev, trimmed]);
-        }
-        setSkillInput('');
-    };
-
-    const removeSkill = (skill: string) => {
-        setSkills(prev => prev.filter(s => s !== skill));
-    };
 
     const handlePickImage = async (source: 'camera' | 'gallery') => {
         setShowPicModal(false);
@@ -86,7 +85,9 @@ export default function EditProfileScreen() {
     };
 
     const handleSave = async () => {
-        if (!name.trim()) { Alert.alert('Error', 'Username is required'); return; }
+        if (!name.trim()) { Alert.alert(t('common.error'), t('editProfile.nameRequired')); return; }
+        const problem = experienceChanged ? experience.map(entryProblem).find(Boolean) : null;
+        if (problem) { Alert.alert(t('common.error'), t(problem)); return; }
         setLoading(true);
         try {
             const user = await authService.getCurrentUser();
@@ -116,7 +117,8 @@ export default function EditProfileScreen() {
             await enrollmentService.updateStudentProfile({
                 keySkills: skills,
                 educationLevel: educationLevel.trim() || undefined,
-                professionalExperience: professionalExperience.trim() || undefined,
+                // Only when changed: an untouched older paragraph is kept.
+                ...(experienceChanged ? { experienceEntries: experience } : {}),
                 linkedinUrl: linkedinUrl.trim() || null,
                 portfolioUrl: portfolioUrl.trim() || null,
             });
@@ -127,12 +129,12 @@ export default function EditProfileScreen() {
                 await SecureStore.setItemAsync('user_data', JSON.stringify(updatedUser));
             }
 
-            Alert.alert('Success', 'Profile updated successfully!', [
-                { text: 'OK', onPress: () => router.back() },
+            Alert.alert(t('editProfile.saved'), '', [
+                { text: t('common.ok'), onPress: () => router.back() },
             ]);
         } catch (error: any) {
             console.log('Save error', error?.response?.data || error?.message || error);
-            Alert.alert('Error', `Failed to update profile: ${error?.message || 'Unknown error'}`);
+            Alert.alert(t('common.error'), error?.response?.data?.message || t('editProfile.saveFailed'));
         } finally {
             setLoading(false);
         }
@@ -194,47 +196,42 @@ export default function EditProfileScreen() {
                     <Text style={styles.sectionTitle}>{t('editProfile.professionalProfile')}</Text>
 
                     <Text style={styles.fieldLabel}>{t('editProfile.educationLevel')}</Text>
-                    <View style={styles.inputWrap}>
-                        <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput style={styles.input} value={educationLevel} onChangeText={setEducationLevel} placeholder={t('editProfile.educationPlaceholder')} placeholderTextColor="#555" />
+                    {/* A choice, as at onboarding — it used to be typed. A value
+                        typed before stays selectable. */}
+                    <View style={styles.tagsWrap}>
+                        {[...EDUCATION_LEVELS, ...(educationLevel && !(EDUCATION_LEVELS as readonly string[]).includes(educationLevel) ? [educationLevel] : [])]
+                            .map(level => (
+                                <TouchableOpacity
+                                    key={level}
+                                    style={[styles.choice, educationLevel === level && styles.choiceOn]}
+                                    onPress={() => setEducationLevel(level)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[styles.choiceText, educationLevel === level && styles.choiceTextOn]}>
+                                        {educationLabel(t, level)}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
                     </View>
 
                     <Text style={styles.fieldLabel}>{t('editProfile.professionalExperience')}</Text>
-                    <View style={[styles.inputWrap, styles.bioWrap]}>
-                        <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                        <TextInput style={[styles.input, styles.bioInput]} value={professionalExperience} onChangeText={setProfessionalExperience} placeholder={t('editProfile.experiencePlaceholder')} placeholderTextColor="#555" multiline textAlignVertical="top" />
+                    {!!oldExperienceText && !experienceChanged && (
+                        <View style={styles.oldText}>
+                            <Text style={styles.oldTextLabel}>{t('experience.earlierText')}</Text>
+                            <Text style={styles.oldTextBody}>{oldExperienceText}</Text>
+                        </View>
+                    )}
+                    <View style={{ marginBottom: 20 }}>
+                        <ExperienceEditor
+                            value={experience}
+                            onChange={e => { setExperience(e); setExperienceChanged(true); }}
+                        />
                     </View>
 
                     <Text style={styles.fieldLabel}>{t('editProfile.keySkills')}</Text>
-                    <View style={styles.tagInputRow}>
-                        <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
-                            <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
-                            <TextInput
-                                style={styles.input}
-                                value={skillInput}
-                                onChangeText={setSkillInput}
-                                placeholder={t('editProfile.addSkill')}
-                                placeholderTextColor="#555"
-                                onSubmitEditing={addSkill}
-                                returnKeyType="done"
-                            />
-                        </View>
-                        <TouchableOpacity style={styles.addTagBtn} onPress={addSkill} activeOpacity={0.8}>
-                            <Ionicons name="add" size={20} color="#000" />
-                        </TouchableOpacity>
+                    <View style={{ marginBottom: 20 }}>
+                        <SkillPicker value={skills} onChange={setSkills} />
                     </View>
-                    {skills.length > 0 && (
-                        <View style={styles.tagsWrap}>
-                            {skills.map(skill => (
-                                <View key={skill} style={styles.tag}>
-                                    <Text style={styles.tagText}>{skill}</Text>
-                                    <TouchableOpacity onPress={() => removeSkill(skill)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                                        <Ionicons name="close" size={13} color="#7cce06" />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
-                        </View>
-                    )}
 
                     {/* Section: Links */}
                     <Text style={styles.sectionTitle}>{t('editProfile.links')} <Text style={styles.optionalPill}>{t('editProfile.optional')}</Text></Text>
@@ -337,6 +334,19 @@ const styles = StyleSheet.create({
         flexShrink: 0,
     },
     tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+    choice: {
+        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.04)',
+    },
+    choiceOn: { borderColor: '#7cce06', backgroundColor: 'rgba(124,206,6,0.15)' },
+    choiceText: { fontSize: 13, color: 'rgba(255,255,255,0.75)', fontWeight: '600' },
+    choiceTextOn: { color: '#7cce06' },
+    oldText: {
+        borderRadius: 12, padding: 12, marginBottom: 10,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)',
+    },
+    oldTextLabel: { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 },
+    oldTextBody: { fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 19 },
     tag: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: 'rgba(124,206,6,0.12)',

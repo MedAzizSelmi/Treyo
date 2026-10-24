@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentService {
 
     private final StudentRepository studentRepository;
+    private final SkillOptionService skillOptionService;
 
     public StudentProfileResponse getProfile(String studentId) {
         Student student = studentRepository.findByStudentId(studentId)
@@ -49,8 +50,12 @@ public class StudentService {
         Student student = studentRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
+        // Only fields and skills from the administrators' list: the skills
+        // show on the learner's public profile, so free text would be shown
+        // to everyone.
+        String[] skills = skillOptionService.checkChoices(request.getPrimaryDomains(), request.getSpecificInterests());
         student.setPrimaryDomains(request.getPrimaryDomains());
-        student.setSpecificInterests(request.getSpecificInterests());
+        student.setSpecificInterests(skills);
         student.setExperienceLevel(Levels.normalize(request.getExperienceLevel()));
 
         student = studentRepository.save(student);
@@ -64,7 +69,19 @@ public class StudentService {
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
         student.setCvUrl(request.getCvUrl());
-        student.setProfessionalExperience(request.getProfessionalExperience());
+        if (request.getExperienceEntries() != null) {
+            // Entries, as the onboarding CV screen and edit profile build
+            // them; the text is made from them so older readers still work.
+            var entries = com.byb.backend.util.ExperienceEntries.clean(request.getExperienceEntries(), java.time.YearMonth.now());
+            student.setExperienceEntries(com.byb.backend.util.ExperienceEntries.toJson(entries));
+            student.setProfessionalExperience(com.byb.backend.util.ExperienceEntries.toText(entries));
+        } else if (request.getProfessionalExperience() != null) {
+            // Text from an older app: it replaces the entries it no longer matches.
+            student.setProfessionalExperience(request.getProfessionalExperience());
+            student.setExperienceEntries(null);
+        }
+        // Neither sent: the experience is left as it is — edit profile only
+        // sends it when it was changed.
         student.setKeySkills(request.getKeySkills());
         student.setEducationLevel(request.getEducationLevel());
         student.setTrainingDomain(request.getTrainingDomain());
@@ -92,6 +109,7 @@ public class StudentService {
                 .experienceLevel(student.getExperienceLevel())
                 .cvUrl(student.getCvUrl())
                 .professionalExperience(student.getProfessionalExperience())
+                .experienceEntries(com.byb.backend.util.ExperienceEntries.fromJson(student.getExperienceEntries()))
                 .keySkills(student.getKeySkills())
                 .educationLevel(student.getEducationLevel())
                 .trainingDomain(student.getTrainingDomain())
@@ -154,8 +172,12 @@ public class StudentService {
         Student student = studentRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
 
+        // Only fields and skills from the administrators' list: the skills
+        // show on the learner's public profile, so free text would be shown
+        // to everyone.
+        String[] skills = skillOptionService.checkChoices(request.getPrimaryDomains(), request.getSpecificInterests());
         student.setPrimaryDomains(request.getPrimaryDomains());
-        student.setSpecificInterests(request.getSpecificInterests());
+        student.setSpecificInterests(skills);
         student.setExperienceLevel(Levels.normalize(request.getExperienceLevel()));
 
         student = studentRepository.save(student);

@@ -26,6 +26,7 @@ public class StudentProfileResponse {
     private String experienceLevel;
     private String cvUrl;
     private String professionalExperience;
+    private java.util.List<com.byb.backend.util.ExperienceEntries.Entry> experienceEntries;
     private String[] keySkills;
     private String educationLevel;
     private String trainingDomain;

@@ -15,6 +15,9 @@ public class TrainerProfilePage2Request {
 
     private String professionalExperience; // Optional, from CV or manual
 
+    /** When sent, replaces the experience, its text and experienceYears; null leaves them. */
+    private java.util.List<com.byb.backend.util.ExperienceEntries.Entry> experienceEntries;
+
     @NotEmpty(message = "Specializations are required")
     private String[] specializations;
 

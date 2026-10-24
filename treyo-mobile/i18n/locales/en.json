@@ -308,7 +308,8 @@
         "maxGroupsBody": "Recommendations pause when you hit this number; new spots free up as groups finish",
         "savedAvailability": "Availability updated",
         "suggestCourse": "Suggest a course",
-        "suggestCourseSubtitle": "Ask for a course that isn't here yet"
+        "suggestCourseSubtitle": "Ask for a course that isn't here yet",
+        "trainingGoalsCaps": "TRAINING GOALS"
     },
     "search": {
         "title": "Search",
@@ -453,7 +454,8 @@
         "keySkills": "Key Skills",
         "addSkill": "Add a skill...",
         "linkedinUrl": "LinkedIn URL",
-        "portfolioUrl": "Portfolio URL"
+        "portfolioUrl": "Portfolio URL",
+        "nameRequired": "Your name is required."
     },
     "groups": {
         "formingNow": "Groups Forming Now",
@@ -892,14 +894,16 @@
         "experiencePh": "e.g. 5 years in web development, led teams of 10…",
         "skillsPh": "e.g. React, Node.js, Python, Figma…",
         "selectEducation": "Select your education level",
-        "bioMin": "Please write a bio (minimum 50 characters).",
+        "bioMin": "Please write a bio of at least {{min}} characters.",
         "uploadFailedTitle": "Upload failed",
         "uploadFailedBody": "Could not upload your profile picture. You can add one later from your profile.",
         "profileTitle": "Your Profile",
         "profileSubtitle": "Tell learners about yourself",
         "addPicture": "Add Profile Picture",
         "optionalParen": "(Optional)",
-        "bioPh": "Tell learners about your experience, teaching style, and what makes you a great trainer… (min 50 characters)"
+        "bioPh": "Tell learners about your experience, teaching style, and what makes you a great trainer… (at least 100 characters)",
+        "bioCount": "{{count}} / {{min}} characters minimum",
+        "bioCountDone": "{{count}} characters"
     },
     "interestFields": {
         "informatique": "Computer Science",
@@ -913,19 +917,23 @@
     },
     "studentOnboarding": {
         "pickField": "Please select at least one field.",
-        "fieldsTitle": "What interests you?",
-        "fieldsSubtitle": "Select fields you want to learn",
+        "fieldsTitle": "What do you want to train in?",
+        "fieldsSubtitle": "Choose the fields you want to train in",
         "nextSelected": "Next ({{count}} selected)",
-        "pickInterest": "Please select at least one specific interest.",
-        "interestsSaveFailed": "Failed to save interests. Please try again.",
-        "interestsTitle": "What specifically?",
-        "interestsSubtitle": "Select your specific interests",
+        "pickInterest": "Choose at least one skill to develop.",
+        "interestsSaveFailed": "Could not save your skills. Please try again.",
+        "interestsTitle": "Which skills do you want to develop?",
+        "interestsSubtitle": "Choose the skills that matter for your work",
         "cvHint": "PDF or Word — fields auto-fill",
         "experiencePh": "e.g. 2 years studying data science, intern at…",
         "skillsPh": "e.g. Python, SQL, Communication, Excel…",
         "finish": "Finish",
         "done": "Upload done successfully",
-        "contactSubtitle": "So we can reach you about your groups"
+        "contactSubtitle": "So we can reach you about your groups",
+        "consent": "I confirm these are the skills I want to develop at this time.",
+        "confirmRequired": "Please confirm these are the skills you want to develop.",
+        "skillsLoadFailed": "Could not load the skills. Check your connection and try again.",
+        "noSkills": "No skills are listed for these fields yet. Go back and choose another field."
     },
     "groupOffer": {
         "kicker": "Your group is open",
@@ -1020,5 +1028,56 @@
         "withdrawBody": "We will stop looking for a trainer for it.",
         "unsupportTitle": "Remove yourself?",
         "unsupportBody": "You won't be told when this course is available."
+    },
+    "recommended": {
+        "subtitle": "Picked by our AI from your training goals",
+        "emptyTitle": "No recommendations yet",
+        "emptyBody": "We'll have suggestions for you once you've browsed a few courses or completed onboarding.",
+        "count_one": "{{count}} course for you",
+        "count_other": "{{count}} courses for you",
+        "count": "{{count}} courses for you"
+    },
+    "userProfile": {
+        "title": "Profile",
+        "loadFailed": "Couldn't load this profile.",
+        "unknown": "Unknown user",
+        "trainer": "Trainer",
+        "admin": "Admin",
+        "learner": "Learner",
+        "seeFull": "See full trainer profile",
+        "about": "About",
+        "specializations": "Specializations",
+        "trainingFields": "Training fields",
+        "skills": "Skills",
+        "trainingGoals": "Training goals"
+    },
+    "experience": {
+        "organization": "Organisation",
+        "organizationPh": "e.g. Vermeg",
+        "position": "Position",
+        "positionPh": "e.g. Full-stack developer",
+        "from": "From",
+        "to": "To",
+        "pick": "Pick",
+        "present": "Present",
+        "remove": "Remove this experience",
+        "add": "Add experience",
+        "pickMonth": "Choose the month",
+        "stillThere": "I still work here",
+        "none": "I don't have professional experience yet",
+        "addOneOrNone": "Add at least one experience, or tick that you don't have any yet.",
+        "needOrganization": "Each experience needs its organisation.",
+        "needPosition": "Each experience needs its position.",
+        "needFrom": "Choose when each experience started.",
+        "endBeforeStart": "An experience cannot end before it starts.",
+        "earlierText": "What you wrote before — add entries below to replace it",
+        "years_one": "{{count}} year",
+        "years_other": "{{count}} years",
+        "years": "{{count}} years"
+    },
+    "skillPicker": {
+        "placeholder": "Type a skill — e.g. C#, Communication",
+        "remove": "Remove {{skill}}",
+        "addTyped": "Add “{{skill}}”"
     }
 }

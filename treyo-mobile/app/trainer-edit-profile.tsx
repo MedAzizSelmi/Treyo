@@ -11,7 +11,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { authService, trainerService, fetchUpload, API_BASE_URL } from '../services/api';
 import api from '../services/api';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { SkillPicker } from '../components/SkillPicker';
 import { useTranslation } from 'react-i18next';
+import { TRAINER_BIO_MIN } from '../constants/profile';
 
 export default function TrainerEditProfileScreen() {
     const router = useRouter();
@@ -30,7 +32,6 @@ export default function TrainerEditProfileScreen() {
     const [experienceYears, setExperienceYears] = useState('');
     const [education, setEducation] = useState('');
     const [specializationInput, setSpecializationInput] = useState('');
-    const [skillInput, setSkillInput] = useState('');
 
     // Professional fields this screen shows but does not edit. The save
     // endpoint replaces the whole professional section, so they are sent
@@ -135,7 +136,11 @@ export default function TrainerEditProfileScreen() {
 
     const handleSave = async () => {
         if (!trainerId) return;
-        if (!bio.trim()) { Alert.alert(t('trainerEditProfile.required'), t('trainerEditProfile.bioRequired')); return; }
+        // The same minimum as onboarding: a bio could otherwise be cut to one word here.
+        if (bio.trim().length < TRAINER_BIO_MIN) {
+            Alert.alert(t('trainerEditProfile.required'), t('trainerOnboarding.bioMin', { min: TRAINER_BIO_MIN }));
+            return;
+        }
 
         // The professional section is saved only when it changed, and only
         // whole: the server requires specializations, skills and education.
@@ -242,6 +247,11 @@ export default function TrainerEditProfileScreen() {
                                 textAlignVertical="top"
                             />
                         </View>
+                        <Text style={[styles.bioCount, bio.trim().length >= TRAINER_BIO_MIN && { color: '#7cce06' }]}>
+                            {bio.trim().length >= TRAINER_BIO_MIN
+                                ? t('trainerOnboarding.bioCountDone', { count: bio.trim().length })
+                                : t('trainerOnboarding.bioCount', { count: bio.trim().length, min: TRAINER_BIO_MIN })}
+                        </Text>
                     </View>
 
                     {/* Experience + Education */}
@@ -317,38 +327,8 @@ export default function TrainerEditProfileScreen() {
                     {/* Skills */}
                     <View style={styles.fieldGroup}>
                         <Text style={styles.fieldLabel}>{t('trainerEditProfile.skills')}</Text>
-                        <View style={styles.inputWrap}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <TextInput
-                                style={styles.input}
-                                value={skillInput}
-                                onChangeText={setSkillInput}
-                                placeholder={t('trainerEditProfile.typeAndAdd')}
-                                placeholderTextColor="rgba(255,255,255,0.3)"
-                                onSubmitEditing={() => addTag(skillInput, skills, setSkills, setSkillInput)}
-                                returnKeyType="done"
-                            />
-                            <TouchableOpacity
-                                onPress={() => addTag(skillInput, skills, setSkills, setSkillInput)}
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            >
-                                <Ionicons name="add-circle" size={20} color="#7cce06" />
-                            </TouchableOpacity>
-                        </View>
-                        {skills.length > 0 && (
-                            <View style={styles.tagRow}>
-                                {skills.map((s, i) => (
-                                    <TouchableOpacity
-                                        key={i}
-                                        style={styles.tag}
-                                        onPress={() => removeTag(i, skills, setSkills)}
-                                    >
-                                        <Text style={styles.tagText}>{s}</Text>
-                                        <Ionicons name="close" size={12} color="#7cce06" />
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
+                        {/* Suggested from the Skills list as one types, as at onboarding. */}
+                        <SkillPicker value={skills} onChange={setSkills} />
                     </View>
 
                     {/* LinkedIn */}
@@ -438,6 +418,7 @@ export default function TrainerEditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+    bioCount: { fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 },
     scroll: { flex: 1 },
     scrollContent: { paddingBottom: 60, paddingHorizontal: 20 },
 

@@ -50,6 +50,11 @@ public class Trainer extends BaseEntity {
     @Column(name = "professional_experience", columnDefinition = "TEXT")
     private String professionalExperience;
 
+    /** Experience as entries, JSON (ExperienceEntries); professional_experience
+     *  holds the readable text made from them. */
+    @Column(name = "experience_entries", columnDefinition = "TEXT")
+    private String experienceEntries;
+
     // PostgreSQL array types - using @JdbcTypeCode annotation
     @Column(name = "specializations", columnDefinition = "text[]")
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.ARRAY)

@@ -308,7 +308,8 @@
         "maxGroupsBody": "Las recomendaciones se pausan al alcanzar este número; las plazas se liberan al terminar un grupo",
         "savedAvailability": "Disponibilidad actualizada",
         "suggestCourse": "Sugerir un curso",
-        "suggestCourseSubtitle": "Pide un curso que aún no existe"
+        "suggestCourseSubtitle": "Pide un curso que aún no existe",
+        "trainingGoalsCaps": "OBJETIVOS DE FORMACIÓN"
     },
     "search": {
         "title": "Buscar",
@@ -453,7 +454,8 @@
         "keySkills": "Habilidades clave",
         "addSkill": "Añadir habilidad...",
         "linkedinUrl": "URL de LinkedIn",
-        "portfolioUrl": "URL del portfolio"
+        "portfolioUrl": "URL del portfolio",
+        "nameRequired": "Tu nombre es obligatorio."
     },
     "groups": {
         "formingNow": "Grupos en formación",
@@ -892,14 +894,16 @@
         "experiencePh": "p. ej. 5 años en desarrollo web, dirigí equipos de 10…",
         "skillsPh": "p. ej. React, Node.js, Python, Figma…",
         "selectEducation": "Selecciona tu nivel de estudios",
-        "bioMin": "Escribe una biografía (mínimo 50 caracteres).",
+        "bioMin": "Escribe una biografía de al menos {{min}} caracteres.",
         "uploadFailedTitle": "Error al subir",
         "uploadFailedBody": "No se pudo subir tu foto de perfil. Puedes añadir una más tarde desde tu perfil.",
         "profileTitle": "Tu perfil",
         "profileSubtitle": "Preséntate a los estudiantes",
         "addPicture": "Añadir foto de perfil",
         "optionalParen": "(Opcional)",
-        "bioPh": "Cuenta a los estudiantes tu experiencia, tu forma de enseñar y qué te hace un gran formador… (mín. 50 caracteres)"
+        "bioPh": "Cuenta a los estudiantes tu experiencia, tu forma de enseñar y qué te hace un gran formador… (mínimo 100 caracteres)",
+        "bioCount": "{{count}} / {{min}} caracteres mínimo",
+        "bioCountDone": "{{count}} caracteres"
     },
     "interestFields": {
         "informatique": "Informática",
@@ -913,19 +917,23 @@
     },
     "studentOnboarding": {
         "pickField": "Elige al menos un área.",
-        "fieldsTitle": "¿Qué te interesa?",
-        "fieldsSubtitle": "Elige las áreas que quieres aprender",
+        "fieldsTitle": "¿En qué áreas quieres formarte?",
+        "fieldsSubtitle": "Elige las áreas en las que quieres formarte",
         "nextSelected": "Siguiente ({{count}} seleccionado(s))",
-        "pickInterest": "Elige al menos un interés específico.",
-        "interestsSaveFailed": "No se pudieron guardar tus intereses. Inténtalo de nuevo.",
-        "interestsTitle": "¿Qué en concreto?",
-        "interestsSubtitle": "Elige tus intereses específicos",
+        "pickInterest": "Elige al menos una habilidad a desarrollar.",
+        "interestsSaveFailed": "No se pudieron guardar tus habilidades. Inténtalo de nuevo.",
+        "interestsTitle": "¿Qué habilidades quieres desarrollar?",
+        "interestsSubtitle": "Elige las habilidades que importan para tu trabajo",
         "cvHint": "PDF o Word — los campos se rellenan solos",
         "experiencePh": "p. ej. 2 años estudiando ciencia de datos, prácticas en…",
         "skillsPh": "p. ej. Python, SQL, Comunicación, Excel…",
         "finish": "Terminar",
         "done": "Subida completada",
-        "contactSubtitle": "Para poder contactarte sobre tus grupos"
+        "contactSubtitle": "Para poder contactarte sobre tus grupos",
+        "consent": "Confirmo que estas son las habilidades que quiero desarrollar en este momento.",
+        "confirmRequired": "Confirma que estas son las habilidades que quieres desarrollar.",
+        "skillsLoadFailed": "No se pudieron cargar las habilidades. Revisa tu conexión e inténtalo de nuevo.",
+        "noSkills": "Todavía no hay habilidades para estas áreas. Vuelve y elige otra área."
     },
     "groupOffer": {
         "kicker": "Tu grupo está abierto",
@@ -1020,5 +1028,56 @@
         "withdrawBody": "Dejaremos de buscar un formador para este curso.",
         "unsupportTitle": "¿Quitarte?",
         "unsupportBody": "No se te avisará cuando este curso esté disponible."
+    },
+    "recommended": {
+        "subtitle": "Elegidos por nuestra IA según tus objetivos de formación",
+        "emptyTitle": "Aún no hay recomendaciones",
+        "emptyBody": "Tendremos sugerencias para ti cuando hayas visto algunos cursos o completado el registro.",
+        "count_one": "{{count}} curso para ti",
+        "count_other": "{{count}} cursos para ti",
+        "count": "{{count}} cursos para ti"
+    },
+    "userProfile": {
+        "title": "Perfil",
+        "loadFailed": "No se pudo cargar este perfil.",
+        "unknown": "Usuario desconocido",
+        "trainer": "Formador",
+        "admin": "Administrador",
+        "learner": "Alumno",
+        "seeFull": "Ver el perfil completo del formador",
+        "about": "Acerca de",
+        "specializations": "Especializaciones",
+        "trainingFields": "Áreas de formación",
+        "skills": "Habilidades",
+        "trainingGoals": "Objetivos de formación"
+    },
+    "experience": {
+        "organization": "Organización",
+        "organizationPh": "p. ej. Vermeg",
+        "position": "Puesto",
+        "positionPh": "p. ej. Desarrollador full-stack",
+        "from": "Desde",
+        "to": "Hasta",
+        "pick": "Elegir",
+        "present": "Actualidad",
+        "remove": "Quitar esta experiencia",
+        "add": "Añadir experiencia",
+        "pickMonth": "Elige el mes",
+        "stillThere": "Sigo trabajando aquí",
+        "none": "Aún no tengo experiencia profesional",
+        "addOneOrNone": "Añade al menos una experiencia o marca que aún no tienes.",
+        "needOrganization": "Cada experiencia necesita su organización.",
+        "needPosition": "Cada experiencia necesita su puesto.",
+        "needFrom": "Indica cuándo empezó cada experiencia.",
+        "endBeforeStart": "Una experiencia no puede terminar antes de empezar.",
+        "earlierText": "Lo que escribiste antes: añade experiencias abajo para reemplazarlo",
+        "years_one": "{{count}} año",
+        "years_other": "{{count}} años",
+        "years": "{{count}} años"
+    },
+    "skillPicker": {
+        "placeholder": "Escribe una habilidad, p. ej. C#, Comunicación",
+        "remove": "Quitar {{skill}}",
+        "addTyped": "Añadir «{{skill}}»"
     }
 }

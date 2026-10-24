@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../../components/ScreenBackground';
+import { ExperienceList } from '../../components/ExperienceList';
 import { ReviewsList } from '../../components/ReviewsList';
 
 export default function TrainerProfileScreen() {
@@ -90,9 +91,9 @@ export default function TrainerProfileScreen() {
         const exp = profile?.professionalExperience;
         if (exp && String(exp).trim()) return String(exp).trim();
         const years = profile?.experienceYears;
-        if (years && Number(years) > 0) return `${years} ${Number(years) === 1 ? 'year' : 'years'}`;
+        if (years && Number(years) > 0) return t('experience.years', { count: Number(years) });
         return null;
-    }, [profile?.professionalExperience, profile?.experienceYears]);
+    }, [profile?.professionalExperience, profile?.experienceYears, t]);
 
     // Location: stitched together from city + state (no single "location"
     // field exists on the DTO). Skips empty pieces gracefully.
@@ -238,7 +239,12 @@ export default function TrainerProfileScreen() {
                             </View>
                             <View style={styles.overviewCell}>
                                 <Text style={styles.overviewTitle}>{t('profile.experienceCaps')}</Text>
-                                <Text style={styles.overviewValue}>{experienceText || t('profile.notProvided')}</Text>
+                                {/* Entries since October 2026; older profiles show their text. */}
+                                <ExperienceList
+                                    entries={profile?.experienceEntries}
+                                    fallback={experienceText}
+                                    textStyle={styles.overviewValue}
+                                />
                             </View>
                             <View style={styles.overviewCell}>
                                 <Text style={styles.overviewTitle}>{t('profile.education')}</Text>
