@@ -51,63 +51,104 @@ public class NotificationService {
         pushNotificationService.sendToUser(userId, title, message, data);
     }
 
-    @Transactional
-    public void sendGroupFormingNotification(String studentId, String courseId,
-                                             String courseTitle, int currentCount, int minRequired) {
-        Notification notification = new Notification();
-        notification.setNotificationId("NOT_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
-        notification.setUserId(studentId);
-        notification.setUserType("student");
-        notification.setNotificationType("GROUP_FORMING");
-        notification.setTitle("Group Forming for " + courseTitle);
-        notification.setMessage(
-                String.format("Great news! We have %d/%d students interested in '%s'. " +
-                                "Confirm your presence to join the group!",
-                        currentCount, minRequired, courseTitle)
-        );
-        notification.setRelatedEntityType("course");
-        notification.setRelatedEntityId(courseId);
-        notification.setActionUrl("/courses/" + courseId + "/confirm");
-        notification.setPriority("high");
-        notification.setActionData(paramsJson(Map.of(
-                "course", courseTitle,
-                "current", currentCount,
-                "min", minRequired
-        )));
+    // ── The automated group flow (GroupAutomationService) ──────────────
+    //
+    // Every notification carries the group as its related entity: the
+    // automation reads them back to know what it has already sent, and the
+    // app opens the right screen from them. actionData holds the values
+    // the app needs to translate the title and message.
 
-        notificationRepository.save(notification);
-        firePush(notification.getUserId(), notification.getNotificationType(),
-                notification.getTitle(), notification.getMessage(),
-                notification.getRelatedEntityType(), notification.getRelatedEntityId());
+    private void sendForGroup(String userId, String userType, String type, String title, String message,
+                              String groupId, String priority, Map<String, Object> params) {
+        Notification n = new Notification();
+        n.setNotificationId("NOT_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
+        n.setUserId(userId);
+        n.setUserType(userType);
+        n.setNotificationType(type);
+        n.setTitle(title);
+        n.setMessage(message);
+        n.setRelatedEntityType("group");
+        n.setRelatedEntityId(groupId);
+        n.setPriority(priority);
+        n.setActionData(paramsJson(params));
+        notificationRepository.save(n);
+        firePush(userId, type, title, message, "group", groupId);
     }
 
+    /** Trainer: a group opened for your course — schedule its sessions. */
     @Transactional
-    public void sendGroupFormingNotificationToTrainer(String trainerId, String courseId,
-                                                      String courseTitle, int interestedCount) {
-        Notification notification = new Notification();
-        notification.setNotificationId("NOT_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
-        notification.setUserId(trainerId);
-        notification.setUserType("trainer");
-        notification.setNotificationType("GROUP_FORMING");
-        notification.setTitle("Students Interested in Your Course");
-        notification.setMessage(
-                String.format("%d students are interested in '%s'. " +
-                                "The group is forming!",
-                        interestedCount, courseTitle)
-        );
-        notification.setRelatedEntityType("course");
-        notification.setRelatedEntityId(courseId);
-        notification.setPriority("high");
-        notification.setActionData(paramsJson(Map.of(
-                "course", courseTitle,
-                "count", interestedCount
-        )));
-
-        notificationRepository.save(notification);
-        firePush(notification.getUserId(), notification.getNotificationType(),
-                notification.getTitle(), notification.getMessage(),
-                notification.getRelatedEntityType(), notification.getRelatedEntityId());
+    public void sendScheduleRequest(String trainerId, String groupId, String courseTitle, boolean reminder) {
+        sendForGroup(trainerId, "trainer", reminder ? "GROUP_SCHEDULE_REMINDER" : "GROUP_SCHEDULE_REQUEST",
+                (reminder ? "Reminder: schedule " : "Schedule the sessions for ") + courseTitle,
+                "Enough learners asked for '" + courseTitle + "'. Plan the group's sessions so they can be invited to join.",
+                groupId, "high", Map.of("course", courseTitle));
     }
+
+    /** Trainer: the administrator approved your schedule; learners are invited. */
+    @Transactional
+    public void sendScheduleApproved(String trainerId, String groupId, String courseTitle) {
+        sendForGroup(trainerId, "trainer", "GROUP_SCHEDULE_APPROVED",
+                "Schedule approved for " + courseTitle,
+                "Your sessions for '" + courseTitle + "' were approved and learners are being invited to join.",
+                groupId, "normal", Map.of("course", courseTitle));
+    }
+
+    /** Learner: a group is open — here are its dates, pay to join. */
+    @Transactional
+    public void sendPaymentOpen(String studentId, String groupId, String courseId, String courseTitle,
+                                String firstSession, int sessionCount) {
+        sendForGroup(studentId, "student", "GROUP_PAYMENT_OPEN",
+                "Your group for " + courseTitle + " is open",
+                "The sessions for '" + courseTitle + "' are scheduled, starting " + firstSession
+                        + ". Check the dates and pay to secure your place.",
+                groupId, "high", Map.of(
+                        "course", courseTitle, "courseId", courseId, "groupId", groupId,
+                        "firstSession", firstSession, "sessions", sessionCount));
+    }
+
+    /** Learner: two days before, the place is still unpaid. */
+    @Transactional
+    public void sendPaymentReminder(String studentId, String groupId, String courseId, String courseTitle,
+                                    String firstSession) {
+        sendForGroup(studentId, "student", "GROUP_PAYMENT_REMINDER",
+                "Last days to join " + courseTitle,
+                "The group for '" + courseTitle + "' starts " + firstSession
+                        + ". Pay now to keep your place: the group goes ahead without unpaid places the day before.",
+                groupId, "high", Map.of(
+                        "course", courseTitle, "courseId", courseId, "groupId", groupId, "firstSession", firstSession));
+    }
+
+    /** Learner or trainer: nobody paid, so the group did not go ahead. */
+    @Transactional
+    public void sendGroupClosed(String userId, String userType, String groupId, String courseTitle) {
+        boolean learner = "student".equals(userType);
+        sendForGroup(userId, userType, "GROUP_CLOSED",
+                "The group for " + courseTitle + " did not go ahead",
+                "Nobody joined the group for '" + courseTitle + "' before its first session, so it will not run."
+                        + (learner ? " Nothing was charged. If you are still interested, request the course again." : ""),
+                groupId, "normal", Map.of("course", courseTitle));
+    }
+
+    /** Learner: the group started without them; their request has ended. */
+    @Transactional
+    public void sendGroupMissed(String studentId, String groupId, String courseTitle) {
+        sendForGroup(studentId, "student", "GROUP_MISSED",
+                "The group for " + courseTitle + " has started",
+                "The group for '" + courseTitle + "' started without your place, as it was not paid. "
+                        + "If you are still interested, request the course again for the next group.",
+                groupId, "normal", Map.of("course", courseTitle));
+    }
+
+    /** Administrator: something in a group needs a person. Also recorded so it is sent once. */
+    @Transactional
+    public void sendAdminGroupAlert(String adminId, String type, String groupId, String title, String message,
+                                    String courseTitle) {
+        sendForGroup(adminId, "admin", type, title, message, groupId, "high", Map.of("course", courseTitle));
+    }
+
+    // The GROUP_FORMING senders went with the manual "notify interested"
+    // step in October 2026. The app still shows GROUP_FORMING
+    // notifications already sent.
 
     @Transactional
     public void sendOneToOneOfferNotification(String studentId, String courseId,

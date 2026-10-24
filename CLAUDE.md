@@ -115,6 +115,31 @@ learner-to-trainer contact is ever wanted, it is a product conversation first.
 **A comment saying something is deliberate is evidence.** Prefer asking over
 assuming a gap.
 
+**Groups form themselves, and there are no refunds.** Since October 2026
+`GroupAutomationService` runs the flow with no admin clicks except one:
+enough requests open a group and ask the trainer to schedule it; the
+trainer schedules; an admin approves the schedule (or edits it, or writes
+it) on the dashboard; every requester is told the dates and pays to join.
+48h before the first session admins get a call list of who has not paid
+(learners now give a phone number at onboarding for this) and those learners
+get a reminder; at 24h the group starts with whoever paid, or closes if
+nobody did — nothing is charged. Late joins stay open until the first
+session; then, or at closing, the unpaid invitees' requests are ended and
+they are told they can ask again, so the course page never shows a request
+that no longer counts. The way to pay is never only the notification: the
+course page shows "See dates & pay" (`GET /api/groups/course/{id}/my-offer`),
+and a learner already enrolled is refused before the gateway, not after.
+Trainers are reminded after 2 days without a schedule, admins after 5.
+Payment is refused before the gateway if the group is not approved, has
+started or is full, because LeanConsulting will not refund — that is the
+boss's call, for the organisation's image, so don't add a refund path.
+Once approved the trainer cannot change the schedule (409); an admin can.
+Only requests newer than a course's last group count towards the next one,
+so learners who were invited and didn't pay don't reopen it. Notifications
+double as the "already sent" record. Groups formed by hand before this
+(enrolments confirmed with no group) keep the dashboard's Form Group.
+`GroupFlowTest` walks the whole flow.
+
 ## Conventions
 
 Commit messages explain **why**, in prose, not bullet lists of what changed.

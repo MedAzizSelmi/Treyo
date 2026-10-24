@@ -114,7 +114,14 @@ public class EnrollmentService {
         enrollment.setStudentId(studentId);
         enrollment.setCourseId(courseId);
         enrollment.setGroupId(groupId);
-        enrollment.setEnrollmentStatus("confirmed");
+        // Joining a group that has already started (late, but before its
+        // first session): the learner is in from now. Otherwise confirmed,
+        // and active once the group starts.
+        Group joining = groupId == null ? null : groupRepository.findByGroupId(groupId).orElse(null);
+        boolean groupStarted = joining != null && joining.getGroupStatus() != null
+                && (joining.getGroupStatus().equalsIgnoreCase("ready") || joining.getGroupStatus().equalsIgnoreCase("active"));
+        enrollment.setEnrollmentStatus(groupStarted ? "active" : "confirmed");
+        if (groupStarted) enrollment.setStartedAt(LocalDateTime.now());
         enrollment.setPaymentStatus(isPaidCourse ? "paid" : "unpaid");
         enrollment.setAmountPaid(amountPaid);
         enrollment.setCardBrand(cardBrand);
@@ -160,6 +167,13 @@ public class EnrollmentService {
 
             group.setCurrentSize(group.getCurrentSize() + 1);
             groupRepository.save(group);
+
+            // This payment may complete the minimum; the group then starts.
+            // After commit, and never failing the confirmation.
+            events.publishEvent(new GroupAutomationService.JoinedGroup(enrollment.getEnrollmentId(), groupId));
+            if (groupStarted) {
+                notificationService.sendGroupReadyNotification(studentId, groupId, course.getTitle());
+            }
         }
 
         return enrollment;

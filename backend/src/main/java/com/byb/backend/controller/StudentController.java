@@ -43,6 +43,14 @@ public class StudentController {
         return ResponseEntity.ok(profile);
     }
 
+    @PutMapping("/me/contact")
+    @Operation(summary = "Update student phone and address (onboarding first step)")
+    public ResponseEntity<StudentProfileResponse> updateContact(
+            Authentication authentication,
+            @Valid @RequestBody com.byb.backend.dto.student.UpdateContactRequest request) {
+        return ResponseEntity.ok(studentService.updateContactByEmail(authentication.getName(), request));
+    }
+
     @PutMapping("/me/basic")
     @Operation(summary = "Update student name and bio")
     public ResponseEntity<StudentProfileResponse> updateBasicProfile(

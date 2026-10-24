@@ -55,7 +55,7 @@ export default function TwoFactorVerifyScreen() {
             if (!response.onboardingComplete) {
                 router.replace(isTrainer
                     ? '/onboarding/trainer/step1' as any
-                    : '/onboarding/student/step1' as any);
+                    : '/onboarding/student/contact' as any);
             } else {
                 router.replace(isTrainer
                     ? '/(trainer-tabs)/home' as any

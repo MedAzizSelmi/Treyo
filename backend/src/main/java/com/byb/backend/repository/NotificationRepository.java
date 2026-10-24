@@ -20,4 +20,14 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
 
     @Query("SELECT COUNT(n) FROM Notification n WHERE n.userId = :userId AND n.isRead = false")
     long countUnreadByUserId(String userId);
+
+    // GroupAutomationService uses notifications as its record of what it
+    // has already sent for a group (invitations, reminders, alerts), so a
+    // job that runs every 15 minutes sends each one once.
+    boolean existsByUserIdAndNotificationTypeAndRelatedEntityId(
+            String userId, String notificationType, String relatedEntityId);
+
+    boolean existsByNotificationTypeAndRelatedEntityId(String notificationType, String relatedEntityId);
+
+    List<Notification> findByNotificationTypeAndRelatedEntityId(String notificationType, String relatedEntityId);
 }

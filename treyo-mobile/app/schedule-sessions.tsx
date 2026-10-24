@@ -142,6 +142,10 @@ export default function ScheduleSessionsScreen() {
     };
 
     const durationHours: number = group?.courseDurationHours || 0;
+    // Approved by an administrator: learners are paying for these dates and
+    // there are no refunds, so the trainer can look but not change them.
+    // The server refuses the save as well; this keeps the screen honest.
+    const locked = !!group?.scheduleApprovedAt;
 
     // Running totals — the heart of the per-session-duration model.
     const totalScheduled = useMemo(
@@ -166,6 +170,7 @@ export default function ScheduleSessionsScreen() {
     }, [sessions]);
 
     const onDayPress = (day: { dateString: string }) => {
+        if (locked) return;
         const date = day.dateString;
         setSessions(prev => {
             const exists = prev.find(s => s.date === date);
@@ -194,16 +199,18 @@ export default function ScheduleSessionsScreen() {
     };
 
     const changeSessionHours = (date: string, delta: number) => {
+        if (locked) return;
         setSessions(prev => prev.map(s =>
             s.date === date ? { ...s, hours: Math.max(1, s.hours + delta) } : s));
     };
 
     const removeSession = (date: string) => {
+        if (locked) return;
         setSessions(prev => prev.filter(s => s.date !== date));
     };
 
     // Save only when the session hours add up to EXACTLY the course total.
-    const canSave = sessions.length > 0 && remaining === 0 && !saving;
+    const canSave = sessions.length > 0 && remaining === 0 && !saving && !locked;
 
     const handleSave = async () => {
         if (!canSave || !groupId) return;
@@ -223,11 +230,22 @@ export default function ScheduleSessionsScreen() {
         setSaving(true);
         try {
             await groupService.saveGroupSchedule(groupId, { sessions: sortedSessions });
-            Alert.alert(t('scheduleSessions.savedTitle'), t('scheduleSessions.savedBody'), [
+            // A group of the automated flow goes to an administrator next,
+            // and its learners are invited once they approve it.
+            const forReview = group?.groupStatus === 'forming';
+            Alert.alert(
+                t('scheduleSessions.savedTitle'),
+                forReview ? t('scheduleSessions.sentForReview') : t('scheduleSessions.savedBody'), [
                 { text: t('common.ok'), onPress: () => router.back() },
             ]);
         } catch (e: any) {
-            Alert.alert(t('scheduleSessions.saveFailedTitle'), e?.response?.data?.error || t('scheduleSessions.tryAgain'));
+            if (e?.response?.status === 409) {
+                // Approved while this screen was open.
+                setGroup((g: any) => ({ ...g, scheduleApprovedAt: g?.scheduleApprovedAt || new Date().toISOString() }));
+                Alert.alert(t('scheduleSessions.lockedTitle'), t('scheduleSessions.lockedBody'));
+            } else {
+                Alert.alert(t('scheduleSessions.saveFailedTitle'), e?.response?.data?.error || t('scheduleSessions.tryAgain'));
+            }
         } finally {
             setSaving(false);
         }
@@ -283,6 +301,13 @@ export default function ScheduleSessionsScreen() {
                     </View>
                 </View>
 
+                {locked && (
+                    <View style={[styles.tallyBanner, styles.tallyBannerExact]}>
+                        <Ionicons name="lock-closed" size={20} color={ACCENT} />
+                        <Text style={[styles.tallyText, { flex: 1 }]}>{t('scheduleSessions.lockedBody')}</Text>
+                    </View>
+                )}
+
                 {/* ── Running tally ── */}
                 <View style={[
                     styles.tallyBanner,
@@ -336,18 +361,21 @@ export default function ScheduleSessionsScreen() {
                                     </View>
                                     <Text style={styles.sessionDate}>{fmtDate(s.date)}</Text>
                                     <View style={{ flex: 1 }} />
-                                    <TouchableOpacity
-                                        onPress={() => removeSession(s.date)}
-                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                    >
-                                        <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.35)" />
-                                    </TouchableOpacity>
+                                    {!locked && (
+                                        <TouchableOpacity
+                                            onPress={() => removeSession(s.date)}
+                                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                        >
+                                            <Ionicons name="close-circle" size={20} color="rgba(255,255,255,0.35)" />
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
 
                                 {/* Bottom line: time chip + per-session duration stepper */}
                                 <View style={styles.sessionBottom}>
                                     <TouchableOpacity
                                         style={styles.timeChip}
+                                        disabled={locked}
                                         onPress={() => setTimePickerFor(
                                             sessions.findIndex(x => x.date === s.date))}
                                     >
@@ -377,18 +405,20 @@ export default function ScheduleSessionsScreen() {
                 )}
 
                 {/* ── Save ── */}
-                <TouchableOpacity
-                    style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-                    onPress={handleSave}
-                    disabled={!canSave}
-                    activeOpacity={0.85}
-                >
-                    {saving ? (
-                        <ActivityIndicator size="small" color="#000" />
-                    ) : (
-                        <Text style={styles.saveBtnText}>{saveLabel}</Text>
-                    )}
-                </TouchableOpacity>
+                {!locked && (
+                    <TouchableOpacity
+                        style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
+                        onPress={handleSave}
+                        disabled={!canSave}
+                        activeOpacity={0.85}
+                    >
+                        {saving ? (
+                            <ActivityIndicator size="small" color="#000" />
+                        ) : (
+                            <Text style={styles.saveBtnText}>{saveLabel}</Text>
+                        )}
+                    </TouchableOpacity>
+                )}
             </ScrollView>
 
             {/* ── Time picker modal ── */}

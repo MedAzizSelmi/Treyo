@@ -56,6 +56,9 @@ public class PaymentService {
     private final WebClient.Builder webClientBuilder;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final VatPolicy vatPolicy;
+    private final com.byb.backend.repository.GroupRepository groupRepository;
+    private final GroupAutomationService groupAutomation;
+    private final com.byb.backend.repository.EnrollmentRepository enrollmentRepository;
 
     /** ISO 4217 numeric code for the Tunisian dinar, per the manual. */
     private static final String CURRENCY_TND = "788";
@@ -143,6 +146,24 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalArgumentException("Student not found: " + studentId));
         Course course = courseRepository.findByCourseId(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found: " + courseId));
+
+        // Confirming refuses any learner who already has an enrollment in the
+        // course, so a second payment would be taken and never become a
+        // place — and there are no refunds. Refuse it before the gateway.
+        // Reachable: the learner's invitation keeps its button after they pay.
+        if (enrollmentRepository.findByStudentIdAndCourseId(studentId, courseId).isPresent()) {
+            throw new IllegalArgumentException("Already enrolled in this course");
+        }
+
+        // Joining a group: check it can take this learner BEFORE the card is
+        // charged — approved schedule, not started, not full. There are no
+        // refunds, so a payment must never be taken for a place that is not
+        // there.
+        if (groupId != null && !groupId.isBlank()) {
+            com.byb.backend.model.Group group = groupRepository.findById(groupId)
+                    .orElseThrow(() -> new IllegalArgumentException("Group not found."));
+            groupAutomation.checkJoinable(group, courseId, java.time.LocalDateTime.now());
+        }
 
         // ClicToPay bills in MILLIMES (1 TND = 1000) with no decimal
         // separator. Course.price is stored in major TND units, e.g. 49.99,

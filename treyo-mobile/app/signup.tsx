@@ -53,7 +53,7 @@ export default function SignupScreen() {
             router.replace(
                 response.onboardingComplete
                     ? (userType === 'STUDENT' ? '/(student-tabs)/home' : '/(trainer-tabs)/home') as any
-                    : (userType === 'STUDENT' ? '/onboarding/student/step1' : '/onboarding/trainer/step1') as any,
+                    : (userType === 'STUDENT' ? '/onboarding/student/contact' : '/onboarding/trainer/step1') as any,
             );
         } catch (error: any) {
             // The user closing the provider's sheet is not a failure.

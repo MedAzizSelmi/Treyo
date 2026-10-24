@@ -119,6 +119,26 @@ public class EmailService {
     }
 
     /**
+     * Something in the automated group flow needs an administrator: a
+     * schedule to review, learners to phone, a trainer who has not
+     * scheduled. Mailed as well as shown in the dashboard because the flow
+     * otherwise runs on its own and nobody is watching the screen.
+     */
+    @Async
+    public void sendAdminGroupAlert(String toEmail, String adminName, String subject, String body,
+                                    String dashboardUrl) {
+        String html = simpleTemplate(
+                subject,
+                "Hi " + safe(adminName == null || adminName.isBlank() ? "there" : adminName) + ",",
+                body,
+                dashboardUrl == null ? null : "Open the dashboard",
+                dashboardUrl,
+                "You receive this because you are a Treyo administrator."
+        );
+        send(toEmail, "Treyo — " + subject, html);
+    }
+
+    /**
      * Sent when an admin clicks "Approve" on a pending trainer. The
      * trainer can sign in immediately after — we tell them so they
      * know what to do next.

@@ -82,7 +82,7 @@ export default function TrainerOnboardingStep1() {
                     <View style={styles.header}>
                         <Text style={styles.title}>{t('trainerOnboarding.contactTitle')}</Text>
                         <Text style={styles.subtitle}>{t('trainerOnboarding.contactSubtitle')}</Text>
-                        <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 1 })}</Text>
+                        <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 1, total: 3 })}</Text>
                     </View>
 
                     <View style={styles.progressContainer}>

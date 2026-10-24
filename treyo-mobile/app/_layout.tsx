@@ -61,6 +61,12 @@ export default function RootLayout() {
             try {
                 if (data.type === 'group_message' && data.groupId) {
                     router.push({ pathname: '/group-chat' as any, params: { groupId: data.groupId } });
+                } else if ((data.type === 'GROUP_PAYMENT_OPEN' || data.type === 'GROUP_PAYMENT_REMINDER')
+                    && data.entityId) {
+                    router.push({ pathname: '/group-offer' as any, params: { groupId: data.entityId } });
+                } else if ((data.type === 'GROUP_SCHEDULE_REQUEST' || data.type === 'GROUP_SCHEDULE_REMINDER')
+                    && data.entityId) {
+                    router.push({ pathname: '/schedule-sessions' as any, params: { groupId: data.entityId } });
                 } else if (data.type) {
                     // Generic notification → drop into the notifications tab.
                     // Both student and trainer tabs have one.
@@ -106,6 +112,7 @@ export default function RootLayout() {
                 <Stack.Screen name="trainer-course-manage" />
                 <Stack.Screen name="trainer-profile" />
                 <Stack.Screen name="groups-forming" />
+                <Stack.Screen name="group-offer" />
                 <Stack.Screen name="recommended-courses" />
                 <Stack.Screen name="settings-privacy" />
                 <Stack.Screen name="settings-language" />
@@ -127,6 +134,7 @@ export default function RootLayout() {
                 <Stack.Screen name="trainer-pending" />
                 <Stack.Screen name="trainer-rejected" />
                 <Stack.Screen name="trainer-course-create" />
+                <Stack.Screen name="onboarding/student/contact" />
                 <Stack.Screen name="onboarding/student/step1" />
                 <Stack.Screen name="onboarding/student/step2" />
                 <Stack.Screen name="onboarding/student/step3" />

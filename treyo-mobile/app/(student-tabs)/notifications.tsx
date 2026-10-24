@@ -2,7 +2,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { ScreenBackground } from '../../components/ScreenBackground';
@@ -10,6 +10,7 @@ import { authService, notificationService, enrollmentService, interactionService
 
 export default function NotificationsScreen() {
     const { t } = useTranslation();
+    const router = useRouter();
     const [notifications, setNotifications] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -159,6 +160,21 @@ export default function NotificationsScreen() {
         }
     };
 
+    /** GROUP_PAYMENT_OPEN: the group's dates and the pay button live on
+     *  their own screen, which marks this notification read once paid. */
+    const openGroupOffer = (notif: any) => {
+        let data: any = {};
+        try {
+            data = typeof notif.actionData === 'string' ? JSON.parse(notif.actionData) : (notif.actionData || {});
+        } catch (_) {}
+        const groupId = data.groupId || notif.relatedEntityId;
+        if (!groupId || !data.courseId) return;
+        router.push({
+            pathname: '/group-offer' as any,
+            params: { groupId, courseId: data.courseId, notificationId: notif.notificationId },
+        });
+    };
+
     const handleMarkAllRead = async () => {
         const unread = notifications.filter(n => !n.isRead);
         await Promise.allSettled(unread.map(n => notificationService.markAsRead(n.notificationId)));
@@ -169,6 +185,10 @@ export default function NotificationsScreen() {
         switch (type) {
             case 'GROUP_FORMING': return 'people';
             case 'GROUP_READY': return 'checkmark-circle';
+            case 'GROUP_PAYMENT_OPEN': return 'calendar';
+            case 'GROUP_PAYMENT_REMINDER': return 'alarm';
+            case 'GROUP_CLOSED': return 'close-circle';
+            case 'GROUP_MISSED': return 'time';
             case 'ONE_TO_ONE_OFFER': return 'person';
             case 'ENROLLMENT_CONFIRMED': return 'school';
             case 'NEW_MESSAGE': return 'mail';
@@ -181,6 +201,10 @@ export default function NotificationsScreen() {
         switch (type) {
             case 'GROUP_FORMING': return '#7cce06';
             case 'GROUP_READY': return '#7cce06';
+            case 'GROUP_PAYMENT_OPEN': return '#7cce06';
+            case 'GROUP_PAYMENT_REMINDER': return '#FFA500';
+            case 'GROUP_CLOSED': return '#aaaaaa';
+            case 'GROUP_MISSED': return '#aaaaaa';
             case 'ONE_TO_ONE_OFFER': return '#3b5bdb';
             case 'ENROLLMENT_CONFIRMED': return '#FFA500';
             case 'NEW_MESSAGE': return '#FFA500';
@@ -283,6 +307,22 @@ export default function NotificationsScreen() {
                 titleKey: 'notifications.groupReadyTitle',
                 messageKey: 'notifications.groupReadyMessage',
             },
+            GROUP_PAYMENT_OPEN: {
+                titleKey: 'notifications.groupPaymentOpenTitle',
+                messageKey: 'notifications.groupPaymentOpenMessage',
+            },
+            GROUP_PAYMENT_REMINDER: {
+                titleKey: 'notifications.paymentReminderTitle',
+                messageKey: 'notifications.paymentReminderMessage',
+            },
+            GROUP_CLOSED: {
+                titleKey: 'notifications.groupClosedTitle',
+                messageKey: 'notifications.groupClosedMessage',
+            },
+            GROUP_MISSED: {
+                titleKey: 'notifications.groupMissedTitle',
+                messageKey: 'notifications.groupMissedMessage',
+            },
             ONE_TO_ONE_OFFER: {
                 titleKey: 'notifications.oneToOneTitle',
                 messageKey: 'notifications.oneToOneMessage',
@@ -299,7 +339,9 @@ export default function NotificationsScreen() {
         // If we still don't have the required params after both lookups,
         // give up on translation for this row and show the original
         // English text — better than literal "{{course}}" placeholders.
-        const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'ONE_TO_ONE_OFFER'].includes(notif.notificationType);
+        const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'GROUP_PAYMENT_OPEN', 'GROUP_PAYMENT_REMINDER',
+            'GROUP_CLOSED', 'GROUP_MISSED', 'ONE_TO_ONE_OFFER']
+            .includes(notif.notificationType);
         if (needsCourse && !params.course) {
             return { title: notif.title, message: notif.message };
         }
@@ -316,6 +358,12 @@ export default function NotificationsScreen() {
 
     const isActionable = (type: string) =>
         ['GROUP_FORMING', 'ONE_TO_ONE_OFFER', 'GROUP_READY'].includes(type);
+
+    /** An invitation to pay for a group. Its button stays after the
+     *  notification is read — reading it is not paying. The payment screen
+     *  says when the group is joined, full or started, and the server
+     *  refuses a second payment. */
+    const isOffer = (type: string) => type === 'GROUP_PAYMENT_OPEN' || type === 'GROUP_PAYMENT_REMINDER';
 
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -366,6 +414,7 @@ export default function NotificationsScreen() {
                     notifications.map((notif: any) => {
                         const color = getIconColor(notif.notificationType);
                         const actionable = isActionable(notif.notificationType) && !notif.isRead;
+                        const offer = isOffer(notif.notificationType);
                         const localized = translateNotification(notif);
                         return (
                             <TouchableOpacity
@@ -412,6 +461,17 @@ export default function NotificationsScreen() {
                                     <Text style={styles.message} numberOfLines={2}>{localized.message}</Text>
                                     <Text style={styles.time}>{formatTime(notif.createdAt)}</Text>
 
+                                    {offer && (
+                                        <View style={styles.actions}>
+                                            <TouchableOpacity
+                                                style={styles.confirmBtn}
+                                                onPress={() => openGroupOffer(notif)}
+                                                activeOpacity={0.85}
+                                            >
+                                                <Text style={styles.confirmText}>{t('notifications.seeDatesAndPay')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                     {actionable && (() => {
                                         const isGroupForming = notif.notificationType === 'GROUP_FORMING';
                                         const isProcessing = processingId === notif.notificationId;
@@ -447,7 +507,7 @@ export default function NotificationsScreen() {
                                         );
                                     })()}
 
-                                    {notif.isRead && (
+                                    {notif.isRead && !offer && (
                                         <Text style={styles.readLabel}>{t('notifications.read')}</Text>
                                     )}
                                 </View>
@@ -479,6 +539,7 @@ export default function NotificationsScreen() {
                             const localized = translateNotification(openNotif);
                             const color = getIconColor(openNotif.notificationType);
                             const actionable = isActionable(openNotif.notificationType) && !openNotif.isRead;
+                            const offer = isOffer(openNotif.notificationType);
                             const isGroupForming = openNotif.notificationType === 'GROUP_FORMING';
                             const isProcessing = processingId === openNotif.notificationId;
                             return (
@@ -496,6 +557,21 @@ export default function NotificationsScreen() {
                                     <ScrollView style={modalStyles.messageScroll} showsVerticalScrollIndicator={false}>
                                         <Text style={modalStyles.message}>{localized.message}</Text>
                                     </ScrollView>
+                                    {offer && (
+                                        <View style={modalStyles.actions}>
+                                            <TouchableOpacity
+                                                style={modalStyles.confirmBtn}
+                                                onPress={() => {
+                                                    const n = openNotif;
+                                                    setOpenNotif(null);
+                                                    openGroupOffer(n);
+                                                }}
+                                                activeOpacity={0.85}
+                                            >
+                                                <Text style={modalStyles.confirmText}>{t('notifications.seeDatesAndPay')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                     {actionable && (
                                         <View style={modalStyles.actions}>
                                             <TouchableOpacity

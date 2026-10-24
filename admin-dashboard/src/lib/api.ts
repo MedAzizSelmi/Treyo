@@ -144,8 +144,17 @@ export const cleanupStaleRequests = () => api.post('/admin/requests/cleanup');
 export const getAllGroups = () => api.get('/admin/groups');
 export const getCourseInterest = (courseId: string) =>
   api.get(`/admin/courses/${courseId}/interest`);
-export const notifyInterestedStudents = (courseId: string) =>
-  api.post(`/admin/courses/${courseId}/notify-interested`);
+// The automated group flow (backend GroupAutomationService): groups open
+// by themselves; an admin reviews and approves the schedule, which invites
+// the learners to pay, and phones the ones who have not near the deadline.
+export const approveGroupSchedule = (groupId: string) =>
+  api.put(`/admin/groups/${groupId}/approve-schedule`);
+export const getGroupCallList = (groupId: string) =>
+  api.get(`/admin/groups/${groupId}/call-list`);
+export const saveGroupSchedule = (
+  groupId: string,
+  sessions: { date: string; time: string; hours: number }[],
+) => api.put(`/groups/${groupId}/schedule`, { sessions });
 export const formCourseGroup = (courseId: string) =>
   api.post(`/admin/courses/${courseId}/form-group`);
 

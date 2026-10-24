@@ -176,7 +176,15 @@
         "courseCompleted": "🎉 اكتملت الدورة",
         "groupEnded": "انتهت المجموعة — المحادثة للقراءة فقط",
         "priceExclVat": "خ.ق.م",
-        "priceInclVat": "{{amount}} {{currency}} جميع الأداءات محتسبة"
+        "priceInclVat": "{{amount}} {{currency}} جميع الأداءات محتسبة",
+        "requestFailed": "تعذّر إرسال الطلب. يرجى المحاولة مجددًا.",
+        "favouriteFailed": "تعذّر تحديث المفضلة",
+        "tryAgain": "يرجى المحاولة مجددًا.",
+        "cancelRequestTitle": "إلغاء الطلب",
+        "cancelRequestBody": "هل أنت متأكد من سحب طلبك لهذه الدورة؟",
+        "keepRequest": "الإبقاء على الطلب",
+        "cancelFailed": "تعذّر إلغاء الطلب.",
+        "portfolio": "معرض الأعمال"
     },
     "schedule": {
         "myScheduleTitle": "جدولي",
@@ -374,7 +382,24 @@
         "oneToOneMessage": "المدرب يقدم جلسات فردية لدورة « {{course}} ». هل أنت مهتم؟",
         "groupReadyTitle": "المجموعة جاهزة للبدء!",
         "groupReadyMessage": "مجموعتك لدورة « {{course}} » جاهزة للبدء. تحقق من الجدول وتفاصيل اللقاء.",
-        "newMessageTitle": "رسالة جديدة من {{sender}}"
+        "newMessageTitle": "رسالة جديدة من {{sender}}",
+        "seeDatesAndPay": "عرض المواعيد والدفع",
+        "groupPaymentOpenTitle": "مجموعتك في {{course}} مفتوحة",
+        "groupPaymentOpenMessage": "تمت جدولة حصص «{{course}}» ابتداءً من {{firstSession}}. اطّلع على المواعيد وادفع لتضمن مكانك.",
+        "groupClosedTitle": "لن تنطلق مجموعة {{course}}",
+        "groupClosedMessage": "لم ينضم أحد إلى مجموعة «{{course}}» قبل حصتها الأولى، لذا لن تنطلق. لم يتم خصم أي مبلغ. إن كنت لا تزال مهتمًا، اطلب الدورة من جديد.",
+        "scheduleNow": "جدولة الحصص",
+        "viewSchedule": "عرض الجدول",
+        "scheduleRequestTitle": "جدول حصص {{course}}",
+        "scheduleReminderTitle": "تذكير: جدول {{course}}",
+        "scheduleRequestMessage": "طلب عدد كافٍ من المتعلمين «{{course}}». جدول حصص المجموعة حتى تتم دعوتهم للانضمام.",
+        "scheduleApprovedTitle": "تمت الموافقة على جدول {{course}}",
+        "scheduleApprovedMessage": "تمت الموافقة على حصصك في «{{course}}» وتجري دعوة المتعلمين للانضمام.",
+        "groupClosedTrainerMessage": "لم ينضم أحد إلى مجموعة «{{course}}» قبل حصتها الأولى، لذا لن تنطلق.",
+        "paymentReminderTitle": "آخر الأيام للانضمام إلى {{course}}",
+        "paymentReminderMessage": "تبدأ مجموعة «{{course}}» في {{firstSession}}. ادفع الآن لتحتفظ بمكانك: في اليوم السابق تنطلق المجموعة دون الأماكن غير المدفوعة.",
+        "groupMissedTitle": "بدأت مجموعة {{course}}",
+        "groupMissedMessage": "بدأت مجموعة «{{course}}» دون مكانك لأنه لم يُدفع. إن كنت لا تزال مهتمًا، اطلب الدورة من جديد للمجموعة القادمة."
     },
     "favorites": {
         "title": "المفضلة",
@@ -781,7 +806,10 @@
         "hour": "الساعة",
         "minute": "الدقيقة",
         "pickLater": "اختر وقتًا لاحقًا",
-        "setTime": "تعيين الوقت"
+        "setTime": "تعيين الوقت",
+        "sentForReview": "تم إرسال جدولك إلى المشرف. ستتم دعوة المتعلمين إلى الدفع فور الموافقة عليه.",
+        "lockedTitle": "تمت الموافقة على الجدول",
+        "lockedBody": "تمت الموافقة على هذا الجدول ويدفع المتعلمون مقابل هذه المواعيد، لذا لم يعد بالإمكان تغييره. تواصل مع المشرف."
     },
     "educationLevels": {
         "highSchool": "الثانوية",
@@ -818,7 +846,7 @@
         "saveFailed": "تعذّر الحفظ. يرجى المحاولة مجددًا.",
         "saving": "جارٍ الحفظ…",
         "continue": "متابعة",
-        "stepOf": "الخطوة {{step}} من 3",
+        "stepOf": "الخطوة {{step}} من {{total}}",
         "finalStep": "الخطوة 3 من 3 — الخطوة الأخيرة! 🎉",
         "signOut": "تسجيل الخروج",
         "contactTitle": "معلومات الاتصال",
@@ -877,6 +905,48 @@
         "experiencePh": "مثال: سنتان من دراسة علم البيانات، تدريب لدى…",
         "skillsPh": "مثال: Python، SQL، التواصل، Excel…",
         "finish": "إنهاء",
-        "done": "تم الرفع بنجاح"
+        "done": "تم الرفع بنجاح",
+        "contactSubtitle": "حتى نتمكن من التواصل معك بشأن مجموعاتك"
+    },
+    "groupOffer": {
+        "kicker": "مجموعتك مفتوحة",
+        "summary_one": "{{count}} حصة · {{hours}} س في المجموع",
+        "summary_other": "{{count}} حصص · {{hours}} س في المجموع",
+        "seatsLeft_one": "بقي {{count}} مكان",
+        "seatsLeft_other": "بقي {{count}} أماكن",
+        "sessions": "الحصص",
+        "noSessions": "لا توجد حصص مجدولة بعد.",
+        "hours_one": "{{count}} ساعة",
+        "hours_other": "{{count}} ساعات",
+        "price": "السعر",
+        "noRefund": "الدفع نهائي: لا تُستردّ قيمة الأماكن، حتى إن لم تتمكن من حضور بعض الحصص.",
+        "payAndJoin": "ادفع {{amount}} {{currency}} وانضم",
+        "joinFree": "انضم إلى المجموعة",
+        "joinedTitle": "تم الانضمام!",
+        "joinedBody": "تم تأكيد مكانك. الحصص الآن في جدولك.",
+        "alreadyJoined": "لقد انضممت إلى هذه المجموعة من قبل.",
+        "notPaidTitle": "لم يكتمل الدفع",
+        "notPaidBody": "لم يكتمل الدفع، لذلك لم تنضم بعد. يمكنك المحاولة مجددًا.",
+        "payFailed": "تعذّر بدء عملية الدفع.",
+        "full": "هذه المجموعة مكتملة.",
+        "alreadyStarted": "بدأت هذه المجموعة حصصها بالفعل.",
+        "notOpen": "هذه المجموعة غير مفتوحة للتسجيل.",
+        "notFound": "تعذّر العثور على هذه المجموعة.",
+        "summary": "{{count}} حصص · {{hours}} س في المجموع",
+        "seatsLeft": "بقي {{count}} أماكن",
+        "hours": "{{count}} ساعات"
+    },
+    "groupsForming": {
+        "subtitle": "دورات على وشك فتح مجموعة",
+        "sortProgress": "على وشك الاكتمال",
+        "sortNewest": "الأحدث",
+        "sortName": "أ–ي",
+        "emptyTitle": "لا توجد مجموعات قيد التكوين",
+        "emptyBody": "تظهر الدورات هنا عندما تبلغ 75٪ على الأقل من الطلبات اللازمة لفتح مجموعة. عُد قريبًا.",
+        "moreNeeded_one": "يلزم {{count}} طلب إضافي",
+        "moreNeeded_other": "يلزم {{count}} طلبات إضافية",
+        "moreNeeded": "يلزم {{count}} طلبات إضافية",
+        "trainer": "المدرّب",
+        "viewCourse": "عرض تفاصيل الدورة"
     }
 }

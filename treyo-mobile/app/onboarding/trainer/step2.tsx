@@ -184,7 +184,7 @@ export default function TrainerOnboardingStep2() {
                 {/* Header */}
                 <View style={styles.header}>
                     <Text style={styles.title}>{t('trainerOnboarding.uploadTitle')}</Text>
-                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 2 })}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 2, total: 3 })}</Text>
                 </View>
 
                 <View style={styles.progressContainer}>

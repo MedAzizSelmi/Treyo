@@ -176,7 +176,15 @@
         "courseCompleted": "🎉 Curso completado",
         "groupEnded": "Grupo finalizado — chat solo lectura",
         "priceExclVat": "Base imp.",
-        "priceInclVat": "{{amount}} {{currency}} IVA incluido"
+        "priceInclVat": "{{amount}} {{currency}} IVA incluido",
+        "requestFailed": "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+        "favouriteFailed": "No se pudieron actualizar los favoritos",
+        "tryAgain": "Inténtalo de nuevo.",
+        "cancelRequestTitle": "Cancelar solicitud",
+        "cancelRequestBody": "¿Seguro que quieres retirar tu solicitud para este curso?",
+        "keepRequest": "Mantener solicitud",
+        "cancelFailed": "No se pudo cancelar la solicitud.",
+        "portfolio": "Portafolio"
     },
     "schedule": {
         "myScheduleTitle": "Mi agenda",
@@ -374,7 +382,24 @@
         "oneToOneMessage": "El formador ofrece sesiones individuales para « {{course}} ». ¿Te interesa?",
         "groupReadyTitle": "¡El grupo está listo para empezar!",
         "groupReadyMessage": "Tu grupo de « {{course}} » está listo para empezar. Revisa el horario y los detalles del encuentro.",
-        "newMessageTitle": "Nuevo mensaje de {{sender}}"
+        "newMessageTitle": "Nuevo mensaje de {{sender}}",
+        "seeDatesAndPay": "Ver fechas y pagar",
+        "groupPaymentOpenTitle": "Tu grupo de {{course}} está abierto",
+        "groupPaymentOpenMessage": "Las sesiones de «{{course}}» están programadas a partir del {{firstSession}}. Revisa las fechas y paga para asegurar tu plaza.",
+        "groupClosedTitle": "El grupo de {{course}} no se realizará",
+        "groupClosedMessage": "Nadie se unió al grupo de «{{course}}» antes de su primera sesión, así que no se realizará. No se ha cobrado nada. Si sigues interesado, vuelve a solicitar el curso.",
+        "scheduleNow": "Programar las sesiones",
+        "viewSchedule": "Ver el calendario",
+        "scheduleRequestTitle": "Programa las sesiones de {{course}}",
+        "scheduleReminderTitle": "Recordatorio: programa {{course}}",
+        "scheduleRequestMessage": "Suficientes alumnos han pedido «{{course}}». Programa las sesiones del grupo para que puedan ser invitados a unirse.",
+        "scheduleApprovedTitle": "Calendario aprobado para {{course}}",
+        "scheduleApprovedMessage": "Tus sesiones de «{{course}}» han sido aprobadas y se está invitando a los alumnos a unirse.",
+        "groupClosedTrainerMessage": "Nadie se unió al grupo de «{{course}}» antes de su primera sesión, así que no se realizará.",
+        "paymentReminderTitle": "Últimos días para unirte a {{course}}",
+        "paymentReminderMessage": "El grupo de «{{course}}» empieza el {{firstSession}}. Paga ahora para conservar tu plaza: el día anterior el grupo arranca sin las plazas no pagadas.",
+        "groupMissedTitle": "El grupo de {{course}} ha comenzado",
+        "groupMissedMessage": "El grupo de «{{course}}» comenzó sin tu plaza, porque no se pagó. Si sigues interesado, vuelve a solicitar el curso para el próximo grupo."
     },
     "favorites": {
         "title": "Favoritos",
@@ -781,7 +806,10 @@
         "hour": "Hora",
         "minute": "Minuto",
         "pickLater": "Elige una hora posterior",
-        "setTime": "Fijar hora"
+        "setTime": "Fijar hora",
+        "sentForReview": "Tu calendario se ha enviado a un administrador. Se invitará a los alumnos a pagar en cuanto lo apruebe.",
+        "lockedTitle": "Calendario aprobado",
+        "lockedBody": "Este calendario fue aprobado y los alumnos están pagando por estas fechas, así que ya no se puede cambiar. Contacta con un administrador."
     },
     "educationLevels": {
         "highSchool": "Bachillerato",
@@ -818,7 +846,7 @@
         "saveFailed": "No se pudo guardar. Inténtalo de nuevo.",
         "saving": "Guardando…",
         "continue": "Continuar",
-        "stepOf": "Paso {{step}} de 3",
+        "stepOf": "Paso {{step}} de {{total}}",
         "finalStep": "Paso 3 de 3 — ¡Último paso! 🎉",
         "signOut": "Cerrar sesión",
         "contactTitle": "Información de contacto",
@@ -877,6 +905,48 @@
         "experiencePh": "p. ej. 2 años estudiando ciencia de datos, prácticas en…",
         "skillsPh": "p. ej. Python, SQL, Comunicación, Excel…",
         "finish": "Terminar",
-        "done": "Subida completada"
+        "done": "Subida completada",
+        "contactSubtitle": "Para poder contactarte sobre tus grupos"
+    },
+    "groupOffer": {
+        "kicker": "Tu grupo está abierto",
+        "summary_one": "{{count}} sesión · {{hours}} h en total",
+        "summary_other": "{{count}} sesiones · {{hours}} h en total",
+        "seatsLeft_one": "{{count}} plaza libre",
+        "seatsLeft_other": "{{count}} plazas libres",
+        "sessions": "Sesiones",
+        "noSessions": "Aún no hay sesiones programadas.",
+        "hours_one": "{{count}} hora",
+        "hours_other": "{{count}} horas",
+        "price": "Precio",
+        "noRefund": "El pago es definitivo: las plazas no se reembolsan, tampoco si no puedes asistir a algunas sesiones.",
+        "payAndJoin": "Pagar {{amount}} {{currency}} y unirme",
+        "joinFree": "Unirme al grupo",
+        "joinedTitle": "¡Estás dentro!",
+        "joinedBody": "Tu plaza está confirmada. Las sesiones ya están en tu calendario.",
+        "alreadyJoined": "Ya te has unido a este grupo.",
+        "notPaidTitle": "Pago no completado",
+        "notPaidBody": "Tu pago no se completó, así que aún no te has unido. Puedes intentarlo de nuevo.",
+        "payFailed": "No se pudo iniciar el pago.",
+        "full": "Este grupo está completo.",
+        "alreadyStarted": "Este grupo ya ha comenzado sus sesiones.",
+        "notOpen": "Este grupo no está abierto a inscripciones.",
+        "notFound": "No se encontró este grupo.",
+        "summary": "{{count}} sesiones · {{hours}} h en total",
+        "seatsLeft": "{{count}} plazas libres",
+        "hours": "{{count}} horas"
+    },
+    "groupsForming": {
+        "subtitle": "Cursos a punto de abrir un grupo",
+        "sortProgress": "Casi listos",
+        "sortNewest": "Más recientes",
+        "sortName": "A–Z",
+        "emptyTitle": "No hay grupos en formación",
+        "emptyBody": "Los cursos aparecen aquí cuando tienen al menos el 75 % de las solicitudes necesarias para abrir un grupo. Vuelve pronto.",
+        "moreNeeded_one": "Falta {{count}} solicitud",
+        "moreNeeded_other": "Faltan {{count}} solicitudes",
+        "moreNeeded": "Faltan {{count}} solicitudes",
+        "trainer": "Formador",
+        "viewCourse": "Ver el curso"
     }
 }

@@ -6,6 +6,7 @@ import com.byb.backend.repository.EnrollmentRepository;
 import com.byb.backend.repository.InteractionRepository;
 import com.byb.backend.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class InteractionService {
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final MLRecommendationService mlRecommendationService;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public void trackInterest(String studentId, String courseId) {
@@ -60,7 +62,11 @@ public class InteractionService {
         }
 
         mlRecommendationService.trackInteraction(studentId, courseId, "clicked_interested");
-        // Note: group formation is now admin-driven (POST /admin/courses/{id}/notify-interested)
+
+        // This may be the request that opens a group, or the learner may be
+        // invited to one that is open. Handled once this is committed so
+        // the count includes it; see GroupAutomationService.
+        events.publishEvent(new GroupAutomationService.InterestRegistered(studentId, courseId));
     }
 
     @Transactional

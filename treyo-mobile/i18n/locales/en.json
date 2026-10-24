@@ -176,7 +176,15 @@
         "courseCompleted": "🎉 Course completed",
         "groupEnded": "Group ended — chat is read-only",
         "priceExclVat": "excl. VAT",
-        "priceInclVat": "{{amount}} {{currency}} incl. VAT"
+        "priceInclVat": "{{amount}} {{currency}} incl. VAT",
+        "requestFailed": "Could not send the request. Please try again.",
+        "favouriteFailed": "Could not update favourites",
+        "tryAgain": "Please try again.",
+        "cancelRequestTitle": "Cancel request",
+        "cancelRequestBody": "Are you sure you want to withdraw your request for this course?",
+        "keepRequest": "Keep request",
+        "cancelFailed": "Could not cancel the request.",
+        "portfolio": "Portfolio"
     },
     "schedule": {
         "myScheduleTitle": "My Schedule",
@@ -374,7 +382,24 @@
         "oneToOneMessage": "The trainer is offering one-to-one sessions for '{{course}}'. Are you interested?",
         "groupReadyTitle": "Group Ready to Start!",
         "groupReadyMessage": "Your group for '{{course}}' is ready to start. Check the schedule and meeting details.",
-        "newMessageTitle": "New Message from {{sender}}"
+        "newMessageTitle": "New Message from {{sender}}",
+        "seeDatesAndPay": "See dates & pay",
+        "groupPaymentOpenTitle": "Your group for {{course}} is open",
+        "groupPaymentOpenMessage": "The sessions for '{{course}}' are scheduled, starting {{firstSession}}. Check the dates and pay to secure your place.",
+        "groupClosedTitle": "The group for {{course}} did not go ahead",
+        "groupClosedMessage": "Nobody joined the group for '{{course}}' before its first session, so it will not run. Nothing was charged. If you are still interested, request the course again.",
+        "scheduleNow": "Schedule the sessions",
+        "viewSchedule": "View the schedule",
+        "scheduleRequestTitle": "Schedule the sessions for {{course}}",
+        "scheduleReminderTitle": "Reminder: schedule {{course}}",
+        "scheduleRequestMessage": "Enough learners asked for '{{course}}'. Plan the group's sessions so they can be invited to join.",
+        "scheduleApprovedTitle": "Schedule approved for {{course}}",
+        "scheduleApprovedMessage": "Your sessions for '{{course}}' were approved and learners are being invited to join.",
+        "groupClosedTrainerMessage": "Nobody joined the group for '{{course}}' before its first session, so it will not run.",
+        "paymentReminderTitle": "Last days to join {{course}}",
+        "paymentReminderMessage": "The group for '{{course}}' starts {{firstSession}}. Pay now to keep your place: the group goes ahead without unpaid places the day before.",
+        "groupMissedTitle": "The group for {{course}} has started",
+        "groupMissedMessage": "The group for '{{course}}' started without your place, as it was not paid. If you are still interested, request the course again for the next group."
     },
     "favorites": {
         "title": "Favorites",
@@ -781,7 +806,10 @@
         "hour": "Hour",
         "minute": "Minute",
         "pickLater": "Pick a later time",
-        "setTime": "Set time"
+        "setTime": "Set time",
+        "sentForReview": "Your schedule was sent to an administrator. Learners are invited to pay once it is approved.",
+        "lockedTitle": "Schedule approved",
+        "lockedBody": "This schedule was approved and learners are paying for these dates, so it can no longer be changed. Contact an administrator."
     },
     "educationLevels": {
         "highSchool": "High School",
@@ -818,7 +846,7 @@
         "saveFailed": "Failed to save. Please try again.",
         "saving": "Saving…",
         "continue": "Continue",
-        "stepOf": "Step {{step}} of 3",
+        "stepOf": "Step {{step}} of {{total}}",
         "finalStep": "Step 3 of 3 — Final Step! 🎉",
         "signOut": "Sign out",
         "contactTitle": "Contact Information",
@@ -877,6 +905,48 @@
         "experiencePh": "e.g. 2 years studying data science, intern at…",
         "skillsPh": "e.g. Python, SQL, Communication, Excel…",
         "finish": "Finish",
-        "done": "Upload done successfully"
+        "done": "Upload done successfully",
+        "contactSubtitle": "So we can reach you about your groups"
+    },
+    "groupOffer": {
+        "kicker": "Your group is open",
+        "summary_one": "{{count}} session · {{hours}} h in total",
+        "summary_other": "{{count}} sessions · {{hours}} h in total",
+        "seatsLeft_one": "{{count}} place left",
+        "seatsLeft_other": "{{count}} places left",
+        "sessions": "Sessions",
+        "noSessions": "No sessions scheduled yet.",
+        "hours_one": "{{count}} hour",
+        "hours_other": "{{count}} hours",
+        "price": "Price",
+        "noRefund": "Payment is final: places are not refunded, including if you cannot attend some sessions.",
+        "payAndJoin": "Pay {{amount}} {{currency}} and join",
+        "joinFree": "Join the group",
+        "joinedTitle": "You're in!",
+        "joinedBody": "Your place is confirmed. The sessions are now in your schedule.",
+        "alreadyJoined": "You have already joined this group.",
+        "notPaidTitle": "Payment not completed",
+        "notPaidBody": "Your payment was not completed, so you have not joined yet. You can try again.",
+        "payFailed": "Could not start the payment.",
+        "full": "This group is full.",
+        "alreadyStarted": "This group has already started its sessions.",
+        "notOpen": "This group is not open for enrollment.",
+        "notFound": "This group could not be found.",
+        "summary": "{{count}} sessions · {{hours}} h in total",
+        "seatsLeft": "{{count}} places left",
+        "hours": "{{count}} hours"
+    },
+    "groupsForming": {
+        "subtitle": "Courses close to opening a group",
+        "sortProgress": "Almost there",
+        "sortNewest": "Newest",
+        "sortName": "A–Z",
+        "emptyTitle": "No groups forming",
+        "emptyBody": "Courses appear here once they have at least 75% of the requests needed to open a group. Check back soon.",
+        "moreNeeded_one": "{{count}} more request needed",
+        "moreNeeded_other": "{{count}} more requests needed",
+        "moreNeeded": "{{count}} more requests needed",
+        "trainer": "Trainer",
+        "viewCourse": "View course details"
     }
 }

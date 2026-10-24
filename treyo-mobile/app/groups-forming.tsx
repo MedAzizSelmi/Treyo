@@ -3,6 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { levelLabel } from '../utils/courseLabels';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { courseService } from '../services/api';
 
@@ -16,6 +18,7 @@ const GROUP_FORMING_THRESHOLD = 0.75;
 
 export default function GroupsFormingScreen() {
     const router = useRouter();
+    const { t } = useTranslation();
     const [courses, setCourses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [sort, setSort] = useState<SortMode>('progress');
@@ -92,16 +95,16 @@ export default function GroupsFormingScreen() {
                         <Ionicons name="arrow-back" size={22} color="#ffffff" />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.headerTitle}>Groups Forming Now</Text>
-                        <Text style={styles.headerSubtitle}>Join before they fill up</Text>
+                        <Text style={styles.headerTitle}>{t('home.groupsForming')}</Text>
+                        <Text style={styles.headerSubtitle}>{t('groupsForming.subtitle')}</Text>
                     </View>
                 </View>
 
                 {/* ── Sort row ── */}
                 <View style={styles.sortRow}>
-                    <SortPill mode="progress" label="Almost full" />
-                    <SortPill mode="newest" label="Newest" />
-                    <SortPill mode="name" label="A–Z" />
+                    <SortPill mode="progress" label={t('groupsForming.sortProgress')} />
+                    <SortPill mode="newest" label={t('groupsForming.sortNewest')} />
+                    <SortPill mode="name" label={t('groupsForming.sortName')} />
                 </View>
 
                 {loading ? (
@@ -113,11 +116,8 @@ export default function GroupsFormingScreen() {
                         <View style={styles.emptyIconWrap}>
                             <Ionicons name="people-outline" size={48} color="rgba(124,206,6,0.4)" />
                         </View>
-                        <Text style={styles.emptyTitle}>No groups forming</Text>
-                        <Text style={styles.emptySubtitle}>
-                            Groups appear here once they&apos;re at least 75% of the way to their minimum
-                            student count. Check back soon — interest is building.
-                        </Text>
+                        <Text style={styles.emptyTitle}>{t('groupsForming.emptyTitle')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('groupsForming.emptyBody')}</Text>
                     </View>
                 ) : (
                     formingGroups.map(course => {
@@ -135,19 +135,17 @@ export default function GroupsFormingScreen() {
                                 <View style={styles.cardTop}>
                                     <View style={styles.domainBadge}>
                                         <Ionicons name="people" size={14} color="#7cce06" />
-                                        <Text style={styles.domainText}>{course.domain || course.level || 'Course'}</Text>
+                                        <Text style={styles.domainText}>{course.domain || t('home.course')}</Text>
                                     </View>
                                     <View style={styles.spotsBadge}>
                                         <Text style={styles.spotsText}>
-                                            {course._min - course._enrolled === 1
-                                                ? '1 spot left'
-                                                : `${course._min - course._enrolled} spots left`}
+                                            {t('groupsForming.moreNeeded', { count: course._min - course._enrolled })}
                                         </Text>
                                     </View>
                                 </View>
 
                                 <Text style={styles.cardTitle} numberOfLines={2}>{course.title}</Text>
-                                <Text style={styles.cardTrainer}>{course.trainerName || 'Trainer'}</Text>
+                                <Text style={styles.cardTrainer}>{course.trainerName || t('groupsForming.trainer')}</Text>
 
                                 {/* Progress */}
                                 <View style={styles.progressRow}>
@@ -162,7 +160,7 @@ export default function GroupsFormingScreen() {
                                     {course.level && (
                                         <View style={styles.metaChip}>
                                             <Ionicons name="bar-chart-outline" size={12} color="#aaaaaa" />
-                                            <Text style={styles.metaText}>{course.level}</Text>
+                                            <Text style={styles.metaText}>{levelLabel(t, course.level)}</Text>
                                         </View>
                                     )}
                                     {course.durationHours && (
@@ -183,7 +181,7 @@ export default function GroupsFormingScreen() {
                                     The request action lives on the course-detail page now,
                                     so we don't have two paths into the funnel to keep in sync. */}
                                 <View style={styles.viewHintRow}>
-                                    <Text style={styles.viewHintText}>View course details</Text>
+                                    <Text style={styles.viewHintText}>{t('groupsForming.viewCourse')}</Text>
                                     <Ionicons name="chevron-forward" size={16} color="#7cce06" />
                                 </View>
                             </TouchableOpacity>

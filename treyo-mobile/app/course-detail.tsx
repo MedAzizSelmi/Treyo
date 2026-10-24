@@ -28,6 +28,10 @@ export default function CourseDetailScreen() {
     const [actionLoading, setActionLoading] = useState(false);
     const [interested, setInterested] = useState(false);
     const [enrolled, setEnrolled] = useState(false);
+    // A group of this course the learner was invited to and can still pay
+    // to join. Shown in place of "Requested" so the way to pay is never
+    // only the notification, which can be read or cleared.
+    const [offer, setOffer] = useState<{ groupId: string } | null>(null);
     // Scheduled sessions for this specific course (filtered from the
     // student's full session list). Only shown once `enrolled` is true.
     const [courseSessions, setCourseSessions] = useState<any[]>([]);
@@ -67,6 +71,9 @@ export default function CourseDetailScreen() {
                     const status = await interactionService.getStatus(user.userId, courseId);
                     setInterested(!!status.interested);
                     setEnrolled(!!status.enrolled);
+                    if (!status.enrolled) {
+                        groupService.getMyOffer(courseId).then(setOffer).catch(() => {});
+                    }
                     // If the student is enrolled, fetch their sessions and
                     // keep only the ones for this course. Failures are silent
                     // — schedule section just stays empty.
@@ -123,7 +130,7 @@ export default function CourseDetailScreen() {
         } catch (e: any) {
             // Roll back the optimistic flip if the call actually failed
             setInterested(false);
-            Alert.alert('Error', e?.response?.data?.message || 'Could not send request. Please try again.');
+            Alert.alert(t('common.error'), e?.response?.data?.message || t('course.requestFailed'));
         } finally {
             requestInFlight.current = false;
             setActionLoading(false);
@@ -147,8 +154,8 @@ export default function CourseDetailScreen() {
         } catch (e: any) {
             setSaved(previous); // roll back
             Alert.alert(
-                'Could not update favourites',
-                e?.response?.data?.message || 'Please try again.',
+                t('course.favouriteFailed'),
+                e?.response?.data?.message || t('course.tryAgain'),
             );
         } finally {
             setSaveInFlight(false);
@@ -158,12 +165,12 @@ export default function CourseDetailScreen() {
     const handleCancelRequest = async () => {
         if (!userId || !courseId || requestInFlight.current) return;
         Alert.alert(
-            'Cancel Request',
-            'Are you sure you want to withdraw your interest from this course?',
+            t('course.cancelRequestTitle'),
+            t('course.cancelRequestBody'),
             [
-                { text: 'Keep Request', style: 'cancel' },
+                { text: t('course.keepRequest'), style: 'cancel' },
                 {
-                    text: 'Cancel Request', style: 'destructive', onPress: async () => {
+                    text: t('course.cancelRequestTitle'), style: 'destructive', onPress: async () => {
                         if (requestInFlight.current) return;
                         requestInFlight.current = true;
                         setActionLoading(true);
@@ -171,7 +178,7 @@ export default function CourseDetailScreen() {
                             await interactionService.cancelInterest(userId, courseId);
                             setInterested(false);
                         } catch (e: any) {
-                            Alert.alert('Error', e?.response?.data?.message || 'Could not cancel request.');
+                            Alert.alert(t('common.error'), e?.response?.data?.message || t('course.cancelFailed'));
                         } finally {
                             requestInFlight.current = false;
                             setActionLoading(false);
@@ -538,7 +545,7 @@ export default function CourseDetailScreen() {
                                             style={styles.linkBtn}
                                         >
                                             <Ionicons name="globe-outline" size={14} color="#7cce06" />
-                                            <Text style={styles.linkText}>Portfolio</Text>
+                                            <Text style={styles.linkText}>{t('course.portfolio')}</Text>
                                         </TouchableOpacity>
                                     )}
                                 </View>
@@ -582,6 +589,18 @@ export default function CourseDetailScreen() {
                             <Ionicons name="checkmark-circle" size={17} color="#000" />
                             <Text style={styles.enrollBtnText}>{t('course.enrolled')}</Text>
                         </View>
+                    ) : offer ? (
+                        <TouchableOpacity
+                            style={styles.enrollBtn}
+                            onPress={() => router.push({
+                                pathname: '/group-offer' as any,
+                                params: { groupId: offer.groupId, courseId },
+                            })}
+                            activeOpacity={0.85}
+                        >
+                            <Ionicons name="calendar-outline" size={17} color="#000" />
+                            <Text style={styles.enrollBtnText}>{t('notifications.seeDatesAndPay')}</Text>
+                        </TouchableOpacity>
                     ) : interested ? (
                         <View style={styles.actionGroup}>
                             <View style={[styles.requestedBtn]}>
@@ -597,7 +616,7 @@ export default function CourseDetailScreen() {
                                 {actionLoading ? (
                                     <ActivityIndicator size="small" color="#ff6b6b" />
                                 ) : (
-                                    <Text style={styles.cancelRequestText}>Cancel</Text>
+                                    <Text style={styles.cancelRequestText}>{t('common.cancel')}</Text>
                                 )}
                             </TouchableOpacity>
                         </View>

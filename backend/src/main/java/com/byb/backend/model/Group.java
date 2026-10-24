@@ -61,4 +61,13 @@ public class Group extends BaseEntity {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    /**
+     * When an administrator approved the session schedule. Until then the
+     * group is being prepared; once set, learners are invited to pay and
+     * the trainer can no longer change the schedule. Null for groups
+     * formed under the old flow. See GroupAutomationService.
+     */
+    @Column(name = "schedule_approved_at")
+    private LocalDateTime scheduleApprovedAt;
 }

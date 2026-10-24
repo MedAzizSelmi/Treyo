@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getRequestedCourses,
   getCourseInterest,
-  notifyInterestedStudents,
   formCourseGroup,
   cleanupStaleRequests,
 } from '@/lib/api';
@@ -93,28 +92,6 @@ export default function RequestsPage() {
       const res = await getCourseInterest(selected.courseId);
       setInterest(res.data);
     } catch (err) { console.error(err); }
-  };
-
-  const askNotify = () => {
-    if (!interest) return;
-    setConfirmDialog({
-      open: true,
-      title: 'Send Group-Forming Notifications',
-      message: `Notify all ${interest.interestedCount} interested student${interest.interestedCount === 1 ? '' : 's'} that a group is forming for "${interest.courseTitle}"? They'll be asked to confirm their participation.`,
-      confirmLabel: 'Send Notifications',
-      variant: 'success',
-      action: async () => {
-        setActionLoading(true);
-        try {
-          const res = await notifyInterestedStudents(selected.courseId);
-          await refreshInterest();
-          await loadRequested();
-          showToast({ kind: 'success', text: `Notified ${res.data?.notifiedCount || 0} student(s)` });
-        } catch (err: any) {
-          showToast({ kind: 'error', text: err?.response?.data?.error || err?.message || 'Failed to notify' });
-        } finally { setActionLoading(false); }
-      },
-    });
   };
 
   const askCleanup = () => {
@@ -327,22 +304,23 @@ export default function RequestsPage() {
                   <FunnelStat icon={Users} label="Min Required" value={interest.minStudentsRequired} tone="muted" />
                 </div>
 
-                <ActionPanel
-                  step={1}
-                  icon={Send}
-                  tone="warning"
-                  title="Notify Interested Students"
-                  description={
-                    interest.canNotify
-                      ? 'Minimum reached — send students a request to confirm their spot.'
-                      : `Need ${interest.minStudentsRequired - interest.interestedCount} more interested student(s) before notifying.`
-                  }
-                  buttonLabel={`Send Notifications (${interest.interestedCount})`}
-                  buttonIcon={Send}
-                  disabled={!interest.canNotify || actionLoading || interest.interestedCount === 0}
-                  onClick={askNotify}
-                />
+                {/* Groups open by themselves now (GroupAutomationService):
+                    there is no "notify" step to click. */}
+                <div className="rounded-xl border border-accent/25 bg-accent/[0.05] p-4 flex gap-3">
+                  <Send className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-foreground/85 leading-relaxed">
+                    {interest.hasFormingGroup
+                      ? 'A group for this course is being prepared — follow it on the Groups page.'
+                      : interest.canNotify
+                        ? 'The minimum is reached: a group opens automatically as soon as the trainer is available, and appears on the Groups page.'
+                        : `A group opens automatically once ${interest.minStudentsRequired - interest.interestedCount} more learner(s) ask for this course.`}
+                    {' '}The trainer schedules it, you approve the schedule, and the learners are then invited to pay.
+                  </p>
+                </div>
 
+                {/* The old flow: learners who paid before groups were opened
+                    automatically still need forming the old way. */}
+                {interest.confirmedCount > 0 && (
                 <ActionPanel
                   step={2}
                   icon={GitBranch}
@@ -358,6 +336,7 @@ export default function RequestsPage() {
                   disabled={!interest.canFormGroup || actionLoading}
                   onClick={askFormGroup}
                 />
+                )}
 
                 <div>
                   <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">

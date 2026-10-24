@@ -123,6 +123,21 @@ public class StudentService {
         return mapToProfileResponse(student);
     }
 
+    /** Onboarding's contact step, the same one trainers have. */
+    @Transactional
+    public StudentProfileResponse updateContactByEmail(String email,
+                                                       com.byb.backend.dto.student.UpdateContactRequest request) {
+        Student student = studentRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+        student.setPhone(request.getPhone().trim());
+        student.setAddress(request.getAddress().trim());
+        student.setCity(request.getCity().trim());
+        student.setState(request.getState().trim());
+        student.setPostalCode(request.getPostalCode().trim());
+        student = studentRepository.save(student);
+        return mapToProfileResponse(student);
+    }
+
     @Transactional
     public StudentProfileResponse updateProfilePictureByEmail(String email, String profilePictureUrl) {
         Student student = studentRepository.findByEmail(email)

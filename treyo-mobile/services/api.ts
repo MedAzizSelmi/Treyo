@@ -29,7 +29,7 @@ const PRODUCTION_API_URL: string =
     '';
 
 // Last-resort LAN fallback for development only.
-const MANUAL_OVERRIDE = 'http://192.168.1.138:8085';
+const MANUAL_OVERRIDE = 'http://192.168.0.188:8085';
 
 function resolveApiBase(): string {
     // hostUri looks like "192.168.100.68:8081" or "localhost:8081"
@@ -768,6 +768,14 @@ export const groupService = {
         return response.data;
     },
 
+    /** The group of this course the signed-in learner was invited to and
+     *  can still pay to join, or null. Backs "See dates & pay" on the
+     *  course page, which must not depend on the notification. */
+    getMyOffer: async (courseId: string): Promise<{ groupId: string; courseId: string; stage: string } | null> => {
+        const response = await api.get(`/groups/course/${courseId}/my-offer`);
+        return response.status === 204 || !response.data ? null : response.data;
+    },
+
     /** Persist the trainer's session schedule for a group.
      *  Each session carries its own duration (hours), so a schedule can
      *  mix e.g. a 2h session and a 1h session.
@@ -1052,6 +1060,18 @@ export const studentService = {
      *  address from this response — those stay on /me only. */
     getPublicProfile: async (studentId: string) => {
         const response = await api.get(`/students/${studentId}/public`);
+        return response.data;
+    },
+
+    /** The signed-in learner's own profile, phone and address included. */
+    getMyProfile: async () => {
+        const response = await api.get('/students/me');
+        return response.data;
+    },
+
+    /** Onboarding's contact step: phone and address, as trainers give. */
+    updateContact: async (data: { phone: string; address: string; city: string; state: string; postalCode: string }) => {
+        const response = await api.put('/students/me/contact', data);
         return response.data;
     },
 };

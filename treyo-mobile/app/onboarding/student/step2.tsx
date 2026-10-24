@@ -79,11 +79,11 @@ export default function StudentOnboardingStep2() {
                 <View style={styles.header}>
                     <Text style={styles.title}>{t('studentOnboarding.interestsTitle')}</Text>
                     <Text style={styles.subtitle}>{t('studentOnboarding.interestsSubtitle')}</Text>
-                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 2 })}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 3, total: 4 })}</Text>
                 </View>
 
                 <View style={styles.progressContainer}>
-                    <View style={[styles.progressBar, { width: '66%' }]} />
+                    <View style={[styles.progressBar, { width: '75%' }]} />
                 </View>
 
                 <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>

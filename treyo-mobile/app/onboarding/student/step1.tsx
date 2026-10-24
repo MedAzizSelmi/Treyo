@@ -62,11 +62,11 @@ export default function StudentOnboardingStep1() {
                 <View style={styles.header}>
                     <Text style={styles.title}>{t('studentOnboarding.fieldsTitle')}</Text>
                     <Text style={styles.subtitle}>{t('studentOnboarding.fieldsSubtitle')}</Text>
-                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 1 })}</Text>
+                    <Text style={styles.step}>{t('trainerOnboarding.stepOf', { step: 2, total: 4 })}</Text>
                 </View>
 
                 <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: '33%' }]} />
+                    <View style={[styles.progressFill, { width: '50%' }]} />
                 </View>
 
                 {/* Glass container with fields and button */}

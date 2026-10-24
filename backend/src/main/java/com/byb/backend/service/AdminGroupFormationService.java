@@ -28,14 +28,15 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Admin-driven group formation workflow.
+ * What administrators see of demand and groups, and the manual group
+ * formation that preceded the automated flow.
  * <p>
- * Replaces the auto-trigger that used to fire from InteractionService. The admin now:
- *   1. Inspects interest on /admin/courses/{id}/interest
- *   2. Notifies interested students once the minimum is reached → POST /notify-interested
- *      (students get a GROUP_FORMING notification; confirming creates a pending Enrollment)
- *   3. Forms the group once enough students have confirmed → POST /form-group
- *      (creates the Group, links the confirmed enrollments, sends GROUP_READY)
+ * Since October 2026 groups open, invite and start themselves
+ * ({@link GroupAutomationService}). What remains here:
+ *   1. Interest per course on /admin/courses/{id}/interest
+ *   2. The group list with each group's stage, for the dashboard
+ *   3. POST /form-group, for learners who confirmed under the old flow and
+ *      have no group yet (creates the Group, links them, sends GROUP_READY)
  */
 @Service
 @RequiredArgsConstructor
@@ -53,6 +54,8 @@ public class AdminGroupFormationService {
     // BEFORE the isActive filter runs, dropping them from the
     // admin's view immediately.
     private final CourseLifecycleService courseLifecycleService;
+    // Stage, sessions and members of the automated flow, for the dashboard.
+    private final GroupAutomationService groupAutomation;
 
     /** Count of unique non-enrolled students requesting this course. */
     public int countActiveRequests(String courseId) {
@@ -233,6 +236,17 @@ public class AdminGroupFormationService {
                     r.put("trainerId", g.getTrainerId());
                     r.put("trainerName", trainer != null ? trainer.getName() : "Unknown");
                     r.put("members", memberList);
+                    // The automated flow (GroupAutomationService): where the
+                    // group is, its sessions for the review editor, and how
+                    // far it is from its minimum.
+                    r.put("stage", groupAutomation.stage(g));
+                    r.put("scheduleApprovedAt", g.getScheduleApprovedAt());
+                    r.put("meetingSchedule", g.getMeetingSchedule());
+                    r.put("firstSessionAt", groupAutomation.firstSession(g).orElse(null));
+                    r.put("joinedCount", groupAutomation.members(g).size());
+                    r.put("minStudents", course != null ? course.getMinStudentsRequired() : null);
+                    r.put("courseDurationHours", course != null ? course.getDurationHours() : null);
+                    r.put("createdAt", g.getCreatedAt());
                     return r;
                 })
                 .collect(Collectors.toList());
@@ -283,44 +297,9 @@ public class AdminGroupFormationService {
         return result;
     }
 
-    /**
-     * Sends a GROUP_FORMING notification to every interested student.
-     * Idempotent at the admin's discretion (can be re-triggered).
-     */
-    @Transactional
-    public Map<String, Object> notifyInterestedStudents(String courseId) {
-        Course course = courseRepository.findByCourseId(courseId)
-                .orElseThrow(() -> new RuntimeException("Course not found"));
-
-        // Only deduped, non-enrolled students get notified
-        List<String> activeRequestIds = getActiveRequestStudentIds(courseId);
-
-        if (activeRequestIds.isEmpty()) {
-            throw new RuntimeException("No interested students to notify");
-        }
-
-        for (String sid : activeRequestIds) {
-            notificationService.sendGroupFormingNotification(
-                    sid,
-                    courseId,
-                    course.getTitle(),
-                    activeRequestIds.size(),
-                    course.getMinStudentsRequired()
-            );
-        }
-
-        notificationService.sendGroupFormingNotificationToTrainer(
-                course.getTrainerId(),
-                courseId,
-                course.getTitle(),
-                activeRequestIds.size()
-        );
-
-        Map<String, Object> r = new HashMap<>();
-        r.put("notifiedCount", activeRequestIds.size());
-        r.put("courseId", courseId);
-        return r;
-    }
+    // notifyInterestedStudents was removed in October 2026: groups open
+    // and invite learners by themselves now (GroupAutomationService), and
+    // it asked learners to pay for a group that had no dates yet.
 
     /**
      * Forms a group from all confirmed enrollments (groupId == null).

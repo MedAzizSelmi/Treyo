@@ -42,6 +42,7 @@ public class GroupController {
     // Used to attach session-progress metadata to single-group responses.
     private final com.byb.backend.service.CourseLifecycleService courseLifecycleService;
     private final CallerGuard callerGuard;
+    private final com.byb.backend.service.GroupAutomationService groupAutomation;
 
     /**
      * Upcoming sessions for the trainer's home dashboard.
@@ -79,6 +80,27 @@ public class GroupController {
             m.put("meetingLocation", g.getMeetingLocation());
             return m;
         }).collect(Collectors.toList()));
+    }
+
+    /**
+     * The group of this course the signed-in learner was invited to and
+     * can still pay to join — 204 when there is none. Lets the course page
+     * offer "See dates & pay" without depending on the notification.
+     */
+    @GetMapping("/course/{courseId}/my-offer")
+    @Operation(summary = "The open group the caller was invited to, for a course")
+    public ResponseEntity<Map<String, Object>> getMyOffer(@PathVariable String courseId) {
+        String me = callerGuard.current().getUserId();
+        return groupAutomation.openOfferFor(me, courseId, java.time.LocalDateTime.now())
+                .map(g -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("groupId", g.getGroupId());
+                    m.put("courseId", g.getCourseId());
+                    m.put("stage", groupAutomation.stage(g));
+                    m.put("firstSessionAt", groupAutomation.firstSession(g).orElse(null));
+                    return ResponseEntity.ok(m);
+                })
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /**
@@ -214,6 +236,14 @@ public class GroupController {
         m.put("meetingSchedule", g.getMeetingSchedule());
         m.put("courseTitle", course != null ? course.getTitle() : null);
         m.put("courseDurationHours", course != null ? course.getDurationHours() : null);
+        m.put("courseId", g.getCourseId());
+        m.put("currentSize", g.getCurrentSize());
+        m.put("maxSize", g.getMaxSize());
+        m.put("minStudents", course != null ? course.getMinStudentsRequired() : null);
+        // Set once an administrator approves; the trainer's screen shows the
+        // schedule as locked from then on.
+        m.put("scheduleApprovedAt", g.getScheduleApprovedAt());
+        m.put("stage", groupAutomation.stage(g));
         // Derived progress — sessionsCompleted / total / percentage /
         // groupStatus / isCompleted. Lets the mobile UI render a
         // progress bar without re-parsing the JSON itself.
@@ -260,6 +290,16 @@ public class GroupController {
         // signed in could previously rewrite any group's sessions — and
         // with them the trainer's earnings, which are computed from them.
         callerGuard.requireOwnerOrAdmin(g.getTrainerId());
+        // Approved means learners are paying for these dates, and there are
+        // no refunds: the trainer can no longer move them. An administrator
+        // still can, and contacts the learners.
+        boolean byAdmin = callerGuard.isAdmin();
+        if (!byAdmin && g.getScheduleApprovedAt() != null) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "error", "Schedule locked",
+                    "message", "This schedule was approved and learners are paying for these dates, "
+                            + "so it can no longer be changed. Contact an administrator."));
+        }
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> sessions =
@@ -296,6 +336,7 @@ public class GroupController {
         g.setStartDate(earliest);
         g.setEndDate(latest);
         groupRepository.save(g);
+        groupAutomation.onScheduleSaved(g, byAdmin);
 
         return ResponseEntity.ok(Map.of(
                 "status", "saved",

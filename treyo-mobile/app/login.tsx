@@ -52,7 +52,7 @@ export default function LoginScreen() {
 
             if (!response.onboardingComplete) {
                 if (response.role === 'STUDENT') {
-                    router.replace('/onboarding/student/step1' as any);
+                    router.replace('/onboarding/student/contact' as any);
                 } else {
                     router.replace('/onboarding/trainer/step1' as any);
                 }
@@ -148,7 +148,7 @@ export default function LoginScreen() {
             // Assuming response has same structure as email/password login
             if (!response.onboardingComplete) {
                 if (response.role === 'STUDENT') {
-                    router.replace('/onboarding/student/step1' as any);
+                    router.replace('/onboarding/student/contact' as any);
                 } else {
                     router.replace('/onboarding/trainer/step1' as any);
                 }

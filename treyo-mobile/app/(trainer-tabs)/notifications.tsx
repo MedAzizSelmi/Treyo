@@ -52,6 +52,10 @@ export default function TrainerNotificationsScreen() {
             case 'NEW_STUDENT_REQUEST': return 'person-add';
             case 'GROUP_FORMING': return 'people';
             case 'GROUP_READY': return 'checkmark-circle';
+            case 'GROUP_SCHEDULE_REQUEST': return 'calendar';
+            case 'GROUP_SCHEDULE_REMINDER': return 'alarm';
+            case 'GROUP_SCHEDULE_APPROVED': return 'checkmark-done-circle';
+            case 'GROUP_CLOSED': return 'close-circle';
             case 'SESSION_CONFIRMED': return 'calendar';
             case 'NEW_MESSAGE': return 'mail';
             case 'ENROLLMENT_CONFIRMED': return 'school';
@@ -65,6 +69,10 @@ export default function TrainerNotificationsScreen() {
             case 'NEW_STUDENT_REQUEST': return '#7cce06';
             case 'GROUP_FORMING': return '#7cce06';
             case 'GROUP_READY': return '#7cce06';
+            case 'GROUP_SCHEDULE_REQUEST': return '#7cce06';
+            case 'GROUP_SCHEDULE_REMINDER': return '#FFA500';
+            case 'GROUP_SCHEDULE_APPROVED': return '#7cce06';
+            case 'GROUP_CLOSED': return '#aaaaaa';
             case 'SESSION_CONFIRMED': return '#3b5bdb';
             case 'NEW_MESSAGE': return '#FFA500';
             case 'ENROLLMENT_CONFIRMED': return '#FFA500';
@@ -135,6 +143,22 @@ export default function TrainerNotificationsScreen() {
                 titleKey: 'notifications.groupReadyTitle',
                 messageKey: 'notifications.groupReadyMessage',
             },
+            GROUP_SCHEDULE_REQUEST: {
+                titleKey: 'notifications.scheduleRequestTitle',
+                messageKey: 'notifications.scheduleRequestMessage',
+            },
+            GROUP_SCHEDULE_REMINDER: {
+                titleKey: 'notifications.scheduleReminderTitle',
+                messageKey: 'notifications.scheduleRequestMessage',
+            },
+            GROUP_SCHEDULE_APPROVED: {
+                titleKey: 'notifications.scheduleApprovedTitle',
+                messageKey: 'notifications.scheduleApprovedMessage',
+            },
+            GROUP_CLOSED: {
+                titleKey: 'notifications.groupClosedTitle',
+                messageKey: 'notifications.groupClosedTrainerMessage',
+            },
             ONE_TO_ONE_OFFER: {
                 titleKey: 'notifications.oneToOneTitle',
                 messageKey: 'notifications.oneToOneMessage',
@@ -147,7 +171,8 @@ export default function TrainerNotificationsScreen() {
         const entry = typeMap[notif.notificationType];
         if (!entry) return { title: notif.title, message: notif.message };
 
-        const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'ONE_TO_ONE_OFFER'].includes(notif.notificationType);
+        const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'ONE_TO_ONE_OFFER', 'GROUP_SCHEDULE_REQUEST',
+            'GROUP_SCHEDULE_REMINDER', 'GROUP_SCHEDULE_APPROVED', 'GROUP_CLOSED'].includes(notif.notificationType);
         if (needsCourse && !params.course) {
             return { title: notif.title, message: notif.message };
         }
@@ -266,6 +291,24 @@ export default function TrainerNotificationsScreen() {
                                     <ScrollView style={modalStyles.messageScroll} showsVerticalScrollIndicator={false}>
                                         <Text style={modalStyles.message}>{localized.message}</Text>
                                     </ScrollView>
+                                    {['GROUP_SCHEDULE_REQUEST', 'GROUP_SCHEDULE_REMINDER', 'GROUP_SCHEDULE_APPROVED']
+                                        .includes(openNotif.notificationType) && openNotif.relatedEntityId && (
+                                        <TouchableOpacity
+                                            style={modalStyles.actionBtn}
+                                            activeOpacity={0.85}
+                                            onPress={() => {
+                                                const groupId = openNotif.relatedEntityId;
+                                                setOpenNotif(null);
+                                                router.push({ pathname: '/schedule-sessions' as any, params: { groupId } });
+                                            }}
+                                        >
+                                            <Text style={modalStyles.actionText}>
+                                                {openNotif.notificationType === 'GROUP_SCHEDULE_APPROVED'
+                                                    ? t('notifications.viewSchedule')
+                                                    : t('notifications.scheduleNow')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </>
                             );
                         })()}
@@ -313,6 +356,11 @@ const modalStyles = StyleSheet.create({
     time: { fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 14 },
     messageScroll: { maxHeight: 280 },
     message: { fontSize: 14, lineHeight: 21, color: 'rgba(255,255,255,0.85)' },
+    actionBtn: {
+        backgroundColor: '#7cce06', borderRadius: 14,
+        paddingVertical: 14, alignItems: 'center', marginTop: 18,
+    },
+    actionText: { fontSize: 14, fontWeight: '700', color: '#000' },
 });
 
 const styles = StyleSheet.create({

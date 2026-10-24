@@ -44,7 +44,7 @@ export default function WelcomeScreen() {
                     // rather than the tabs.
                     if (user.onboardingComplete === false) {
                         const isTrainer = String(user.role || user.userType || '').toUpperCase().includes('TRAINER');
-                        router.replace(isTrainer ? '/onboarding/trainer/step1' as any : '/onboarding/student/step1' as any);
+                        router.replace(isTrainer ? '/onboarding/trainer/step1' as any : '/onboarding/student/contact' as any);
                         return;
                     }
                     const isTrainer = String(user.role || user.userType || '').toUpperCase().includes('TRAINER');

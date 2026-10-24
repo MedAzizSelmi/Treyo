@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getAllGroups } from '@/lib/api';
+import { getAllGroups, approveGroupSchedule, getGroupCallList, saveGroupSchedule } from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Badge from '@/components/Badge';
@@ -20,9 +20,45 @@ import {
   Globe,
   Filter,
   Search,
+  Phone,
+  Pencil,
+  Plus,
+  Trash2,
+  CalendarCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
-type StatusFilter = 'all' | 'active' | 'ready' | 'completed';
+type StatusFilter = 'all' | 'review' | 'payment' | 'active' | 'ready' | 'completed';
+
+/**
+ * Where a group being prepared is in the automated flow (backend
+ * GroupAutomationService.stage). Started groups show their status.
+ */
+const STAGE_LABEL: Record<string, string> = {
+  awaiting_schedule: 'Awaiting schedule',
+  awaiting_review: 'Schedule to review',
+  open_for_payment: 'Open for payment',
+};
+
+/** Sessions as stored on the group: {"sessions":[{date,time,hours}]}. */
+function parseSessions(json?: string | null): { date: string; time: string; hours: number }[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed?.sessions)
+      ? parsed.sessions.map((s: any) => ({ date: String(s.date), time: String(s.time).slice(0, 5), hours: Number(s.hours) || 0 }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Near the deadline with too few paid: the call list matters now. */
+function needsCalls(g: any): boolean {
+  if (g.stage !== 'open_for_payment' || !g.firstSessionAt) return false;
+  const hoursLeft = (new Date(g.firstSessionAt).getTime() - Date.now()) / 3600000;
+  return hoursLeft <= 48 && (g.joinedCount ?? 0) < (g.minStudents ?? 1);
+}
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -30,6 +66,10 @@ export default function GroupsPage() {
   const [open, setOpen] = useState<any | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const [editing, setEditing] = useState<any | null>(null);
+  const [callList, setCallList] = useState<any[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const loadGroups = useCallback(async () => {
     setLoading(true);
@@ -45,6 +85,38 @@ export default function GroupsPage() {
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
 
+  // Keep the open drawer in step with a reload.
+  useEffect(() => {
+    if (open) setOpen(groups.find((g) => g.groupId === open.groupId) || null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups]);
+
+  // The call list is read when a group open for payment is opened.
+  useEffect(() => {
+    setCallList(null);
+    if (open?.stage !== 'open_for_payment') return;
+    getGroupCallList(open.groupId)
+      .then((r) => setCallList(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setCallList([]));
+  }, [open?.groupId, open?.stage]);
+
+  const approve = async (g: any) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const r = await approveGroupSchedule(g.groupId);
+      setNotice({ kind: 'ok', text: `Schedule approved — ${r.data?.invited ?? 0} learner(s) invited to pay.` });
+      await loadGroups();
+    } catch (e: any) {
+      setNotice({ kind: 'error', text: e?.response?.data?.error || 'Could not approve the schedule.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toReview = groups.filter((g) => g.stage === 'awaiting_review').length;
+  const toCall = groups.filter(needsCalls).length;
+
   const totalMembers = groups.reduce((s, g) => s + (g.members?.length || 0), 0);
   const paidMembers = groups.reduce(
     (s, g) => s + (g.members?.filter((m: any) => m.paymentStatus === 'paid').length || 0),
@@ -53,7 +125,9 @@ export default function GroupsPage() {
   const activeCount = groups.filter((g) => (g.groupStatus || '').toLowerCase() === 'active').length;
 
   const filtered = groups.filter((g) => {
-    if (filter !== 'all' && (g.groupStatus || '').toLowerCase() !== filter) return false;
+    if (filter === 'review' && g.stage !== 'awaiting_review') return false;
+    if (filter === 'payment' && g.stage !== 'open_for_payment') return false;
+    if (!['all', 'review', 'payment'].includes(filter) && (g.groupStatus || '').toLowerCase() !== filter) return false;
     if (search) {
       const s = search.toLowerCase();
       return (
@@ -69,8 +143,23 @@ export default function GroupsPage() {
     <div>
       <PageHeader
         title="Groups"
-        subtitle="Active learning groups — students who've paid and are taking the course"
+        subtitle="Groups open by themselves when a course reaches its minimum requests — review their schedules here"
       />
+
+      {/* What needs a person: the rest of the flow runs on its own. */}
+      {(toReview > 0 || toCall > 0) && (
+        <div className="mb-5 rounded-xl border border-warning/30 bg-warning/[0.06] p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-foreground/90 space-y-1">
+            {toReview > 0 && (
+              <p><strong className="text-white">{toReview}</strong> schedule{toReview === 1 ? '' : 's'} to review — approving one invites its learners to pay.</p>
+            )}
+            {toCall > 0 && (
+              <p><strong className="text-white">{toCall}</strong> group{toCall === 1 ? '' : 's'} near the deadline without the minimum paid — open {toCall === 1 ? 'it' : 'them'} for the learners to call.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Top stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -95,6 +184,8 @@ export default function GroupsPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-4 h-4 text-muted" />
           <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="All" />
+          <FilterChip active={filter === 'review'} onClick={() => setFilter('review')} label="To review" tone="warning" />
+          <FilterChip active={filter === 'payment'} onClick={() => setFilter('payment')} label="Open for payment" tone="info" />
           <FilterChip active={filter === 'active'} onClick={() => setFilter('active')} label="Active" tone="success" />
           <FilterChip active={filter === 'ready'} onClick={() => setFilter('ready')} label="Ready" tone="warning" />
           <FilterChip active={filter === 'completed'} onClick={() => setFilter('completed')} label="Completed" tone="info" />
@@ -113,7 +204,7 @@ export default function GroupsPage() {
             title={groups.length === 0 ? 'No groups formed yet' : 'No matching groups'}
             hint={
               groups.length === 0
-                ? 'Form a group from the Requests page once enough students confirm.'
+                ? 'A group opens here by itself once a course reaches its minimum requests.'
                 : 'Try clearing the search or filter.'
             }
           />
@@ -136,7 +227,12 @@ export default function GroupsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="font-medium text-white truncate">{g.groupName}</p>
-                        <Badge variant={statusVariant(status)}>{status}</Badge>
+                        <Badge variant={statusVariant(status)}>{STAGE_LABEL[g.stage] || status}</Badge>
+                        {g.stage === 'open_for_payment' && (
+                          <span className={`text-[11px] font-semibold ${needsCalls(g) ? 'text-warning' : 'text-muted'}`}>
+                            {g.joinedCount ?? 0}/{g.minStudents ?? '?'} paid
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-muted truncate">
                         {g.courseTitle} · trainer {g.trainerName}
@@ -206,6 +302,59 @@ export default function GroupsPage() {
               />
             </div>
 
+            {notice && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${notice.kind === 'ok' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                {notice.text}
+              </p>
+            )}
+
+            {/* The schedule: reviewed, edited or made here, then approved. */}
+            {['awaiting_schedule', 'awaiting_review', 'open_for_payment'].includes(open.stage) && (
+              <ScheduleSection
+                group={open}
+                busy={busy}
+                onEdit={() => setEditing(open)}
+                onApprove={() => approve(open)}
+              />
+            )}
+
+            {/* Payments, and who to phone near the deadline. */}
+            {open.stage === 'open_for_payment' && (
+              <div>
+                <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-accent" />
+                  Not paid yet ({callList?.length ?? '…'})
+                </h4>
+                <p className="text-xs text-muted mb-3">
+                  {open.joinedCount ?? 0} of {open.minStudents ?? '?'} needed have paid. 24 hours before the first
+                  session the group starts with whoever has paid; if nobody has, it closes and nothing is charged.
+                </p>
+                {callList === null ? (
+                  <LoadingSpinner />
+                ) : callList.length === 0 ? (
+                  <EmptyMini icon={CheckCircle2} text="Everyone invited has paid" />
+                ) : (
+                  <ul className="space-y-2">
+                    {callList.map((c: any) => (
+                      <li key={c.studentId} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-card-hover/40 border border-border">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{c.name}</p>
+                          {c.email && <p className="text-[11px] text-muted truncate">{c.email}</p>}
+                        </div>
+                        {c.phone ? (
+                          <a href={`tel:${c.phone}`} className="text-sm font-semibold text-accent hover:underline whitespace-nowrap">
+                            {c.phone}
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-muted">No phone</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <FunnelStat icon={GraduationCap} label="Members" value={open.members?.length || 0} tone="success" />
               <FunnelStat icon={Users} label="Capacity" value={open.maxSize || 0} tone="muted" />
@@ -245,6 +394,171 @@ export default function GroupsPage() {
           </div>
         </Drawer>
       )}
+
+      {editing && (
+        <ScheduleEditor
+          group={editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            setNotice({ kind: 'ok', text: 'Schedule saved.' });
+            await loadGroups();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────── schedule ───────
+
+function ScheduleSection({
+  group, busy, onEdit, onApprove,
+}: { group: any; busy: boolean; onEdit: () => void; onApprove: () => void }) {
+  const sessions = parseSessions(group.meetingSchedule);
+  const total = sessions.reduce((s, x) => s + (x.hours || 0), 0);
+  const locked = group.stage === 'open_for_payment';
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+        <Calendar className="w-4 h-4 text-accent" />
+        Schedule {sessions.length > 0 && <span className="text-muted font-normal">· {total}h of {group.courseDurationHours ?? '?'}h</span>}
+      </h4>
+      {sessions.length === 0 ? (
+        <EmptyMini icon={Clock} text="The trainer has not scheduled this group yet — you can do it yourself." />
+      ) : (
+        <ul className="space-y-1.5 mb-3">
+          {sessions.map((s, i) => (
+            <li key={`${s.date}-${i}`} className="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-card-hover/40 border border-border">
+              <span className="text-muted w-5">{i + 1}</span>
+              <span className="text-white flex-1">
+                {new Date(`${s.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+              <span className="text-foreground/80">{s.time}</span>
+              <span className="text-muted w-10 text-right">{s.hours}h</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-center gap-2 flex-wrap mt-3">
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border text-foreground hover:bg-card-hover transition"
+        >
+          <Pencil className="w-3.5 h-3.5" /> {sessions.length === 0 ? 'Create schedule' : 'Edit schedule'}
+        </button>
+        {group.stage === 'awaiting_review' && (
+          <button
+            onClick={onApprove}
+            disabled={busy}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-accent text-black hover:bg-accent/90 disabled:opacity-50 transition"
+          >
+            <CalendarCheck className="w-3.5 h-3.5" /> Approve &amp; invite learners
+          </button>
+        )}
+        {group.stage === 'awaiting_schedule' && sessions.length > 0 && (
+          <button
+            onClick={onApprove}
+            disabled={busy}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-accent text-black hover:bg-accent/90 disabled:opacity-50 transition"
+          >
+            <CalendarCheck className="w-3.5 h-3.5" /> Approve &amp; invite learners
+          </button>
+        )}
+      </div>
+      {locked && (
+        <p className="text-[11px] text-warning mt-2">
+          Learners are paying for these dates and there are no refunds — the trainer can no longer change them.
+          If you change them, contact the learners who have paid.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The admin's schedule editor: the same rule as the trainer's app — the
+ * session hours must add up to the course's total. Saved through the same
+ * endpoint the app uses.
+ */
+function ScheduleEditor({ group, onClose, onSaved }: { group: any; onClose: () => void; onSaved: () => void }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [rows, setRows] = useState(() => {
+    const existing = parseSessions(group.meetingSchedule);
+    return existing.length > 0 ? existing : [{ date: today, time: '18:00', hours: 2 }];
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const duration = Number(group.courseDurationHours) || 0;
+  const total = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+  const dates = rows.map((r) => r.date);
+  const duplicate = dates.some((d, i) => dates.indexOf(d) !== i);
+  const past = rows.some((r) => new Date(`${r.date}T${r.time}:00`).getTime() <= Date.now());
+  const valid = rows.length > 0 && !duplicate && !past && rows.every((r) => r.date && r.time && r.hours > 0)
+    && (duration === 0 || total === duration);
+
+  const set = (i: number, patch: Partial<{ date: string; time: string; hours: number }>) =>
+    setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const sorted = [...rows].sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`));
+      await saveGroupSchedule(group.groupId, sorted.map((r) => ({ ...r, hours: Number(r.hours) })));
+      onSaved();
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.response?.data?.error || 'Could not save the schedule.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="relative w-full max-w-lg rounded-2xl bg-card border border-border p-6" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center">
+          <X className="w-4 h-4 text-muted" />
+        </button>
+        <h2 className="text-lg font-bold text-white mb-1">Schedule — {group.groupName}</h2>
+        <p className={`text-xs mb-4 ${duration > 0 && total !== duration ? 'text-warning' : 'text-muted'}`}>
+          {total}h scheduled{duration > 0 ? ` of the course's ${duration}h — they must match` : ''}
+        </p>
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input type="date" min={today} value={r.date} onChange={(e) => set(i, { date: e.target.value })}
+                className="flex-1 rounded-lg bg-card-hover border border-border p-2 text-sm text-foreground outline-none focus:border-accent" />
+              <input type="time" step={900} value={r.time} onChange={(e) => set(i, { time: e.target.value })}
+                className="w-28 rounded-lg bg-card-hover border border-border p-2 text-sm text-foreground outline-none focus:border-accent" />
+              <input type="number" min={1} max={12} value={r.hours} onChange={(e) => set(i, { hours: Number(e.target.value) })}
+                className="w-16 rounded-lg bg-card-hover border border-border p-2 text-sm text-foreground outline-none focus:border-accent" />
+              <span className="text-xs text-muted">h</span>
+              <button onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} disabled={rows.length === 1}
+                className="p-2 rounded-lg text-muted hover:text-danger disabled:opacity-30">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setRows((rs) => [...rs, { date: today, time: '18:00', hours: 2 }])}
+          className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline">
+          <Plus className="w-3.5 h-3.5" /> Add a session
+        </button>
+        {(duplicate || past) && (
+          <p className="text-xs text-danger mt-3">
+            {duplicate ? 'Two sessions are on the same day. ' : ''}{past ? 'A session is in the past.' : ''}
+          </p>
+        )}
+        {error && <p className="text-xs text-danger mt-3">{error}</p>}
+        <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted hover:text-foreground">Cancel</button>
+          <button onClick={save} disabled={!valid || saving}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-black hover:bg-accent/90 transition disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save schedule'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

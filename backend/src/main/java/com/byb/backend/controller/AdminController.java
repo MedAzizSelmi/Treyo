@@ -24,6 +24,8 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AdminGroupFormationService groupFormationService;
+    private final com.byb.backend.service.GroupAutomationService groupAutomation;
+    private final com.byb.backend.repository.GroupRepository groupRepository;
 
     /**
      * Get dashboard overview statistics
@@ -316,10 +318,29 @@ public class AdminController {
      * Sends a GROUP_FORMING notification to every interested student. The students
      * confirm by accepting the notification (which creates a pending Enrollment).
      */
-    @PostMapping("/courses/{courseId}/notify-interested")
-    @Operation(summary = "Send group-forming notifications to interested students")
-    public ResponseEntity<Map<String, Object>> notifyInterested(@PathVariable String courseId) {
-        return ResponseEntity.ok(groupFormationService.notifyInterestedStudents(courseId));
+    // POST /courses/{courseId}/notify-interested was removed in October 2026:
+    // groups now open by themselves when requests reach the minimum, and
+    // learners are invited once an administrator approves the schedule
+    // (GroupAutomationService). It invited learners to pay for a group that
+    // had no dates.
+
+    @PutMapping("/groups/{groupId}/approve-schedule")
+    @Operation(summary = "Approve a group's schedule and invite the learners to pay")
+    public ResponseEntity<Map<String, Object>> approveGroupSchedule(@PathVariable String groupId) {
+        try {
+            int invited = groupAutomation.approveSchedule(groupId, java.time.LocalDateTime.now());
+            return ResponseEntity.ok(Map.of("groupId", groupId, "invited", invited));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/groups/{groupId}/call-list")
+    @Operation(summary = "Invited learners who have not paid, with their phone numbers")
+    public ResponseEntity<?> groupCallList(@PathVariable String groupId) {
+        return groupRepository.findById(groupId)
+                .<ResponseEntity<?>>map(g -> ResponseEntity.ok(groupAutomation.callList(g)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     /**
