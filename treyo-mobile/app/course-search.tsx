@@ -1,13 +1,17 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Image, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
 import { authService, courseService, searchLogService } from '../services/api';
 import { HISTORY_LIMIT, loadSearchHistory, saveSearchHistory } from '../utils/searchHistory';
 import { COURSE_LEVELS, levelLabel, normalizeLevel } from '../utils/courseLabels';
+import { closest, matchesPrepared, prepare } from '../utils/textMatch';
+
+/** How many results are drawn at first; more on request. */
+const PAGE = 30;
 
 // The backend's vocabulary. This used to be BEGINNER / INTERMEDIATE /
 // ADVANCED, and no course is ever saved as "advanced", so the Advanced
@@ -27,6 +31,10 @@ export default function CourseSearchScreen() {
     const [filterOpen, setFilterOpen] = useState(false);
     const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
     const [selectedDomain, setSelectedDomain] = useState<string | null>(null);
+    const [shown, setShown] = useState(PAGE);
+    // Results follow the typing a moment behind it, so the keyboard never
+    // waits for the list.
+    const searchQuery = useDeferredValue(query);
 
     useEffect(() => {
         loadCourses();
@@ -62,7 +70,7 @@ export default function CourseSearchScreen() {
      *  effect below — so a user who just types and looks at results
      *  without explicitly hitting Search still gets their query
      *  remembered. */
-    const recordSearch = (term: string, clickedCourseId?: string) => {
+    const recordSearch = (term: string, clickedCourseId?: string, resultCount?: number) => {
         const trimmed = term.trim();
         if (!trimmed) return;
         const next = [trimmed, ...history.filter(h => h.toLowerCase() !== trimmed.toLowerCase())].slice(0, HISTORY_LIMIT);
@@ -71,7 +79,7 @@ export default function CourseSearchScreen() {
         // its next refresh. Silent fail — UX doesn't care if logging
         // missed a beat.
         if (studentId) {
-            searchLogService.log({ studentId, query: trimmed, clickedCourseId });
+            searchLogService.log({ studentId, query: trimmed, clickedCourseId, resultCount });
         }
     };
 
@@ -82,12 +90,14 @@ export default function CourseSearchScreen() {
     // search) in their history. The 3-char floor stops us flooding
     // history with single-letter typos.
     useEffect(() => {
-        const trimmed = query.trim();
+        const trimmed = searchQuery.trim();
         if (trimmed.length < 3) return;
-        const t = setTimeout(() => recordSearch(trimmed), 1200);
+        const t = setTimeout(() => recordSearch(trimmed, undefined, countForLog()), 1200);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query]);
+    }, [searchQuery]);
+
+    useEffect(() => { setShown(PAGE); }, [searchQuery, selectedLevel, selectedDomain]);
 
     const removeHistoryItem = (term: string) => {
         saveHistory(history.filter(h => h !== term));
@@ -102,23 +112,43 @@ export default function CourseSearchScreen() {
         return Array.from(set).sort();
     }, [allCourses]);
 
+    /** Each course's text normalised once, when the catalogue loads — not
+     *  on every keystroke. */
+    const index = useMemo(() => allCourses.map(c => ({
+        course: c,
+        strong: prepare([c.title, c.domain, c.specificTopic, c.trainerName].filter(Boolean).join(' ')),
+        loose: prepare(c.description),
+        title: c.title ? { title: String(c.title), prepared: prepare(c.title) } : null,
+    })), [allCourses]);
+
     /** Filtered list. Empty query + no filters → no results yet (we show history instead). */
     const results = useMemo(() => {
-        const q = query.trim().toLowerCase();
-        if (!q && !selectedLevel && !selectedDomain) return [];
+        const q = prepare(searchQuery);
+        if (!q.key && !selectedLevel && !selectedDomain) return [];
 
-        return allCourses.filter(c => {
-            const matchesQuery = !q || [c.title, c.description, c.trainerName, c.domain, c.specificTopic]
-                .filter(Boolean)
-                .some(v => String(v).toLowerCase().includes(q));
+        return index.filter(({ course: c, strong, loose }) => {
+            // Case, accents, spacing and small typos do not matter, and the
+            // words can come in any order: "powerbi", "bi power" and
+            // "pwer bi" all find "Power BI" (utils/textMatch).
+            const matchesQuery = !q.key || matchesPrepared(q, strong, loose);
             const matchesLevel = !selectedLevel || normalizeLevel(c.level) === selectedLevel;
             const matchesDomain = !selectedDomain || c.domain === selectedDomain;
             return matchesQuery && matchesLevel && matchesDomain;
-        });
-    }, [query, allCourses, selectedLevel, selectedDomain]);
+        }).map(i => i.course);
+    }, [searchQuery, index, selectedLevel, selectedDomain]);
 
     const activeFilterCount = (selectedLevel ? 1 : 0) + (selectedDomain ? 1 : 0);
     const showHistory = !query.trim() && activeFilterCount === 0;
+
+    /** What this search found, for the server's "searches that found
+     *  nothing" — only without filters, since a filter emptying the list
+     *  is not a course missing from the catalogue. */
+    const countForLog = () => (activeFilterCount === 0 ? results.length : undefined);
+
+    /** "Did you mean…?" when nothing matched but a title is a typo away. */
+    const didYouMean = useMemo(() => (results.length === 0 && searchQuery.trim().length >= 3
+        ? closest(searchQuery, index.map(i => i.title).filter((x): x is { title: string; prepared: ReturnType<typeof prepare> } => !!x))
+        : null), [results, searchQuery, index]);
 
     return (
         <ScreenBackground>
@@ -142,7 +172,7 @@ export default function CourseSearchScreen() {
                             placeholderTextColor="rgba(255,255,255,0.35)"
                             value={query}
                             onChangeText={setQuery}
-                            onSubmitEditing={() => recordSearch(query)}
+                            onSubmitEditing={() => recordSearch(query, undefined, countForLog())}
                             returnKeyType="search"
                             autoFocus
                         />
@@ -223,7 +253,7 @@ export default function CourseSearchScreen() {
                 ) : (
                     <View style={styles.section}>
                         <Text style={styles.resultsCount}>
-                            {results.length} {results.length === 1 ? 'result' : 'results'}
+                            {t('search.resultCount', { count: results.length })}
                         </Text>
                         {results.length === 0 ? (
                             <View style={styles.emptyHistoryState}>
@@ -231,10 +261,33 @@ export default function CourseSearchScreen() {
                                     <Ionicons name="search-outline" size={36} color="rgba(124,206,6,0.4)" />
                                 </View>
                                 <Text style={styles.emptyTitle}>{t('search.noResults')}</Text>
-                                <Text style={styles.emptySubtitle}>{t('search.tryDifferent')}</Text>
+                                {didYouMean ? (
+                                    <TouchableOpacity onPress={() => setQuery(didYouMean)} activeOpacity={0.8}>
+                                        <Text style={styles.didYouMean}>
+                                            {t('search.didYouMean')} <Text style={styles.didYouMeanTerm}>{didYouMean}</Text> ?
+                                        </Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <Text style={styles.emptySubtitle}>{t('search.tryDifferent')}</Text>
+                                )}
+                                {/* A course that is not there can be asked for. Only
+                                    without filters: with one on, the course may exist. */}
+                                {activeFilterCount === 0 && query.trim().length > 0 && (
+                                    <TouchableOpacity
+                                        style={styles.suggestBtn}
+                                        activeOpacity={0.85}
+                                        onPress={() => router.push({ pathname: '/suggest-course' as any, params: { topic: query.trim() } })}
+                                    >
+                                        <Ionicons name="bulb-outline" size={17} color="#000" />
+                                        <Text style={styles.suggestBtnText}>{t('search.suggestThis')}</Text>
+                                    </TouchableOpacity>
+                                )}
+                                {activeFilterCount === 0 && query.trim().length > 0 && (
+                                    <Text style={styles.suggestHint}>{t('search.suggestHint')}</Text>
+                                )}
                             </View>
                         ) : (
-                            results.map((c: any) => (
+                            results.slice(0, shown).map((c: any) => (
                                 <TouchableOpacity
                                     key={c.courseId || c.id}
                                     style={styles.resultCard}
@@ -243,7 +296,7 @@ export default function CourseSearchScreen() {
                                         // Pass the clicked course so the ML
                                         // engine learns "query X → user wanted
                                         // course Y" associations.
-                                        recordSearch(query, c.courseId || c.id);
+                                        recordSearch(query, c.courseId || c.id, countForLog());
                                         router.push({ pathname: '/course-detail' as any, params: { courseId: c.courseId || c.id } });
                                     }}
                                 >
@@ -254,7 +307,7 @@ export default function CourseSearchScreen() {
                                     <View style={styles.resultInfo}>
                                         <Text style={styles.resultTitle} numberOfLines={1}>{c.title}</Text>
                                         <Text style={styles.resultTrainer} numberOfLines={1}>
-                                            {c.trainerName || 'Trainer'}
+                                            {c.trainerName || t('groupsForming.trainer')}
                                         </Text>
                                         <View style={styles.resultMeta}>
                                             {c.level && (
@@ -281,6 +334,15 @@ export default function CourseSearchScreen() {
                                 </TouchableOpacity>
                             ))
                         )}
+                        {/* Drawing every card at once for a one-letter search
+                            made the list slow to appear. */}
+                        {results.length > shown && (
+                            <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShown(n => n + PAGE)} activeOpacity={0.8}>
+                                <Text style={styles.showMoreText}>
+                                    {t('search.showMore', { count: Math.min(PAGE, results.length - shown) })}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 )}
             </ScrollView>
@@ -292,13 +354,14 @@ export default function CourseSearchScreen() {
                     <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
                     <View style={styles.modalHandle} />
                     <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Filters</Text>
+                        <Text style={styles.modalTitle}>{t('search.filters')}</Text>
                         <TouchableOpacity onPress={() => { setSelectedLevel(null); setSelectedDomain(null); }}>
-                            <Text style={styles.modalReset}>Reset</Text>
+                            <Text style={styles.modalReset}>{t('search.reset')}</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.filterLabel}>Level</Text>
+                    <ScrollView style={styles.filterScroll} showsVerticalScrollIndicator nestedScrollEnabled>
+                    <Text style={styles.filterLabel}>{t('suggest.level')}</Text>
                     <View style={styles.chipRow}>
                         {LEVELS.map(level => {
                             const active = selectedLevel === level;
@@ -316,7 +379,7 @@ export default function CourseSearchScreen() {
 
                     {domains.length > 0 && (
                         <>
-                            <Text style={styles.filterLabel}>Domain</Text>
+                            <Text style={styles.filterLabel}>{t('suggest.domain')}</Text>
                             <View style={styles.chipRow}>
                                 {domains.map(domain => {
                                     const active = selectedDomain === domain;
@@ -334,8 +397,10 @@ export default function CourseSearchScreen() {
                         </>
                     )}
 
+                    </ScrollView>
+
                     <TouchableOpacity style={styles.applyBtn} onPress={() => setFilterOpen(false)}>
-                        <Text style={styles.applyBtnText}>Apply</Text>
+                        <Text style={styles.applyBtnText}>{t('search.apply')}</Text>
                     </TouchableOpacity>
                 </View>
             </Modal>
@@ -423,6 +488,14 @@ const styles = StyleSheet.create({
     },
     emptyTitle: { fontSize: 16, fontWeight: '700', color: '#ffffff', marginBottom: 6 },
     emptySubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center' },
+    didYouMean: { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
+    didYouMeanTerm: { color: '#7cce06', fontWeight: '700' },
+    suggestBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 22,
+        backgroundColor: '#7cce06', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 18,
+    },
+    suggestBtnText: { fontSize: 14, fontWeight: '700', color: '#000' },
+    suggestHint: { fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginTop: 8, lineHeight: 18 },
 
     // Filter modal
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
@@ -433,7 +506,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20, paddingTop: 12, paddingBottom: 30,
         borderTopWidth: 1, borderColor: 'rgba(124,206,6,0.2)',
         overflow: 'hidden',
+        // Many domains made the sheet taller than the screen, with no way
+        // to reach the ones below; it now stops short and its list scrolls.
+        maxHeight: '85%',
     },
+    filterScroll: { flexGrow: 0, flexShrink: 1 },
+    showMoreBtn: {
+        alignSelf: 'center', marginTop: 6, paddingHorizontal: 18, paddingVertical: 10,
+        borderRadius: 12, borderWidth: 1, borderColor: 'rgba(124,206,6,0.35)',
+    },
+    showMoreText: { color: '#7cce06', fontSize: 13, fontWeight: '700' },
     modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'center', marginBottom: 16 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#ffffff' },

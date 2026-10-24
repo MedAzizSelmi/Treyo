@@ -158,6 +158,20 @@ export const saveGroupSchedule = (
 export const formCourseGroup = (courseId: string) =>
   api.post(`/admin/courses/${courseId}/form-group`);
 
+// ── Course suggestions (backend CourseSuggestionService) ──
+export const getCourseSuggestions = (status?: string) =>
+  api.get('/admin/course-suggestions', { params: status ? { status } : {} });
+export const setCourseSuggestionStatus = (id: string, status: string, note?: string) =>
+  api.put(`/admin/course-suggestions/${id}/status`, { status, note });
+export const setCourseSuggestionNote = (id: string, note: string) =>
+  api.put(`/admin/course-suggestions/${id}/note`, { note });
+export const mergeCourseSuggestion = (id: string, into: string) =>
+  api.post(`/admin/course-suggestions/${id}/merge`, { into });
+export const publishCourseSuggestion = (id: string, courseId: string) =>
+  api.post(`/admin/course-suggestions/${id}/publish`, { courseId });
+export const getMissedSearches = () => api.get('/admin/missed-searches');
+export const hideMissedSearch = (term: string) => api.post('/admin/missed-searches/hide', { term });
+
 // ── Promote to Admin ──
 export const promoteToAdmin = (userId: string, userType: string) =>
   api.post(`/admin/users/${userId}/promote-to-admin`, null, { params: { userType } });

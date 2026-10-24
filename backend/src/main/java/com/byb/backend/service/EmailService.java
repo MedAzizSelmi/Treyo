@@ -229,6 +229,27 @@ public class EmailService {
                 "</table></td></tr></table></body></html>";
     }
 
+    /**
+     * A course a learner asked for is now in the catalogue. Email as well as
+     * a notification because finding a trainer can take weeks, by which time
+     * the learner may no longer open the app or allow notifications.
+     */
+    @Async
+    public void sendSuggestedCourseAvailableEmail(String toEmail, String learnerName, String topic,
+                                                  String courseTitle) {
+        String html = simpleTemplate(
+                "The course you asked for is here",
+                "Hi " + safe(learnerName == null || learnerName.isBlank() ? "there" : learnerName) + ",",
+                "You asked Treyo for a course on \"" + safe(topic) + "\". It is now available: \""
+                        + safe(courseTitle) + "\". Your request for it is registered, so you will be "
+                        + "invited to pay with the session dates as soon as a group opens.",
+                "Open Treyo",
+                "treyomobile://login",
+                "You receive this because you suggested this course, or asked for it too."
+        );
+        send(toEmail, "Treyo — " + courseTitle + " is now available", html);
+    }
+
     /** Notify a trainer that a course they submitted was approved.
      *  Course goes live immediately for students. */
     @Async

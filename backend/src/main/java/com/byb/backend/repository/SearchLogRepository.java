@@ -11,4 +11,7 @@ public interface SearchLogRepository extends JpaRepository<SearchLog, String> {
 
     /** One learner's search history — erased on account deletion. */
     List<SearchLog> findByStudentId(String studentId);
+
+    /** Searches that found nothing since a date — the catalogue's gaps. */
+    List<SearchLog> findByResultCountAndCreatedAtAfter(Integer resultCount, java.time.LocalDateTime since);
 }

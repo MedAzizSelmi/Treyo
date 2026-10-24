@@ -64,6 +64,8 @@ export default function RootLayout() {
                 } else if ((data.type === 'GROUP_PAYMENT_OPEN' || data.type === 'GROUP_PAYMENT_REMINDER')
                     && data.entityId) {
                     router.push({ pathname: '/group-offer' as any, params: { groupId: data.entityId } });
+                } else if (data.type === 'COURSE_SUGGESTION_PUBLISHED' && data.entityId) {
+                    router.push({ pathname: '/course-detail' as any, params: { courseId: data.entityId } });
                 } else if ((data.type === 'GROUP_SCHEDULE_REQUEST' || data.type === 'GROUP_SCHEDULE_REMINDER')
                     && data.entityId) {
                     router.push({ pathname: '/schedule-sessions' as any, params: { groupId: data.entityId } });
@@ -113,6 +115,8 @@ export default function RootLayout() {
                 <Stack.Screen name="trainer-profile" />
                 <Stack.Screen name="groups-forming" />
                 <Stack.Screen name="group-offer" />
+                <Stack.Screen name="suggest-course" />
+                <Stack.Screen name="my-suggestions" />
                 <Stack.Screen name="recommended-courses" />
                 <Stack.Screen name="settings-privacy" />
                 <Stack.Screen name="settings-language" />

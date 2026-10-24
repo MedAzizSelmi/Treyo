@@ -51,6 +51,7 @@ public class AccountDeletionService {
     private final InteractionRepository interactionRepository;
     private final ReviewRepository reviewRepository;
     private final CourseRepository courseRepository;
+    private final CourseSuggestionService courseSuggestionService;
 
     /** Marker put in place of a name, so the UI has something to show. */
     private static final String ANON_NAME = "Deleted user";
@@ -63,6 +64,7 @@ public class AccountDeletionService {
         purgeCommon(studentId);
         searchLogRepository.deleteAll(searchLogRepository.findByStudentId(studentId));
         interactionRepository.deleteAll(interactionRepository.findByStudentId(studentId));
+        courseSuggestionService.forgetLearner(studentId);
 
         // Reviews: the scores stay (course and trainer averages are built
         // from them and belong to the courses, not to the author), the

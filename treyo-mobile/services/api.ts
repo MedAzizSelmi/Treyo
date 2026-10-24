@@ -891,11 +891,47 @@ export const feedService = {
 // ══════════════════════════════════════════════
 // Search log — records queries for the ML recommendation engine
 // ══════════════════════════════════════════════
+/** Courses learners asked for and did not find. Every call acts as the
+ *  signed-in learner; none names a user. */
+export const courseSuggestionService = {
+    create: async (data: {
+        topic: string; details: string; domain?: string | null; level?: string | null;
+        format?: string | null; language?: string | null; city?: string | null;
+    }) => {
+        const response = await api.post('/course-suggestions', data);
+        return response.data;
+    },
+
+    /** Accepted requests like this one, for "me too". */
+    similar: async (q: string) => {
+        const response = await api.get('/course-suggestions/similar', { params: { q } });
+        return response.data as { suggestionId: string; topic: string; domain?: string; supporters: number; supported: boolean }[];
+    },
+
+    support: async (suggestionId: string) => {
+        const response = await api.post(`/course-suggestions/${suggestionId}/support`);
+        return response.data as { suggestionId: string; supporters: number };
+    },
+
+    unsupport: async (suggestionId: string) => {
+        await api.delete(`/course-suggestions/${suggestionId}/support`);
+    },
+
+    withdraw: async (suggestionId: string) => {
+        await api.delete(`/course-suggestions/${suggestionId}`);
+    },
+
+    mine: async () => {
+        const response = await api.get('/course-suggestions/mine');
+        return Array.isArray(response.data) ? response.data : [];
+    },
+};
+
 export const searchLogService = {
     /** Record a search the student executed. Fire-and-forget on the
      *  client side; backend writes to the search_logs table which the
      *  recommendation engine reads on its next refresh. */
-    log: async (payload: { studentId: string; query: string; clickedCourseId?: string }) => {
+    log: async (payload: { studentId: string; query: string; clickedCourseId?: string; resultCount?: number }) => {
         try {
             await api.post('/searches/log', payload);
         } catch (_) {

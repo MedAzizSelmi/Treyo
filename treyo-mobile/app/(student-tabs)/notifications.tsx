@@ -189,6 +189,8 @@ export default function NotificationsScreen() {
             case 'GROUP_PAYMENT_REMINDER': return 'alarm';
             case 'GROUP_CLOSED': return 'close-circle';
             case 'GROUP_MISSED': return 'time';
+            case 'COURSE_SUGGESTION_PUBLISHED': return 'bulb';
+            case 'COURSE_SUGGESTION_DECLINED': return 'bulb-outline';
             case 'ONE_TO_ONE_OFFER': return 'person';
             case 'ENROLLMENT_CONFIRMED': return 'school';
             case 'NEW_MESSAGE': return 'mail';
@@ -205,6 +207,8 @@ export default function NotificationsScreen() {
             case 'GROUP_PAYMENT_REMINDER': return '#FFA500';
             case 'GROUP_CLOSED': return '#aaaaaa';
             case 'GROUP_MISSED': return '#aaaaaa';
+            case 'COURSE_SUGGESTION_PUBLISHED': return '#7cce06';
+            case 'COURSE_SUGGESTION_DECLINED': return '#aaaaaa';
             case 'ONE_TO_ONE_OFFER': return '#3b5bdb';
             case 'ENROLLMENT_CONFIRMED': return '#FFA500';
             case 'NEW_MESSAGE': return '#FFA500';
@@ -323,6 +327,14 @@ export default function NotificationsScreen() {
                 titleKey: 'notifications.groupMissedTitle',
                 messageKey: 'notifications.groupMissedMessage',
             },
+            COURSE_SUGGESTION_PUBLISHED: {
+                titleKey: 'notifications.suggestionPublishedTitle',
+                messageKey: 'notifications.suggestionPublishedMessage',
+            },
+            COURSE_SUGGESTION_DECLINED: {
+                titleKey: 'notifications.suggestionDeclinedTitle',
+                messageKey: 'notifications.suggestionDeclinedMessage',
+            },
             ONE_TO_ONE_OFFER: {
                 titleKey: 'notifications.oneToOneTitle',
                 messageKey: 'notifications.oneToOneMessage',
@@ -346,6 +358,9 @@ export default function NotificationsScreen() {
             return { title: notif.title, message: notif.message };
         }
         if (notif.notificationType === 'NEW_MESSAGE' && !params.sender) {
+            return { title: notif.title, message: notif.message };
+        }
+        if (notif.notificationType.startsWith('COURSE_SUGGESTION_') && !params.topic) {
             return { title: notif.title, message: notif.message };
         }
 
@@ -557,6 +572,21 @@ export default function NotificationsScreen() {
                                     <ScrollView style={modalStyles.messageScroll} showsVerticalScrollIndicator={false}>
                                         <Text style={modalStyles.message}>{localized.message}</Text>
                                     </ScrollView>
+                                    {openNotif.notificationType === 'COURSE_SUGGESTION_PUBLISHED' && openNotif.relatedEntityId && (
+                                        <View style={modalStyles.actions}>
+                                            <TouchableOpacity
+                                                style={modalStyles.confirmBtn}
+                                                onPress={() => {
+                                                    const courseId = openNotif.relatedEntityId;
+                                                    setOpenNotif(null);
+                                                    router.push({ pathname: '/course-detail' as any, params: { courseId } });
+                                                }}
+                                                activeOpacity={0.85}
+                                            >
+                                                <Text style={modalStyles.confirmText}>{t('notifications.seeCourse')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                     {offer && (
                                         <View style={modalStyles.actions}>
                                             <TouchableOpacity

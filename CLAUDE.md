@@ -140,6 +140,22 @@ double as the "already sent" record. Groups formed by hand before this
 (enrolments confirmed with no group) keep the dashboard's Form Group.
 `GroupFlowTest` walks the whole flow.
 
+**Course suggestions turn away noise in layers, not by detecting it.** A
+learner who cannot find a course suggests it (from an empty search, or the
+profile); admins look for a trainer and link the course, which tells every
+learner behind it by notification, push and email and registers their
+request, so the group flow takes over. No rule tells "C#" or "SAP FICO"
+from gibberish, so the form only asks for a letter or digit and a sentence
+of what they want to learn — don't tighten it, it refused "C#" once. The
+rest: at most 3 open per learner, admins close noise as "Not a course"
+without telling anyone, and **nothing a learner typed reaches other
+learners until an admin accepted it** ("me too" lists only accepted ones).
+Searches that found nothing (`search_logs.result_count = 0`, sent only
+when no filter is on) are grouped by `TextMatch` and shown once two
+different learners made them. `TextMatch.java` and the app's
+`utils/textMatch.ts` are the same rules — change both. Showing the demand to
+trainers was deliberately left out for now.
+
 ## Conventions
 
 Commit messages explain **why**, in prose, not bullet lists of what changed.

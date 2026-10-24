@@ -139,6 +139,54 @@ public class NotificationService {
                 groupId, "normal", Map.of("course", courseTitle));
     }
 
+    // ── Course suggestions (CourseSuggestionService) ───────────────────
+
+    private void sendAbout(String userId, String userType, String type, String title, String message,
+                           String entityType, String entityId, String priority, Map<String, Object> params) {
+        Notification n = new Notification();
+        n.setNotificationId("NOT_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
+        n.setUserId(userId);
+        n.setUserType(userType);
+        n.setNotificationType(type);
+        n.setTitle(title);
+        n.setMessage(message);
+        n.setRelatedEntityType(entityType);
+        n.setRelatedEntityId(entityId);
+        n.setPriority(priority);
+        n.setActionData(paramsJson(params));
+        notificationRepository.save(n);
+        firePush(userId, type, title, message, entityType, entityId);
+    }
+
+    /** Learner: the course they asked for exists, and their request for it is registered. */
+    @Transactional
+    public void sendSuggestionPublished(String studentId, String courseId, String courseTitle, String topic) {
+        sendAbout(studentId, "student", "COURSE_SUGGESTION_PUBLISHED",
+                courseTitle + " is now available",
+                "You asked for a course on '" + topic + "'. '" + courseTitle + "' is now available, and your "
+                        + "request for it is registered: you will be invited with the dates when a group opens.",
+                "course", courseId, "high", Map.of("course", courseTitle, "courseId", courseId, "topic", topic));
+    }
+
+    /** Learner: the course they asked for will not be offered. */
+    @Transactional
+    public void sendSuggestionDeclined(String studentId, String suggestionId, String topic) {
+        sendAbout(studentId, "student", "COURSE_SUGGESTION_DECLINED",
+                "About your request: " + topic,
+                "Thank you for suggesting '" + topic + "'. We could not find a trainer for it for now, so it "
+                        + "will not be offered at the moment. You are welcome to suggest other courses.",
+                "course_suggestion", suggestionId, "normal", Map.of("topic", topic));
+    }
+
+    /** Administrator: a learner suggested a course. In-app only; the dashboard lists them. */
+    @Transactional
+    public void sendSuggestionToAdmin(String adminId, String suggestionId, String topic) {
+        sendAbout(adminId, "admin", "COURSE_SUGGESTION_NEW",
+                "New course suggestion: " + topic,
+                "A learner asked for a course on '" + topic + "'. Review it on the Course suggestions page.",
+                "course_suggestion", suggestionId, "normal", Map.of("topic", topic));
+    }
+
     /** Administrator: something in a group needs a person. Also recorded so it is sent once. */
     @Transactional
     public void sendAdminGroupAlert(String adminId, String type, String groupId, String title, String message,

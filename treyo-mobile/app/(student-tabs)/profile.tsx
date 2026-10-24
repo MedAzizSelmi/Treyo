@@ -225,6 +225,26 @@ export default function ProfileScreen() {
                     </TouchableOpacity>
                 </View>
 
+                {/* Course suggestions — a course that is not in the
+                    catalogue can be asked for, and followed here. */}
+                <View style={styles.sectionWrap}>
+                    <TouchableOpacity
+                        style={styles.settingsRow}
+                        onPress={() => router.push('/my-suggestions' as any)}
+                        activeOpacity={0.8}
+                    >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.settingsIconWrap}>
+                            <Ionicons name="bulb-outline" size={22} color="#7cce06" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.settingsTitle}>{t('profile.suggestCourse')}</Text>
+                            <Text style={styles.settingsSubtitle}>{t('profile.suggestCourseSubtitle')}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Settings & Privacy entry */}
                 <View style={styles.sectionWrap}>
                     <TouchableOpacity

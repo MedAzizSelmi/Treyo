@@ -20,6 +20,7 @@ import {
   Clock,
   Settings,
   Flag,
+  Lightbulb,
 } from 'lucide-react';
 import { logout } from '@/lib/api';
 import { useState } from 'react';
@@ -31,6 +32,7 @@ const NAV = [
   { label: 'Courses', href: '/dashboard/courses', icon: BookOpen },
   { label: 'Pending Courses', href: '/dashboard/pending-courses', icon: Clock },
   { label: 'Requests', href: '/dashboard/requests', icon: Mail },
+  { label: 'Course Suggestions', href: '/dashboard/suggestions', icon: Lightbulb },
   { label: 'Groups', href: '/dashboard/groups', icon: GitBranch },
   { label: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { label: 'Reviews', href: '/dashboard/reviews', icon: Star },

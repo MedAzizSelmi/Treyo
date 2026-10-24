@@ -38,7 +38,8 @@ public class SearchLogController {
      *   {
      *     "studentId": "...",
      *     "query": "node.js fundamentals",
-     *     "clickedCourseId": "..." | null
+     *     "clickedCourseId": "..." | null,
+     *     "resultCount": 0
      *   }
      *
      * Returns 200 silently — the caller never blocks on this and the
@@ -63,6 +64,7 @@ public class SearchLogController {
         log.setStudentId(studentId);
         log.setQuery(queryText);
         log.setClickedCourseId(clickedCourseId);
+        if (body.get("resultCount") instanceof Number n) log.setResultCount(Math.max(0, n.intValue()));
         searchLogRepository.save(log);
 
         return ResponseEntity.ok(Map.of("status", "ok"));

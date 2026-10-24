@@ -47,4 +47,10 @@ public class SearchLog extends BaseEntity {
      *  shows the catalogue gap). */
     @Column(name = "clicked_course_id", length = 50)
     private String clickedCourseId;
+
+    /** How many courses the search found; 0 is a gap in the catalogue,
+     *  shown to administrators beside the course suggestions. Null on
+     *  searches logged before October 2026, which did not send it. */
+    @Column(name = "result_count")
+    private Integer resultCount;
 }
