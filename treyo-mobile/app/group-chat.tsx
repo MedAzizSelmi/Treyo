@@ -253,6 +253,15 @@ export default function GroupChatScreen() {
             .catch(() => {});
     }, [groupId]);
 
+    // Opened from a notification, the name is not in the route: look it up.
+    const [fetchedName, setFetchedName] = useState<string | null>(null);
+    useEffect(() => {
+        if (!groupId || groupName) return;
+        groupService.getGroup(String(groupId))
+            .then(g => setFetchedName(g?.groupName || null))
+            .catch(() => {});
+    }, [groupId, groupName]);
+
     // Background poll for live updates. Without this, the user has to
     // leave-and-return to see new messages — what the user reported.
     // We hold a ref to the latest `sending` flag so the interval can read
@@ -454,7 +463,7 @@ export default function GroupChatScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.headerTitle} numberOfLines={1}>
-                            {groupName || 'Group chat'}
+                            {groupName || fetchedName || t('chat.groupChat')}
                         </Text>
                         {/* Replaces the static subtitle while anyone is
                             typing, rather than sitting beside it — two

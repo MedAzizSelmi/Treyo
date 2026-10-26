@@ -587,6 +587,22 @@ export default function NotificationsScreen() {
                                             </TouchableOpacity>
                                         </View>
                                     )}
+                                    {openNotif.relatedEntityType === 'group' && openNotif.relatedEntityId
+                                        && openNotif.notificationType === 'ADMIN_BROADCAST' && (
+                                        <View style={modalStyles.actions}>
+                                            <TouchableOpacity
+                                                style={modalStyles.confirmBtn}
+                                                onPress={() => {
+                                                    const groupId = openNotif.relatedEntityId;
+                                                    setOpenNotif(null);
+                                                    router.push({ pathname: '/group-chat' as any, params: { groupId } });
+                                                }}
+                                                activeOpacity={0.85}
+                                            >
+                                                <Text style={modalStyles.confirmText}>{t('notifications.openGroupChat')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
                                     {offer && (
                                         <View style={modalStyles.actions}>
                                             <TouchableOpacity

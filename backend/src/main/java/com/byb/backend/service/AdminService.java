@@ -481,7 +481,7 @@ public class AdminService {
                 saveNotification(g.getTrainerId(), "trainer", req.getTitle(), req.getMessage(), req.getPriority(), g.getGroupId());
                 recipients.add(g.getTrainerId());
             }
-            pushToAll(recipients, req);
+            pushToAll(recipients, req, g);
             return recipients.size();
         }
 
@@ -534,10 +534,21 @@ public class AdminService {
      * instead of a thread per user.
      */
     private void pushToAll(List<String> recipients, SendNotificationRequest req) {
+        pushToAll(recipients, req, null);
+    }
+
+    /** With the group it was sent to, a tap opens that group's chat. */
+    private void pushToAll(List<String> recipients, SendNotificationRequest req, Group group) {
         if (recipients.isEmpty()) return;
         // `type` is what the app's notification-tap handler switches on;
-        // anything non-null routes to the notifications tab.
-        Map<String, Object> data = Map.of("type", "ADMIN_BROADCAST");
+        // anything non-null routes to the notifications tab, unless a
+        // groupId sends it to the group chat.
+        Map<String, Object> data = new java.util.HashMap<>();
+        data.put("type", "ADMIN_BROADCAST");
+        if (group != null) {
+            data.put("groupId", group.getGroupId());
+            if (group.getGroupName() != null) data.put("groupName", group.getGroupName());
+        }
         pushNotificationService.sendToUsers(
                 recipients, req.getTitle(), req.getMessage(), data);
     }

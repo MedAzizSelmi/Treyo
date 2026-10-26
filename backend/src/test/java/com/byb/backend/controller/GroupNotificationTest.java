@@ -9,6 +9,7 @@ import com.byb.backend.service.PushNotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +27,8 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -117,6 +120,18 @@ class GroupNotificationTest {
         for (Student s : members) assertTrue(got(s.getStudentId()));
         assertTrue(got(course.getTrainerId()));
         assertFalse(got(outsider.getStudentId()));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void thePushNamesTheGroupSoATapOpensItsChat() throws Exception {
+        mvc.perform(post("/api/admin/notifications/send").contentType(MediaType.APPLICATION_JSON).content(body(true)).with(ADMIN))
+                .andExpect(status().isOk());
+        ArgumentCaptor<Map<String, Object>> data = ArgumentCaptor.forClass(Map.class);
+        verify(pushNotificationService).sendToUsers(anyList(), eq("Room change"), anyString(), data.capture());
+        assertEquals("ADMIN_BROADCAST", data.getValue().get("type"));
+        assertEquals(group.getGroupId(), data.getValue().get("groupId"));
+        assertEquals("Notify test", data.getValue().get("groupName"));
     }
 
     @Test

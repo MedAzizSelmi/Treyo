@@ -61,6 +61,13 @@ export default function RootLayout() {
             try {
                 if (data.type === 'group_message' && data.groupId) {
                     router.push({ pathname: '/group-chat' as any, params: { groupId: data.groupId } });
+                } else if (data.type === 'ADMIN_BROADCAST' && data.groupId) {
+                    // An administrator's message to one group: read it where
+                    // the group talks about it.
+                    router.push({
+                        pathname: '/group-chat' as any,
+                        params: { groupId: data.groupId, groupName: data.groupName || '' },
+                    });
                 } else if ((data.type === 'GROUP_PAYMENT_OPEN' || data.type === 'GROUP_PAYMENT_REMINDER')
                     && data.entityId) {
                     router.push({ pathname: '/group-offer' as any, params: { groupId: data.entityId } });

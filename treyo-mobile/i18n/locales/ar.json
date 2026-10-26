@@ -356,6 +356,7 @@
         "trainerEmptyBody": "تحصل كل مجموعة من مجموعاتك على محادثة هنا بمجرد تكوينها."
     },
     "chat": {
+        "groupChat": "محادثة المجموعة",
         "placeholder": "اكتب رسالة…",
         "loading": "جارٍ تحميل الرسائل…",
         "notMember": "أنت لست عضوًا في هذه المجموعة",
@@ -416,6 +417,7 @@
         "groupMissedTitle": "بدأت مجموعة {{course}}",
         "groupMissedMessage": "بدأت مجموعة «{{course}}» دون مكانك لأنه لم يُدفع. إن كنت لا تزال مهتمًا، اطلب الدورة من جديد للمجموعة القادمة.",
         "seeCourse": "عرض الدورة",
+        "openGroupChat": "فتح محادثة المجموعة",
         "suggestionPublishedTitle": "أصبحت {{course}} متاحة الآن",
         "suggestionPublishedMessage": "طلبت دورة حول «{{topic}}». أصبحت «{{course}}» متاحة الآن وتم تسجيل طلبك: ستتم دعوتك مع المواعيد عند فتح مجموعة.",
         "suggestionDeclinedTitle": "بخصوص طلبك: {{topic}}",

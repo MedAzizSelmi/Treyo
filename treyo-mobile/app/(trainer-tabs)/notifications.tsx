@@ -309,6 +309,20 @@ export default function TrainerNotificationsScreen() {
                                             </Text>
                                         </TouchableOpacity>
                                     )}
+                                    {openNotif.relatedEntityType === 'group' && openNotif.relatedEntityId
+                                        && openNotif.notificationType === 'ADMIN_BROADCAST' && (
+                                        <TouchableOpacity
+                                            style={modalStyles.actionBtn}
+                                            activeOpacity={0.85}
+                                            onPress={() => {
+                                                const groupId = openNotif.relatedEntityId;
+                                                setOpenNotif(null);
+                                                router.push({ pathname: '/group-chat' as any, params: { groupId } });
+                                            }}
+                                        >
+                                            <Text style={modalStyles.actionText}>{t('notifications.openGroupChat')}</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </>
                             );
                         })()}

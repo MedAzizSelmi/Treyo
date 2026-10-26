@@ -356,6 +356,7 @@
         "trainerEmptyBody": "Cada uno de tus grupos tiene aquí su chat en cuanto se forma."
     },
     "chat": {
+        "groupChat": "Chat del grupo",
         "placeholder": "Escribe un mensaje…",
         "loading": "Cargando mensajes…",
         "notMember": "No eres miembro de este grupo",
@@ -416,6 +417,7 @@
         "groupMissedTitle": "El grupo de {{course}} ha comenzado",
         "groupMissedMessage": "El grupo de «{{course}}» comenzó sin tu plaza, porque no se pagó. Si sigues interesado, vuelve a solicitar el curso para el próximo grupo.",
         "seeCourse": "Ver el curso",
+        "openGroupChat": "Abrir el chat del grupo",
         "suggestionPublishedTitle": "{{course}} ya está disponible",
         "suggestionPublishedMessage": "Pediste un curso sobre «{{topic}}». «{{course}}» ya está disponible y tu solicitud está registrada: te invitaremos con las fechas cuando se abra un grupo.",
         "suggestionDeclinedTitle": "Sobre tu solicitud: {{topic}}",
