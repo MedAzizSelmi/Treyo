@@ -207,6 +207,13 @@ End with `Co-Authored-By: Claude <noreply@anthropic.com>`. Commit and push only
 when asked.
 
 Mobile strings go in all four locales (`treyo-mobile/i18n/locales/`).
+So do the dashboard's (`admin-dashboard/src/i18n/locales/`, read through
+`useI18n()`): admins pick English, French, Arabic or Spanish in the sidebar
+or Settings, remembered per browser. Arabic turns the page right-to-left,
+so the dashboard uses logical classes — `ms-`/`pe-`/`start-`/`text-start`,
+never `ml-`/`pr-`/`left-`/`text-left` — and arrows get `rtl:rotate-180`.
+Messages from the server and what admins send stay as written. The public
+pages (landing, legal, verify-email…) are not part of it.
 The admin-created course categories are **"Domain"** on screen and `module`
 in code, API (`/api/modules`) and database — the word "module" was dropped
 at the October 2026 review. A course's `domain` field holds the chosen

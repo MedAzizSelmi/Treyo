@@ -25,6 +25,7 @@ import {
 } from 'recharts';
 import { getMlHealth, getBackendHealth } from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
+import { useI18n } from '@/i18n/I18nProvider';
 
 /*
  * System Health page.
@@ -48,6 +49,8 @@ type Sample = {
 };
 
 export default function SystemHealthPage() {
+  const { t } = useI18n();
+  const status = (s?: string) => (s ? t(`system.status_${s}`, { defaultValue: s }) : t('system.status_unknown'));
   const [ml, setMl] = useState<any>(null);
   const [be, setBe] = useState<any>(null);
   const [mlErr, setMlErr] = useState<string | null>(null);
@@ -116,8 +119,8 @@ export default function SystemHealthPage() {
   return (
     <div>
       <PageHeader
-        title="System Health"
-        subtitle="Live operational metrics for the ML service and Spring Boot backend"
+        title={t('system.title')}
+        subtitle={t('system.subtitle')}
       />
 
       {(mlErr || beErr) && (
@@ -125,52 +128,52 @@ export default function SystemHealthPage() {
           <AlertTriangle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-semibold text-danger mb-1">
-              One or more services could not be reached
+              {t('system.unreachable')}
             </p>
-            {mlErr && <p className="text-muted">ML service: {mlErr}</p>}
-            {beErr && <p className="text-muted">Backend: {beErr}</p>}
+            {mlErr && <p className="text-muted">{t('system.mlService')}: {mlErr}</p>}
+            {beErr && <p className="text-muted">{t('system.backend')}: {beErr}</p>}
           </div>
         </div>
       )}
 
       {loading && history.length === 0 ? (
-        <p className="text-muted">Loading metrics…</p>
+        <p className="text-muted">{t('system.loading')}</p>
       ) : (
         <>
           {/* ── ML Service ────────────────────────────────────────── */}
           <SectionHeader
             icon={Zap}
-            title="ML Recommendation Service"
+            title={t('system.mlTitle')}
             statusOk={ml?.status === 'ok'}
-            statusLabel={ml?.status ?? 'unknown'}
+            statusLabel={status(ml?.status)}
           />
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <MetricCard
               icon={Layers}
-              label="Model version"
+              label={t('system.modelVersion')}
               value={ml?.model_version ?? '—'}
               hint={
                 ml?.refresh_interval_min
-                  ? `refresh every ${ml.refresh_interval_min}m`
+                  ? t('system.refreshEvery', { min: ml.refresh_interval_min })
                   : undefined
               }
               color="#7cce06"
             />
             <MetricCard
               icon={Cpu}
-              label="Process CPU"
+              label={t('system.processCpu')}
               value={fmtPercent(ml?.process?.cpu_percent)}
               hint={
                 ml?.process?.system_cpu_percent != null
-                  ? `host ${fmtPercent(ml.process.system_cpu_percent)}`
-                  : 'psutil unavailable'
+                  ? t('system.host', { value: fmtPercent(ml.process.system_cpu_percent) })
+                  : t('system.psutilUnavailable')
               }
               color="#3b82f6"
             />
             <MetricCard
               icon={HardDrive}
-              label="Process memory"
+              label={t('system.processMemory')}
               value={fmtPercent(ml?.process?.memory_percent)}
               hint={
                 ml?.process?.memory_rss_mb != null
@@ -181,10 +184,10 @@ export default function SystemHealthPage() {
             />
             <MetricCard
               icon={Timer}
-              label="Uptime"
+              label={t('system.uptime')}
               value={fmtDuration(ml?.uptime_seconds)}
               hint={
-                ml?.scheduler_running ? 'scheduler running' : 'scheduler off'
+                ml?.scheduler_running ? t('system.schedulerOn') : t('system.schedulerOff')
               }
               color="#f59e0b"
             />
@@ -193,25 +196,25 @@ export default function SystemHealthPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <MetricCard
               icon={Database}
-              label="Students"
+              label={t('system.students')}
               value={ml?.data?.students ?? '—'}
               color="#7cce06"
             />
             <MetricCard
               icon={Database}
-              label="Courses"
+              label={t('system.courses')}
               value={ml?.data?.courses ?? '—'}
               color="#3b82f6"
             />
             <MetricCard
               icon={Database}
-              label="Interactions"
+              label={t('system.interactions')}
               value={ml?.data?.interactions ?? '—'}
               color="#a855f7"
             />
             <MetricCard
               icon={Activity}
-              label="Cache hit rate"
+              label={t('system.cacheHitRate')}
               value={
                 typeof ml?.rec_cache?.hit_rate === 'number'
                   ? `${Math.round(ml.rec_cache.hit_rate * 100)}%`
@@ -219,7 +222,7 @@ export default function SystemHealthPage() {
               }
               hint={
                 ml?.rec_cache
-                  ? `${ml.rec_cache.entries} entries / ${ml.rec_cache.hits + ml.rec_cache.misses} reqs`
+                  ? t('system.cacheHint', { entries: ml.rec_cache.entries, reqs: ml.rec_cache.hits + ml.rec_cache.misses })
                   : undefined
               }
               color="#22c55e"
@@ -229,42 +232,42 @@ export default function SystemHealthPage() {
           {/* ── Spring Boot Backend ───────────────────────────────── */}
           <SectionHeader
             icon={Server}
-            title="Backend (Spring Boot)"
+            title={t('system.backendTitle')}
             statusOk={be?.status === 'ok'}
-            statusLabel={be?.status ?? 'unknown'}
+            statusLabel={status(be?.status)}
           />
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <MetricCard
               icon={HardDrive}
-              label="JVM heap"
+              label={t('system.jvmHeap')}
               value={fmtPercent(be?.jvm?.heap_percent)}
               hint={
                 be?.jvm?.heap_used_mb != null && be?.jvm?.heap_max_mb != null
                   ? `${be.jvm.heap_used_mb} / ${be.jvm.heap_max_mb} MB`
                   : be?.jvm?.heap_used_mb != null
-                    ? `${be.jvm.heap_used_mb} MB used`
+                    ? t('system.mbUsed', { mb: be.jvm.heap_used_mb })
                     : undefined
               }
               color="#3b82f6"
             />
             <MetricCard
               icon={RefreshCw}
-              label="JVM threads"
+              label={t('system.jvmThreads')}
               value={be?.jvm?.thread_count ?? '—'}
-              hint={`${be?.jvm?.processors ?? '?'} cores`}
+              hint={t('system.cores', { n: be?.jvm?.processors ?? '?' })}
               color="#a855f7"
             />
             <MetricCard
               icon={Cpu}
-              label="System load (1m)"
+              label={t('system.systemLoad')}
               value={be?.jvm?.system_load_1m ?? '—'}
-              hint={be?.jvm?.system_load_1m == null ? 'unsupported on this OS' : undefined}
+              hint={be?.jvm?.system_load_1m == null ? t('system.unsupportedOs') : undefined}
               color="#f59e0b"
             />
             <MetricCard
               icon={Timer}
-              label="Uptime"
+              label={t('system.uptime')}
               value={fmtDuration(be?.jvm?.uptime_seconds)}
               hint={`Java ${be?.jvm?.jvm_version ?? '?'}`}
               color="#22c55e"
@@ -274,25 +277,25 @@ export default function SystemHealthPage() {
           {/* ── Sparklines ───────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Sparkline
-              title="ML CPU (%)"
+              title={t('system.chartMlCpu')}
               data={history}
               dataKey="mlCpu"
               color="#3b82f6"
             />
             <Sparkline
-              title="ML memory (%)"
+              title={t('system.chartMlMem')}
               data={history}
               dataKey="mlMem"
               color="#a855f7"
             />
             <Sparkline
-              title="JVM heap (%)"
+              title={t('system.chartJvmHeap')}
               data={history}
               dataKey="jvmHeap"
               color="#22c55e"
             />
             <Sparkline
-              title="Cache hit rate (%)"
+              title={t('system.chartCache')}
               data={history}
               dataKey="cacheHitRate"
               color="#7cce06"
@@ -300,9 +303,11 @@ export default function SystemHealthPage() {
           </div>
 
           <p className="text-xs text-muted mt-6">
-            Auto-refreshes every {POLL_MS / 1000}s. Showing last{' '}
-            {history.length} samples ({Math.round((history.length * POLL_MS) / 60000)}{' '}
-            minutes max).
+            {t('system.footer', {
+              sec: POLL_MS / 1000,
+              n: history.length,
+              min: Math.round((history.length * POLL_MS) / 60000),
+            })}
           </p>
         </>
       )}
@@ -390,6 +395,7 @@ function Sparkline({
   dataKey: keyof Sample;
   color: string;
 }) {
+  const { t } = useI18n();
   // Only render once we have at least 2 points — recharts can't draw a
   // line through a single sample and would just show an empty canvas.
   if (data.length < 2) {
@@ -397,7 +403,7 @@ function Sparkline({
       <div className="bg-card border border-border rounded-2xl p-4">
         <p className="text-sm font-semibold text-white mb-2">{title}</p>
         <div className="h-28 flex items-center justify-center text-muted text-xs">
-          collecting samples…
+          {t('system.collecting')}
         </div>
       </div>
     );

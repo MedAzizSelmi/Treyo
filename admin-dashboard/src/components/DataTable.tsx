@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 
 type Column<T> = {
   key: string;
@@ -25,8 +26,9 @@ export default function DataTable<T extends Record<string, any>>({
   searchable = true,
   searchKeys = [],
   pageSize = 10,
-  emptyMessage = 'No data found',
+  emptyMessage,
 }: Props<T>) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -68,13 +70,13 @@ export default function DataTable<T extends Record<string, any>>({
       {searchable && (
         <div className="p-4 border-b border-border">
           <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder={t('common.searchPh')}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-              className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 transition"
+              className="w-full ps-10 pe-4 py-2 bg-background border border-border rounded-xl text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent/50 transition"
             />
           </div>
         </div>
@@ -88,7 +90,7 @@ export default function DataTable<T extends Record<string, any>>({
                 <th
                   key={col.key}
                   onClick={() => col.sortable && handleSort(col.key)}
-                  className={`px-5 py-3 text-left text-xs font-semibold text-muted uppercase tracking-wider ${
+                  className={`px-5 py-3 text-start text-xs font-semibold text-muted uppercase tracking-wider ${
                     col.sortable ? 'cursor-pointer hover:text-foreground select-none' : ''
                   }`}
                 >
@@ -106,7 +108,7 @@ export default function DataTable<T extends Record<string, any>>({
             {paged.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-5 py-12 text-center text-muted text-sm">
-                  {emptyMessage}
+                  {emptyMessage || t('common.noData')}
                 </td>
               </tr>
             ) : (
@@ -130,8 +132,11 @@ export default function DataTable<T extends Record<string, any>>({
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-5 py-3 border-t border-border">
           <p className="text-xs text-muted">
-            Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, filtered.length)} of{' '}
-            {filtered.length}
+            {t('common.showing', {
+              from: page * pageSize + 1,
+              to: Math.min((page + 1) * pageSize, filtered.length),
+              total: filtered.length,
+            })}
           </p>
           <div className="flex items-center gap-2">
             <button
@@ -139,7 +144,7 @@ export default function DataTable<T extends Record<string, any>>({
               disabled={page === 0}
               className="p-1.5 rounded-lg border border-border hover:bg-card-hover disabled:opacity-30 transition"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
             <span className="text-xs text-muted px-2">
               {page + 1} / {totalPages}
@@ -149,7 +154,7 @@ export default function DataTable<T extends Record<string, any>>({
               disabled={page >= totalPages - 1}
               className="p-1.5 rounded-lg border border-border hover:bg-card-hover disabled:opacity-30 transition"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
           </div>
         </div>

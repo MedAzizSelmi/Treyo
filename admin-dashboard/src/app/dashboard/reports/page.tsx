@@ -9,6 +9,7 @@ import {
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Badge from '@/components/Badge';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   Flag, ShieldCheck, ShieldX, X, Loader2, User, GraduationCap,
   BookOpen, AlertTriangle,
@@ -24,14 +25,19 @@ import {
 
 type StatusFilter = 'OPEN' | 'REVIEWED' | 'DISMISSED' | 'ALL';
 
-const FILTERS: { key: StatusFilter; label: string }[] = [
-  { key: 'OPEN', label: 'Open' },
-  { key: 'REVIEWED', label: 'Reviewed' },
-  { key: 'DISMISSED', label: 'Dismissed' },
-  { key: 'ALL', label: 'All' },
+// Labels: reports.status_OPEN, _REVIEWED, _DISMISSED, _ALL.
+const FILTERS: { key: StatusFilter }[] = [
+  { key: 'OPEN' },
+  { key: 'REVIEWED' },
+  { key: 'DISMISSED' },
+  { key: 'ALL' },
 ];
 
 export default function ReportsPage() {
+  const { t, locale } = useI18n();
+  /** The reason in the dashboard's language; the server's English label otherwise. */
+  const reason = (r: any) => t(`reports.reason_${r.reason || 'OTHER'}`, { defaultValue: r.reasonLabel });
+  const status = (s: string) => t(`reports.status_${s}`, { defaultValue: s });
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<StatusFilter>('OPEN');
@@ -65,7 +71,7 @@ export default function ReportsPage() {
       setNote('');
       await load();
     } catch (e: any) {
-      setError(e?.response?.data?.error || 'Could not update the report.');
+      setError(e?.response?.data?.error || t('reports.updateFailed'));
     } finally {
       setBusy(false);
     }
@@ -79,8 +85,8 @@ export default function ReportsPage() {
   return (
     <div>
       <PageHeader
-        title="Reports"
-        subtitle="Trainer reports raised by students"
+        title={t('reports.title')}
+        subtitle={t('reports.subtitle')}
       />
 
       {/* Status filter */}
@@ -95,13 +101,13 @@ export default function ReportsPage() {
                 : 'bg-card border border-border text-muted hover:text-foreground'
             }`}
           >
-            {f.label}
+            {status(f.key)}
           </button>
         ))}
         {filter === 'OPEN' && openCount > 0 && (
-          <span className="ml-auto flex items-center gap-1.5 text-xs text-warning font-semibold">
+          <span className="ms-auto flex items-center gap-1.5 text-xs text-warning font-semibold">
             <AlertTriangle className="w-3.5 h-3.5" />
-            {openCount} awaiting review
+            {t('reports.awaiting', { count: openCount })}
           </span>
         )}
       </div>
@@ -111,11 +117,9 @@ export default function ReportsPage() {
       ) : reports.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <Flag className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-sm text-foreground font-semibold mb-1">Nothing here</p>
+          <p className="text-sm text-foreground font-semibold mb-1">{t('reports.nothing')}</p>
           <p className="text-xs text-muted">
-            {filter === 'OPEN'
-              ? 'No reports are awaiting review.'
-              : `No ${filter.toLowerCase()} reports.`}
+            {filter === 'OPEN' ? t('reports.noneOpen') : t('reports.noneIn', { status: status(filter) })}
           </p>
         </div>
       ) : (
@@ -124,7 +128,7 @@ export default function ReportsPage() {
             <button
               key={r.reportId}
               onClick={() => { setNote(r.adminNote || ''); setError(''); setReviewing(r); }}
-              className="w-full text-left rounded-xl border border-border bg-card p-4 hover:border-accent/40 transition"
+              className="w-full text-start rounded-xl border border-border bg-card p-4 hover:border-accent/40 transition"
             >
               <div className="flex items-start gap-4">
                 <div className="w-11 h-11 rounded-xl bg-danger/10 border border-danger/25 flex items-center justify-center flex-shrink-0">
@@ -132,11 +136,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-bold text-white truncate">{r.reasonLabel}</h3>
-                    <Badge variant={statusVariant(r.status) as any}>{r.status}</Badge>
+                    <h3 className="text-sm font-bold text-white truncate">{reason(r)}</h3>
+                    <Badge variant={statusVariant(r.status) as any}>{status(r.status)}</Badge>
                     {r.trainerReportCount > 1 && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/15 text-warning font-semibold">
-                        {r.trainerReportCount} reports on this trainer
+                        {t('reports.onTrainer', { count: r.trainerReportCount })}
                       </span>
                     )}
                   </div>
@@ -145,7 +149,7 @@ export default function ReportsPage() {
                       <User className="w-3 h-3" /> {r.trainerName}
                     </span>
                     <span className="flex items-center gap-1">
-                      <GraduationCap className="w-3 h-3" /> by {r.studentName}
+                      <GraduationCap className="w-3 h-3" /> {t('reports.by', { name: r.studentName })}
                     </span>
                     {r.courseTitle && (
                       <span className="flex items-center gap-1">
@@ -157,7 +161,7 @@ export default function ReportsPage() {
                     <p className="text-xs text-muted mt-2 line-clamp-2">{r.details}</p>
                   )}
                 </div>
-                <span className="text-xs text-muted whitespace-nowrap">Review →</span>
+                <span className="text-xs text-muted whitespace-nowrap">{t('reports.review')}</span>
               </div>
             </button>
           ))}
@@ -176,32 +180,32 @@ export default function ReportsPage() {
           >
             <button
               onClick={() => !busy && setReviewing(null)}
-              className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
+              className="absolute top-4 end-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
             >
               <X className="w-4 h-4 text-muted" />
             </button>
 
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold text-white">{reviewing.reasonLabel}</h2>
-              <Badge variant={statusVariant(reviewing.status) as any}>{reviewing.status}</Badge>
+              <h2 className="text-xl font-bold text-white">{reason(reviewing)}</h2>
+              <Badge variant={statusVariant(reviewing.status) as any}>{status(reviewing.status)}</Badge>
             </div>
             <p className="text-sm text-muted mb-5">
-              Reported by {reviewing.studentName} · {new Date(reviewing.createdAt).toLocaleString()}
+              {t('reports.reportedBy', { name: reviewing.studentName })} · {new Date(reviewing.createdAt).toLocaleString(locale)}
             </p>
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 border border-border rounded-xl p-4 bg-card-hover/40 mb-5">
-              <Fact label="Trainer" value={reviewing.trainerName} />
-              <Fact label="Trainer email" value={reviewing.trainerEmail} />
-              <Fact label="Reported by" value={reviewing.studentName} />
-              <Fact label="Student email" value={reviewing.studentEmail} />
-              {reviewing.courseTitle && <Fact label="Course" value={reviewing.courseTitle} />}
-              <Fact label="Total reports on trainer" value={reviewing.trainerReportCount} />
+              <Fact label={t('reports.trainer')} value={reviewing.trainerName} />
+              <Fact label={t('reports.trainerEmail')} value={reviewing.trainerEmail} />
+              <Fact label={t('reports.reportedByLabel')} value={reviewing.studentName} />
+              <Fact label={t('reports.studentEmail')} value={reviewing.studentEmail} />
+              {reviewing.courseTitle && <Fact label={t('reports.course')} value={reviewing.courseTitle} />}
+              <Fact label={t('reports.totalOnTrainer')} value={reviewing.trainerReportCount} />
             </div>
 
             {reviewing.details && (
               <div className="mb-5">
                 <h3 className="text-xs uppercase tracking-wider text-muted font-semibold mb-2">
-                  What the student said
+                  {t('reports.whatTheySaid')}
                 </h3>
                 <p className="text-sm text-foreground/85 whitespace-pre-wrap rounded-lg bg-card-hover border border-border p-3">
                   {reviewing.details}
@@ -211,12 +215,12 @@ export default function ReportsPage() {
 
             <div className="mb-2">
               <h3 className="text-xs uppercase tracking-wider text-muted font-semibold mb-2">
-                Admin note (internal)
+                {t('reports.adminNote')}
               </h3>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Record what you decided and why. Only visible to admins."
+                placeholder={t('reports.notePh')}
                 className="w-full min-h-[80px] rounded-lg bg-card-hover border border-border p-3 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
               />
             </div>
@@ -230,7 +234,7 @@ export default function ReportsPage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-card-hover text-muted hover:text-foreground transition disabled:opacity-60"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldX className="w-4 h-4" />}
-                Dismiss
+                {t('reports.dismiss')}
               </button>
               <button
                 onClick={() => decide('REVIEWED')}
@@ -238,7 +242,7 @@ export default function ReportsPage() {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-success text-black hover:bg-success/90 transition disabled:opacity-60"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                Mark reviewed
+                {t('reports.markReviewed')}
               </button>
             </div>
           </div>

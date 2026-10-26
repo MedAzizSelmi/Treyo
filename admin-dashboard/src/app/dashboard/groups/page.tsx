@@ -6,6 +6,7 @@ import { getAllGroups, approveGroupSchedule, getGroupCallList, saveGroupSchedule
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Badge from '@/components/Badge';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   BookOpen,
   Users,
@@ -35,9 +36,9 @@ type StatusFilter = 'all' | 'review' | 'payment' | 'active' | 'ready' | 'complet
  * GroupAutomationService.stage). Started groups show their status.
  */
 const STAGE_LABEL: Record<string, string> = {
-  awaiting_schedule: 'Awaiting schedule',
-  awaiting_review: 'Schedule to review',
-  open_for_payment: 'Open for payment',
+  awaiting_schedule: 'groups.stageAwaitingSchedule',
+  awaiting_review: 'groups.stageAwaitingReview',
+  open_for_payment: 'groups.stageOpenForPayment',
 };
 
 /** Sessions as stored on the group: {"sessions":[{date,time,hours}]}. */
@@ -61,6 +62,10 @@ function needsCalls(g: any): boolean {
 }
 
 export default function GroupsPage() {
+  const { t, locale } = useI18n();
+  /** A started group's status, or where a group being prepared stands. */
+  const stageLabel = (g: any, status: string) =>
+    STAGE_LABEL[g.stage] ? t(STAGE_LABEL[g.stage]) : t(`groups.status_${status}`, { defaultValue: status });
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<any | null>(null);
@@ -105,10 +110,10 @@ export default function GroupsPage() {
     setNotice(null);
     try {
       const r = await approveGroupSchedule(g.groupId);
-      setNotice({ kind: 'ok', text: `Schedule approved — ${r.data?.invited ?? 0} learner(s) invited to pay.` });
+      setNotice({ kind: 'ok', text: t('groups.approved', { count: r.data?.invited ?? 0 }) });
       await loadGroups();
     } catch (e: any) {
-      setNotice({ kind: 'error', text: e?.response?.data?.error || 'Could not approve the schedule.' });
+      setNotice({ kind: 'error', text: e?.response?.data?.error || t('groups.approveFailed') });
     } finally {
       setBusy(false);
     }
@@ -142,8 +147,8 @@ export default function GroupsPage() {
   return (
     <div>
       <PageHeader
-        title="Groups"
-        subtitle="Groups open by themselves when a course reaches its minimum requests — review their schedules here"
+        title={t('groups.title')}
+        subtitle={t('groups.subtitle')}
       />
 
       {/* What needs a person: the rest of the flow runs on its own. */}
@@ -152,10 +157,10 @@ export default function GroupsPage() {
           <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="text-sm text-foreground/90 space-y-1">
             {toReview > 0 && (
-              <p><strong className="text-white">{toReview}</strong> schedule{toReview === 1 ? '' : 's'} to review — approving one invites its learners to pay.</p>
+              <p><strong className="text-white">{toReview}</strong> {t('groups.toReview', { count: toReview })}</p>
             )}
             {toCall > 0 && (
-              <p><strong className="text-white">{toCall}</strong> group{toCall === 1 ? '' : 's'} near the deadline without the minimum paid — open {toCall === 1 ? 'it' : 'them'} for the learners to call.</p>
+              <p><strong className="text-white">{toCall}</strong> {t('groups.toCall', { count: toCall })}</p>
             )}
           </div>
         </div>
@@ -163,32 +168,32 @@ export default function GroupsPage() {
 
       {/* Top stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={GitBranch} color="success" value={groups.length} label="Total Groups" />
-        <StatCard icon={GraduationCap} color="accent" value={totalMembers} label="Students Learning" />
-        <StatCard icon={CheckCircle2} color="info" value={paidMembers} label="Paid Enrollments" />
-        <StatCard icon={Clock} color="warning" value={activeCount} label="Currently Active" />
+        <StatCard icon={GitBranch} color="success" value={groups.length} label={t('groups.totalGroups')} />
+        <StatCard icon={GraduationCap} color="accent" value={totalMembers} label={t('groups.studentsLearning')} />
+        <StatCard icon={CheckCircle2} color="info" value={paidMembers} label={t('groups.paidEnrollments')} />
+        <StatCard icon={Clock} color="warning" value={activeCount} label={t('groups.currentlyActive')} />
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
-            placeholder="Search group, course or trainer..."
+            placeholder={t('groups.searchPh')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+            className="w-full ps-10 pe-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-4 h-4 text-muted" />
-          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="All" />
-          <FilterChip active={filter === 'review'} onClick={() => setFilter('review')} label="To review" tone="warning" />
-          <FilterChip active={filter === 'payment'} onClick={() => setFilter('payment')} label="Open for payment" tone="info" />
-          <FilterChip active={filter === 'active'} onClick={() => setFilter('active')} label="Active" tone="success" />
-          <FilterChip active={filter === 'ready'} onClick={() => setFilter('ready')} label="Ready" tone="warning" />
-          <FilterChip active={filter === 'completed'} onClick={() => setFilter('completed')} label="Completed" tone="info" />
+          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label={t('groups.all')} />
+          <FilterChip active={filter === 'review'} onClick={() => setFilter('review')} label={t('groups.filterReview')} tone="warning" />
+          <FilterChip active={filter === 'payment'} onClick={() => setFilter('payment')} label={t('groups.stageOpenForPayment')} tone="info" />
+          <FilterChip active={filter === 'active'} onClick={() => setFilter('active')} label={t('groups.status_active')} tone="success" />
+          <FilterChip active={filter === 'ready'} onClick={() => setFilter('ready')} label={t('groups.status_ready')} tone="warning" />
+          <FilterChip active={filter === 'completed'} onClick={() => setFilter('completed')} label={t('groups.status_completed')} tone="info" />
         </div>
       </div>
 
@@ -201,11 +206,11 @@ export default function GroupsPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={GitBranch}
-            title={groups.length === 0 ? 'No groups formed yet' : 'No matching groups'}
+            title={groups.length === 0 ? t('groups.noGroups') : t('groups.noMatch')}
             hint={
               groups.length === 0
-                ? 'A group opens here by itself once a course reaches its minimum requests.'
-                : 'Try clearing the search or filter.'
+                ? t('groups.noGroupsBody')
+                : t('groups.noMatchBody')
             }
           />
         ) : (
@@ -227,29 +232,29 @@ export default function GroupsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="font-medium text-white truncate">{g.groupName}</p>
-                        <Badge variant={statusVariant(status)}>{STAGE_LABEL[g.stage] || status}</Badge>
+                        <Badge variant={statusVariant(status)}>{stageLabel(g, status)}</Badge>
                         {g.stage === 'open_for_payment' && (
                           <span className={`text-[11px] font-semibold ${needsCalls(g) ? 'text-warning' : 'text-muted'}`}>
-                            {g.joinedCount ?? 0}/{g.minStudents ?? '?'} paid
+                            {t('groups.paidOf', { paid: g.joinedCount ?? 0, min: g.minStudents ?? '?' })}
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-muted truncate">
-                        {g.courseTitle} · trainer {g.trainerName}
+                        {g.courseTitle} · {t('groups.trainerName', { name: g.trainerName })}
                       </p>
                     </div>
                     <div className="hidden md:flex items-center gap-4 text-xs">
                       <PillStat
-                        label="Members"
+                        label={t('groups.members')}
                         value={`${memberCount}/${g.maxSize || 0}`}
                         accent="success"
                       />
                       <div className="flex items-center gap-1.5 text-muted">
                         {g.isOnline ? <Globe className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
-                        <span>{g.isOnline ? 'Online' : g.meetingLocation || 'In-person'}</span>
+                        <span>{g.isOnline ? t('groups.online') : g.meetingLocation || t('groups.inPerson')}</span>
                       </div>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-muted flex-shrink-0" />
+                    <ArrowRight className="w-4 h-4 text-muted flex-shrink-0 rtl:rotate-180" />
                   </div>
                   {/* Fill bar */}
                   <div className="mt-3 flex items-center gap-3">
@@ -259,7 +264,7 @@ export default function GroupsPage() {
                         style={{ width: `${Math.min(fill, 100)}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-muted font-medium w-16 text-right">
+                    <span className="text-[10px] text-muted font-medium w-16 text-end">
                       {memberCount}/{g.maxSize || 0}
                     </span>
                   </div>
@@ -273,21 +278,21 @@ export default function GroupsPage() {
       {/* Drawer */}
       {open && (
         <Drawer onClose={() => setOpen(null)}>
-          <DrawerHeader label="Group Details" title={open.groupName} onClose={() => setOpen(null)} />
+          <DrawerHeader label={t('groups.details')} title={open.groupName} onClose={() => setOpen(null)} />
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             <div className="bg-card-hover/40 border border-border rounded-xl p-4 space-y-2.5">
-              <Row icon={BookOpen} label="Course" value={open.courseTitle} />
-              <Row icon={Users} label="Trainer" value={open.trainerName} />
+              <Row icon={BookOpen} label={t('groups.course')} value={open.courseTitle} />
+              <Row icon={Users} label={t('groups.trainer')} value={open.trainerName} />
               <Row
                 icon={open.isOnline ? Globe : MapPin}
-                label={open.isOnline ? 'Format' : 'Location'}
-                value={open.isOnline ? 'Online sessions' : open.meetingLocation || 'In-person'}
+                label={open.isOnline ? t('groups.format') : t('groups.location')}
+                value={open.isOnline ? t('groups.onlineSessions') : open.meetingLocation || t('groups.inPerson')}
               />
               {open.startDate && (
                 <Row
                   icon={Calendar}
-                  label="Started"
-                  value={new Date(open.startDate).toLocaleDateString('en-US', {
+                  label={t('groups.started')}
+                  value={new Date(open.startDate).toLocaleDateString(locale, {
                     weekday: 'short',
                     month: 'short',
                     day: 'numeric',
@@ -297,8 +302,8 @@ export default function GroupsPage() {
               )}
               <Row
                 icon={GitBranch}
-                label="Status"
-                value={(open.groupStatus || 'unknown').charAt(0).toUpperCase() + (open.groupStatus || 'unknown').slice(1)}
+                label={t('groups.statusLabel')}
+                value={stageLabel(open, (open.groupStatus || 'unknown').toLowerCase())}
               />
             </div>
 
@@ -323,16 +328,15 @@ export default function GroupsPage() {
               <div>
                 <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                   <Phone className="w-4 h-4 text-accent" />
-                  Not paid yet ({callList?.length ?? '…'})
+                  {t('groups.notPaid', { count: callList?.length ?? '…' })}
                 </h4>
                 <p className="text-xs text-muted mb-3">
-                  {open.joinedCount ?? 0} of {open.minStudents ?? '?'} needed have paid. 24 hours before the first
-                  session the group starts with whoever has paid; if nobody has, it closes and nothing is charged.
+                  {t('groups.paidExplain', { paid: open.joinedCount ?? 0, min: open.minStudents ?? '?' })}
                 </p>
                 {callList === null ? (
                   <LoadingSpinner />
                 ) : callList.length === 0 ? (
-                  <EmptyMini icon={CheckCircle2} text="Everyone invited has paid" />
+                  <EmptyMini icon={CheckCircle2} text={t('groups.allPaid')} />
                 ) : (
                   <ul className="space-y-2">
                     {callList.map((c: any) => (
@@ -346,7 +350,7 @@ export default function GroupsPage() {
                             {c.phone}
                           </a>
                         ) : (
-                          <span className="text-[11px] text-muted">No phone</span>
+                          <span className="text-[11px] text-muted">{t('groups.noPhone')}</span>
                         )}
                       </li>
                     ))}
@@ -356,14 +360,14 @@ export default function GroupsPage() {
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <FunnelStat icon={GraduationCap} label="Members" value={open.members?.length || 0} tone="success" />
-              <FunnelStat icon={Users} label="Capacity" value={open.maxSize || 0} tone="muted" />
+              <FunnelStat icon={GraduationCap} label={t('groups.members')} value={open.members?.length || 0} tone="success" />
+              <FunnelStat icon={Users} label={t('groups.capacity')} value={open.maxSize || 0} tone="muted" />
             </div>
 
             <div>
               <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-accent" />
-                Enrolled Students ({open.members?.length || 0})
+                {t('groups.enrolledStudents', { count: open.members?.length || 0 })}
               </h4>
               {open.members?.length > 0 ? (
                 <ul className="space-y-2">
@@ -375,12 +379,12 @@ export default function GroupsPage() {
                         name={m.studentName || m.studentId}
                         email={m.studentEmail}
                         badge={{
-                          label: paid ? 'Paid' : 'Unpaid',
+                          label: paid ? t('groups.paid') : t('groups.unpaid'),
                           variant: paid ? 'success' : 'warning',
                         }}
                         extra={
                           typeof m.progressPercentage === 'number'
-                            ? `${Math.round(Number(m.progressPercentage))}% complete`
+                            ? t('groups.complete', { pct: Math.round(Number(m.progressPercentage)) })
                             : null
                         }
                       />
@@ -388,7 +392,7 @@ export default function GroupsPage() {
                   })}
                 </ul>
               ) : (
-                <EmptyMini icon={Clock} text="No members assigned yet" />
+                <EmptyMini icon={Clock} text={t('groups.noMembers')} />
               )}
             </div>
           </div>
@@ -401,7 +405,7 @@ export default function GroupsPage() {
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
-            setNotice({ kind: 'ok', text: 'Schedule saved.' });
+            setNotice({ kind: 'ok', text: t('groups.saved') });
             await loadGroups();
           }}
         />
@@ -418,24 +422,25 @@ function ScheduleSection({
   const sessions = parseSessions(group.meetingSchedule);
   const total = sessions.reduce((s, x) => s + (x.hours || 0), 0);
   const locked = group.stage === 'open_for_payment';
+  const { t, locale } = useI18n();
   return (
     <div>
       <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
         <Calendar className="w-4 h-4 text-accent" />
-        Schedule {sessions.length > 0 && <span className="text-muted font-normal">· {total}h of {group.courseDurationHours ?? '?'}h</span>}
+        {t('groups.schedule')} {sessions.length > 0 && <span className="text-muted font-normal">· {t('groups.hoursOf', { total, of: group.courseDurationHours ?? '?' })}</span>}
       </h4>
       {sessions.length === 0 ? (
-        <EmptyMini icon={Clock} text="The trainer has not scheduled this group yet — you can do it yourself." />
+        <EmptyMini icon={Clock} text={t('groups.notScheduled')} />
       ) : (
         <ul className="space-y-1.5 mb-3">
           {sessions.map((s, i) => (
             <li key={`${s.date}-${i}`} className="flex items-center gap-3 text-sm px-3 py-2 rounded-lg bg-card-hover/40 border border-border">
               <span className="text-muted w-5">{i + 1}</span>
               <span className="text-white flex-1">
-                {new Date(`${s.date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                {new Date(`${s.date}T00:00:00`).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
               <span className="text-foreground/80">{s.time}</span>
-              <span className="text-muted w-10 text-right">{s.hours}h</span>
+              <span className="text-muted w-10 text-end">{s.hours}h</span>
             </li>
           ))}
         </ul>
@@ -445,7 +450,7 @@ function ScheduleSection({
           onClick={onEdit}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border text-foreground hover:bg-card-hover transition"
         >
-          <Pencil className="w-3.5 h-3.5" /> {sessions.length === 0 ? 'Create schedule' : 'Edit schedule'}
+          <Pencil className="w-3.5 h-3.5" /> {sessions.length === 0 ? t('groups.createSchedule') : t('groups.editSchedule')}
         </button>
         {group.stage === 'awaiting_review' && (
           <button
@@ -453,7 +458,7 @@ function ScheduleSection({
             disabled={busy}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-accent text-black hover:bg-accent/90 disabled:opacity-50 transition"
           >
-            <CalendarCheck className="w-3.5 h-3.5" /> Approve &amp; invite learners
+            <CalendarCheck className="w-3.5 h-3.5" /> {t('groups.approveInvite')}
           </button>
         )}
         {group.stage === 'awaiting_schedule' && sessions.length > 0 && (
@@ -462,14 +467,13 @@ function ScheduleSection({
             disabled={busy}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-accent text-black hover:bg-accent/90 disabled:opacity-50 transition"
           >
-            <CalendarCheck className="w-3.5 h-3.5" /> Approve &amp; invite learners
+            <CalendarCheck className="w-3.5 h-3.5" /> {t('groups.approveInvite')}
           </button>
         )}
       </div>
       {locked && (
         <p className="text-[11px] text-warning mt-2">
-          Learners are paying for these dates and there are no refunds — the trainer can no longer change them.
-          If you change them, contact the learners who have paid.
+          {t('groups.lockedNote')}
         </p>
       )}
     </div>
@@ -489,6 +493,7 @@ function ScheduleEditor({ group, onClose, onSaved }: { group: any; onClose: () =
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useI18n();
   const duration = Number(group.courseDurationHours) || 0;
   const total = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
   const dates = rows.map((r) => r.date);
@@ -508,7 +513,7 @@ function ScheduleEditor({ group, onClose, onSaved }: { group: any; onClose: () =
       await saveGroupSchedule(group.groupId, sorted.map((r) => ({ ...r, hours: Number(r.hours) })));
       onSaved();
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.response?.data?.error || 'Could not save the schedule.');
+      setError(e?.response?.data?.message || e?.response?.data?.error || t('groups.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -517,14 +522,14 @@ function ScheduleEditor({ group, onClose, onSaved }: { group: any; onClose: () =
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div className="relative w-full max-w-lg rounded-2xl bg-card border border-border p-6" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center">
+        <button onClick={onClose} className="absolute top-4 end-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center">
           <X className="w-4 h-4 text-muted" />
         </button>
-        <h2 className="text-lg font-bold text-white mb-1">Schedule — {group.groupName}</h2>
+        <h2 className="text-lg font-bold text-white mb-1">{t('groups.scheduleOf', { name: group.groupName })}</h2>
         <p className={`text-xs mb-4 ${duration > 0 && total !== duration ? 'text-warning' : 'text-muted'}`}>
-          {total}h scheduled{duration > 0 ? ` of the course's ${duration}h — they must match` : ''}
+          {duration > 0 ? t('groups.scheduledOfCourse', { total, duration }) : t('groups.scheduled', { total })}
         </p>
-        <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+        <div className="space-y-2 max-h-[50vh] overflow-y-auto pe-1">
           {rows.map((r, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type="date" min={today} value={r.date} onChange={(e) => set(i, { date: e.target.value })}
@@ -543,19 +548,19 @@ function ScheduleEditor({ group, onClose, onSaved }: { group: any; onClose: () =
         </div>
         <button onClick={() => setRows((rs) => [...rs, { date: today, time: '18:00', hours: 2 }])}
           className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline">
-          <Plus className="w-3.5 h-3.5" /> Add a session
+          <Plus className="w-3.5 h-3.5" /> {t('groups.addSession')}
         </button>
         {(duplicate || past) && (
           <p className="text-xs text-danger mt-3">
-            {duplicate ? 'Two sessions are on the same day. ' : ''}{past ? 'A session is in the past.' : ''}
+            {duplicate ? t('groups.sameDay') + ' ' : ''}{past ? t('groups.inPast') : ''}
           </p>
         )}
         {error && <p className="text-xs text-danger mt-3">{error}</p>}
         <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-border">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted hover:text-foreground">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-muted hover:text-foreground">{t('common.cancel')}</button>
           <button onClick={save} disabled={!valid || saving}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-black hover:bg-accent/90 transition disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save schedule'}
+            {saving ? t('common.saving') : t('groups.saveSchedule')}
           </button>
         </div>
       </div>
@@ -668,6 +673,7 @@ function FunnelStat({
     warning: 'bg-warning/12 text-warning',
     muted: 'bg-card-hover text-muted',
   };
+  const { t } = useI18n();
   const reached = threshold !== undefined && value >= threshold;
   return (
     <div className="bg-card-hover/40 border border-border rounded-xl p-3.5 flex flex-col items-start gap-2">
@@ -679,7 +685,7 @@ function FunnelStat({
         <p className="text-[10px] text-muted uppercase tracking-wider mt-1">{label}</p>
         {threshold !== undefined && (
           <p className={`text-[10px] mt-1 ${reached ? 'text-success' : 'text-muted'}`}>
-            {reached ? '✓ Min met' : `${threshold - value} more needed`}
+            {reached ? `✓ ${t('requests.minMet')}` : t('requests.moreNeeded', { count: threshold - value })}
           </p>
         )}
       </div>
@@ -747,7 +753,7 @@ function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-xl h-full bg-card border-l border-border shadow-2xl flex flex-col"
+        className="w-full max-w-xl h-full bg-card border-s border-border shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

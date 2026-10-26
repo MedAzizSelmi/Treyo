@@ -6,6 +6,7 @@ import { listAdminModules, createModule, updateModule, archiveModule } from '@/l
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Plus, Pencil, Archive, RotateCcw, FolderTree, X } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 
 /**
  * Domains admin — the categories trainers pick from when creating a
@@ -19,6 +20,7 @@ import { Plus, Pencil, Archive, RotateCcw, FolderTree, X } from 'lucide-react';
  * unarchive. Deleting hard would orphan courses so we don't offer it.
  */
 export default function ModulesPage() {
+  const { t } = useI18n();
   const [modules, setModules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<any | null>(null);
@@ -52,8 +54,8 @@ export default function ModulesPage() {
   return (
     <div>
       <PageHeader
-        title="Domains"
-        subtitle="Course categories trainers pick from when creating a new course"
+        title={t('domains.title')}
+        subtitle={t('domains.subtitle')}
       />
 
       <div className="mb-4">
@@ -61,7 +63,7 @@ export default function ModulesPage() {
           onClick={() => setCreating(true)}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-black font-semibold text-sm hover:bg-accent/90 transition"
         >
-          <Plus className="w-4 h-4" /> New domain
+          <Plus className="w-4 h-4" /> {t('domains.new')}
         </button>
       </div>
 
@@ -70,8 +72,8 @@ export default function ModulesPage() {
       ) : modules.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <FolderTree className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-sm text-foreground font-semibold mb-1">No domains yet</p>
-          <p className="text-xs text-muted">Create your first domain so trainers can start submitting courses.</p>
+          <p className="text-sm text-foreground font-semibold mb-1">{t('domains.empty')}</p>
+          <p className="text-xs text-muted">{t('domains.emptyBody')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -89,15 +91,15 @@ export default function ModulesPage() {
                     <p className="text-xs text-muted mt-1 line-clamp-2">{m.description}</p>
                   )}
                   <div className="flex items-center gap-3 mt-2 text-xs text-muted">
-                    <span>{m.courseCount ?? 0} course{m.courseCount === 1 ? '' : 's'}</span>
-                    {!m.isActive && <span className="text-warning font-semibold">Archived</span>}
+                    <span>{t('domains.courses', { count: m.courseCount ?? 0 })}</span>
+                    {!m.isActive && <span className="text-warning font-semibold">{t('domains.archived')}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setEditing(m)}
                     className="p-2 rounded-lg hover:bg-card-hover text-muted"
-                    title="Edit"
+                    title={t('domains.edit')}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
@@ -105,7 +107,7 @@ export default function ModulesPage() {
                     <button
                       onClick={() => handleArchive(m.moduleId)}
                       className="p-2 rounded-lg hover:bg-warning/10 text-muted hover:text-warning"
-                      title="Archive"
+                      title={t('domains.archive')}
                     >
                       <Archive className="w-3.5 h-3.5" />
                     </button>
@@ -113,7 +115,7 @@ export default function ModulesPage() {
                     <button
                       onClick={() => handleUnarchive(m)}
                       className="p-2 rounded-lg hover:bg-success/10 text-muted hover:text-success"
-                      title="Un-archive"
+                      title={t('domains.unarchive')}
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                     </button>
@@ -145,9 +147,10 @@ function ModuleFormModal({
   const [description, setDescription] = useState(mod?.description || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { t } = useI18n();
 
   const handleSave = async () => {
-    if (!name.trim()) { setError('Name is required.'); return; }
+    if (!name.trim()) { setError(t('domains.nameRequired')); return; }
     setSaving(true);
     setError('');
     try {
@@ -159,7 +162,7 @@ function ModuleFormModal({
       else await createModule(payload);
       onSaved();
     } catch (e: any) {
-      setError(e?.response?.data?.error || 'Could not save the domain.');
+      setError(e?.response?.data?.error || t('domains.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -173,18 +176,18 @@ function ModuleFormModal({
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
+          className="absolute top-4 end-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
         >
           <X className="w-4 h-4 text-muted" />
         </button>
 
         <h2 className="text-xl font-bold text-white mb-4">
-          {mod ? 'Edit domain' : 'New domain'}
+          {mod ? t('domains.editTitle') : t('domains.new')}
         </h2>
 
         <div className="space-y-3">
-          <Field label="Name" value={name} onChange={setName} placeholder="e.g. Web Development" />
-          <Field label="Description" value={description} onChange={setDescription} multi placeholder="Optional short description" />
+          <Field label={t('domains.name')} value={name} onChange={setName} placeholder={t('domains.namePh')} />
+          <Field label={t('domains.description')} value={description} onChange={setDescription} multi placeholder={t('domains.descriptionPh')} />
         </div>
 
         {error && <p className="text-xs text-danger mt-3">{error}</p>}
@@ -194,14 +197,14 @@ function ModuleFormModal({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm text-muted hover:text-foreground"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-black hover:bg-accent/90 transition disabled:opacity-60"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
       </div>

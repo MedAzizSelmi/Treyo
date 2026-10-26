@@ -13,6 +13,7 @@ import DataTable from '@/components/DataTable';
 import Badge from '@/components/Badge';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   Trash2,
   BookOpen,
@@ -28,6 +29,7 @@ import {
 // single flat list of live courses.
 
 export default function CoursesPage() {
+  const { t } = useI18n();
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState<{
@@ -83,7 +85,7 @@ export default function CoursesPage() {
     const raw = dailyRevenueModal.value.trim();
     const n = raw === '' ? null : Number(raw);
     if (n !== null && (!Number.isFinite(n) || n < 0)) {
-      setDailyRevenueModal((m) => ({ ...m, error: 'Enter a non-negative number, or leave empty to clear.' }));
+      setDailyRevenueModal((m) => ({ ...m, error: t('courses.revenueInvalid') }));
       return;
     }
     setDailyRevenueModal((m) => ({ ...m, saving: true, error: '' }));
@@ -95,7 +97,7 @@ export default function CoursesPage() {
       setDailyRevenueModal((m) => ({
         ...m,
         saving: false,
-        error: err?.response?.data?.error || 'Failed to update',
+        error: err?.response?.data?.error || t('courses.updateFailed'),
       }));
     }
   };
@@ -103,11 +105,11 @@ export default function CoursesPage() {
   const handleSaveMinStudents = async () => {
     const n = parseInt(minStudentsModal.value, 10);
     if (isNaN(n) || n < 1) {
-      setMinStudentsModal((m) => ({ ...m, error: 'Must be a positive integer' }));
+      setMinStudentsModal((m) => ({ ...m, error: t('courses.minInvalid') }));
       return;
     }
     if (n > 100) {
-      setMinStudentsModal((m) => ({ ...m, error: 'Maximum is 100' }));
+      setMinStudentsModal((m) => ({ ...m, error: t('courses.minMax') }));
       return;
     }
     setMinStudentsModal((m) => ({ ...m, saving: true, error: '' }));
@@ -119,7 +121,7 @@ export default function CoursesPage() {
       setMinStudentsModal((m) => ({
         ...m,
         saving: false,
-        error: err?.response?.data?.error || 'Failed to update',
+        error: err?.response?.data?.error || t('courses.updateFailed'),
       }));
     }
   };
@@ -136,7 +138,7 @@ export default function CoursesPage() {
   const allColumns = [
     {
       key: 'title',
-      label: 'Course',
+      label: t('courses.course'),
       sortable: true,
       render: (r: any) => (
         <div className="flex items-center gap-3 max-w-[280px]">
@@ -152,14 +154,16 @@ export default function CoursesPage() {
     },
     {
       key: 'level',
-      label: 'Level',
+      label: t('courses.level'),
       render: (r: any) => (
-        <Badge variant={levelVariant(r.level) as any}>{r.level || '—'}</Badge>
+        <Badge variant={levelVariant(r.level) as any}>
+          {r.level ? t(`levels.${String(r.level).toLowerCase() === 'advanced' ? 'expert' : String(r.level).toLowerCase()}`) : '—'}
+        </Badge>
       ),
     },
     {
       key: 'totalEnrolled',
-      label: 'Enrolled',
+      label: t('courses.enrolled'),
       sortable: true,
       render: (r: any) => (
         <div className="flex items-center gap-1.5 text-foreground">
@@ -170,7 +174,7 @@ export default function CoursesPage() {
     },
     {
       key: 'minStudentsRequired',
-      label: 'Min',
+      label: t('courses.min'),
       sortable: true,
       render: (r: any) => {
         const min = r.minStudentsRequired || 5;
@@ -186,7 +190,7 @@ export default function CoursesPage() {
               })
             }
             className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-card-hover text-foreground hover:text-accent transition group"
-            title="Click to edit minimum students"
+            title={t('courses.editMinHint')}
           >
             <Layers className="w-3.5 h-3.5 text-muted group-hover:text-accent transition" />
             <span className="font-medium">{min}</span>
@@ -197,17 +201,17 @@ export default function CoursesPage() {
     },
     {
       key: 'price',
-      label: 'Price (HT)',
+      label: t('courses.priceHt'),
       sortable: true,
       render: (r: any) => (
         <span className="text-foreground font-medium">
-          {r.price ? `${r.price} ${r.currency || 'TND'}` : 'Free'}
+          {r.price ? `${r.price} ${r.currency || 'TND'}` : t('courses.free')}
         </span>
       ),
     },
     {
       key: 'trainerDailyRevenue',
-      label: 'Trainer revenue/day',
+      label: t('courses.revenuePerDay'),
       sortable: true,
       render: (r: any) => {
         const val = r.trainerDailyRevenue;
@@ -224,11 +228,11 @@ export default function CoursesPage() {
               })
             }
             className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-card-hover transition group"
-            title="Click to set the trainer's daily earnings"
+            title={t('courses.editRevenueHint')}
           >
             <Coins className={`w-3.5 h-3.5 ${hasValue ? 'text-accent' : 'text-muted'} group-hover:text-accent transition`} />
             <span className={`font-medium ${hasValue ? 'text-foreground' : 'text-muted italic'}`}>
-              {hasValue ? `${val} ${r.currency || 'TND'}` : 'Not set'}
+              {hasValue ? `${val} ${r.currency || 'TND'}` : t('courses.notSet')}
             </span>
             <Pencil className="w-3 h-3 text-muted opacity-0 group-hover:opacity-100 transition" />
           </button>
@@ -237,16 +241,16 @@ export default function CoursesPage() {
     },
     {
       key: 'isActive',
-      label: 'Status',
+      label: t('courses.status'),
       render: (r: any) => (
         <Badge variant={r.isActive ? 'success' : 'danger'}>
-          {r.isActive ? 'Live' : 'Deleted'}
+          {r.isActive ? t('courses.live') : t('courses.deleted')}
         </Badge>
       ),
     },
     {
       key: 'actions',
-      label: 'Actions',
+      label: t('courses.actions'),
       render: (r: any) => (
         <div className="flex items-center gap-2">
           {r.isActive && (
@@ -254,10 +258,10 @@ export default function CoursesPage() {
               onClick={() =>
                 setDialog({
                   open: true,
-                  title: 'Delete Course',
-                  message: `Are you sure you want to delete "${r.title}"? This action is reversible (soft delete).`,
+                  title: t('courses.deleteTitle'),
+                  message: t('courses.deleteBody', { title: r.title }),
                   variant: 'danger',
-                  confirmLabel: 'Delete',
+                  confirmLabel: t('courses.delete'),
                   action: () => deleteCourse(r.courseId),
                 })
               }
@@ -276,8 +280,8 @@ export default function CoursesPage() {
   return (
     <div>
       <PageHeader
-        title="Courses"
-        subtitle={`${courses.length} live ${courses.length === 1 ? 'course' : 'courses'}`}
+        title={t('courses.title')}
+        subtitle={t('courses.subtitle', { count: courses.length })}
       />
 
       {/* Summary cards */}
@@ -286,13 +290,13 @@ export default function CoursesPage() {
           icon={BookOpen}
           color="success"
           value={courses.filter((c) => c.isActive).length}
-          label="Live"
+          label={t('courses.live')}
         />
         <SummaryCard
           icon={Users}
           color="accent"
           value={courses.reduce((s: number, c: any) => s + (c.totalEnrolled || 0), 0)}
-          label="Total Enrolled"
+          label={t('courses.totalEnrolled')}
         />
       </div>
 
@@ -327,7 +331,7 @@ export default function CoursesPage() {
                   <Coins className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Trainer revenue per day</h3>
+                  <h3 className="text-lg font-bold text-white">{t('courses.revenueTitle')}</h3>
                   <p className="text-xs text-muted truncate max-w-[280px]">
                     {dailyRevenueModal.course?.title}
                   </p>
@@ -345,8 +349,7 @@ export default function CoursesPage() {
             </div>
 
             <p className="text-sm text-muted mb-4">
-              Amount the trainer earns for each day they teach this course.
-              Feeds their monthly earnings breakdown in the mobile app. Leave empty to clear.
+              {t('courses.revenueBody')}
             </p>
 
             <div className="flex items-stretch gap-2">
@@ -359,7 +362,7 @@ export default function CoursesPage() {
                   setDailyRevenueModal((m) => ({ ...m, value: e.target.value, error: '' }))
                 }
                 className="flex-1 px-4 py-3 rounded-xl bg-card-hover border border-border focus:border-accent outline-none text-white text-lg font-semibold"
-                placeholder="e.g. 150"
+                placeholder={t('courses.revenuePh')}
                 disabled={dailyRevenueModal.saving}
               />
               <div className="flex items-center px-4 rounded-xl bg-card-hover border border-border text-muted text-sm font-semibold">
@@ -379,14 +382,14 @@ export default function CoursesPage() {
                 disabled={dailyRevenueModal.saving}
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border text-muted hover:text-foreground hover:bg-card-hover transition disabled:opacity-50"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSaveDailyRevenue}
                 disabled={dailyRevenueModal.saving}
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-accent text-black hover:bg-accent/90 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {dailyRevenueModal.saving ? 'Saving…' : 'Save'}
+                {dailyRevenueModal.saving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>
@@ -412,7 +415,7 @@ export default function CoursesPage() {
                   <Layers className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">Minimum Students Required</h3>
+                  <h3 className="text-lg font-bold text-white">{t('courses.minTitle')}</h3>
                   <p className="text-xs text-muted truncate max-w-[280px]">
                     {minStudentsModal.course?.title}
                   </p>
@@ -436,8 +439,7 @@ export default function CoursesPage() {
             </div>
 
             <p className="text-sm text-muted mb-4">
-              Number of student requests required before a group is created for this course.
-              Default is 5.
+              {t('courses.minBody')}
             </p>
 
             <input
@@ -471,14 +473,14 @@ export default function CoursesPage() {
                 disabled={minStudentsModal.saving}
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border border-border text-muted hover:text-foreground hover:bg-card-hover transition disabled:opacity-50"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSaveMinStudents}
                 disabled={minStudentsModal.saving}
                 className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-accent text-black hover:bg-accent/90 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {minStudentsModal.saving ? 'Saving…' : 'Save'}
+                {minStudentsModal.saving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>

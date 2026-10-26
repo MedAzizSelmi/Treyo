@@ -12,15 +12,18 @@ type Props = {
   onCancel: () => void;
 };
 
+import { useI18n } from '@/i18n/I18nProvider';
+
 export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   variant = 'danger',
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
   if (!open) return null;
 
   return (
@@ -29,7 +32,7 @@ export default function ConfirmDialog({
       <div className="relative bg-card border border-border rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
         <button
           onClick={onCancel}
-          className="absolute top-4 right-4 text-muted hover:text-foreground transition"
+          className="absolute top-4 end-4 text-muted hover:text-foreground transition"
         >
           <X className="w-5 h-5" />
         </button>
@@ -54,7 +57,7 @@ export default function ConfirmDialog({
             onClick={onCancel}
             className="px-4 py-2 text-sm font-medium text-muted hover:text-foreground border border-border rounded-xl hover:bg-card-hover transition"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={onConfirm}
@@ -64,7 +67,7 @@ export default function ConfirmDialog({
                 : 'bg-accent text-black hover:bg-accent/80'
             }`}
           >
-            {confirmLabel}
+            {confirmLabel || t('common.confirm')}
           </button>
         </div>
       </div>

@@ -12,6 +12,7 @@ import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Badge from '@/components/Badge';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { useI18n } from '@/i18n/I18nProvider';
 import {
   BookOpen,
   Users,
@@ -31,6 +32,7 @@ type Filter = 'all' | 'ready' | 'waiting';
 type Toast = { kind: 'success' | 'error'; text: string } | null;
 
 export default function RequestsPage() {
+  const { t } = useI18n();
   const [requested, setRequested] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
@@ -97,10 +99,9 @@ export default function RequestsPage() {
   const askCleanup = () => {
     setConfirmDialog({
       open: true,
-      title: 'Clean Up Stale Requests',
-      message:
-        'Remove orphaned request records (students already enrolled in the course, plus duplicate rows for the same student). Real pending requests are not affected.',
-      confirmLabel: 'Clean Up',
+      title: t('requests.cleanupTitle'),
+      message: t('requests.cleanupBody'),
+      confirmLabel: t('requests.cleanupConfirm'),
       variant: 'danger',
       action: async () => {
         setActionLoading(true);
@@ -109,10 +110,10 @@ export default function RequestsPage() {
           await loadRequested();
           showToast({
             kind: 'success',
-            text: `Removed ${res.data?.removedCount || 0} stale request record(s)`,
+            text: t('requests.cleanupDone', { count: res.data?.removedCount || 0 }),
           });
         } catch (err: any) {
-          showToast({ kind: 'error', text: err?.response?.data?.error || err?.message || 'Cleanup failed' });
+          showToast({ kind: 'error', text: err?.response?.data?.error || err?.message || t('requests.cleanupFailed') });
         } finally {
           setActionLoading(false);
         }
@@ -124,9 +125,9 @@ export default function RequestsPage() {
     if (!interest) return;
     setConfirmDialog({
       open: true,
-      title: 'Form Group',
-      message: `Create a group for "${interest.courseTitle}" with ${interest.confirmedCount} confirmed student${interest.confirmedCount === 1 ? '' : 's'} and the trainer?`,
-      confirmLabel: 'Form Group',
+      title: t('requests.formGroup'),
+      message: t('requests.formGroupBody', { course: interest.courseTitle, count: interest.confirmedCount }),
+      confirmLabel: t('requests.formGroup'),
       variant: 'success',
       action: async () => {
         setActionLoading(true);
@@ -134,9 +135,9 @@ export default function RequestsPage() {
           const res = await formCourseGroup(selected.courseId);
           await refreshInterest();
           await loadRequested();
-          showToast({ kind: 'success', text: `Group "${res.data?.groupName}" formed with ${res.data?.memberCount} student(s)` });
+          showToast({ kind: 'success', text: t('requests.formed', { name: res.data?.groupName, count: res.data?.memberCount }) });
         } catch (err: any) {
-          showToast({ kind: 'error', text: err?.response?.data?.error || err?.message || 'Failed to form group' });
+          showToast({ kind: 'error', text: err?.response?.data?.error || err?.message || t('requests.formFailed') });
         } finally { setActionLoading(false); }
       },
     });
@@ -163,56 +164,56 @@ export default function RequestsPage() {
   return (
     <div>
       <PageHeader
-        title="Requests"
-        subtitle="Students who clicked 'Request to Join' — notify them and form groups"
+        title={t('requests.title')}
+        subtitle={t('requests.subtitle')}
       />
 
       {/* Top stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={Mail} color="warning" value={totalRequests} label="Total Requests" />
-        <StatCard icon={CheckCircle2} color="accent" value={totalConfirmed} label="Awaiting Group" />
-        <StatCard icon={Send} color="info" value={readyToNotify} label="Ready to Notify" />
-        <StatCard icon={GitBranch} color="success" value={readyToForm} label="Ready to Form" />
+        <StatCard icon={Mail} color="warning" value={totalRequests} label={t('requests.totalRequests')} />
+        <StatCard icon={CheckCircle2} color="accent" value={totalConfirmed} label={t('requests.awaitingGroup')} />
+        <StatCard icon={Send} color="info" value={readyToNotify} label={t('requests.minReached')} />
+        <StatCard icon={GitBranch} color="success" value={readyToForm} label={t('requests.readyToForm')} />
       </div>
 
       {/* Search */}
       <div className="relative max-w-sm mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
         <input
           type="text"
-          placeholder="Search course, domain or trainer..."
+          placeholder={t('requests.searchPh')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+          className="w-full ps-10 pe-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
         />
       </div>
 
       {/* Filter chips + cleanup */}
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         <Filter className="w-4 h-4 text-muted" />
-        <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="All" count={requested.length} />
+        <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label={t('requests.all')} count={requested.length} />
         <FilterChip
           active={filter === 'ready'}
           onClick={() => setFilter('ready')}
-          label="Action Needed"
+          label={t('requests.actionNeeded')}
           count={requested.filter((r) => r.canNotify || r.canFormGroup).length}
           tone="success"
         />
         <FilterChip
           active={filter === 'waiting'}
           onClick={() => setFilter('waiting')}
-          label="Waiting for Min"
+          label={t('requests.waitingMin')}
           count={requested.filter((r) => r.interestedCount > 0 && !r.canNotify).length}
           tone="warning"
         />
         <button
           onClick={askCleanup}
           disabled={actionLoading}
-          className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted hover:text-danger hover:border-danger/40 transition disabled:opacity-40"
-          title="Remove orphan request rows from old test data"
+          className="ms-auto flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border text-muted hover:text-danger hover:border-danger/40 transition disabled:opacity-40"
+          title={t('requests.cleanupHint')}
         >
           <Trash2 className="w-3.5 h-3.5" />
-          Clean up stale
+          {t('requests.cleanup')}
         </button>
       </div>
 
@@ -225,12 +226,8 @@ export default function RequestsPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title={requested.length === 0 ? 'No published courses' : 'No matching courses'}
-            hint={
-              requested.length === 0
-                ? 'Once trainers publish courses, requests will appear here.'
-                : 'Try clearing the search or changing the filter.'
-            }
+            title={requested.length === 0 ? t('requests.noCourses') : t('requests.noMatch')}
+            hint={requested.length === 0 ? t('requests.noCoursesBody') : t('requests.noMatchBody')}
           />
         ) : (
           <ul className="divide-y divide-border">
@@ -250,17 +247,17 @@ export default function RequestsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="font-medium text-white truncate">{c.courseTitle}</p>
-                        {c.canFormGroup && <Badge variant="accent">Ready to Form</Badge>}
-                        {c.canNotify && !c.canFormGroup && <Badge variant="success">Min met</Badge>}
+                        {c.canFormGroup && <Badge variant="accent">{t('requests.readyToForm')}</Badge>}
+                        {c.canNotify && !c.canFormGroup && <Badge variant="success">{t('requests.minMet')}</Badge>}
                       </div>
                       <p className="text-xs text-muted truncate">
-                        {c.domain || '—'} · by {c.trainerName}
+                        {c.domain || '—'} · {t('requests.by', { name: c.trainerName })}
                       </p>
                     </div>
                     <div className="hidden sm:flex items-center gap-4 text-xs">
-                      <PillStat label="Requested" value={c.interestedCount} accent="warning" />
-                      <PillStat label="Confirmed" value={c.confirmedCount} accent="accent" />
-                      <PillStat label="Min" value={c.minStudentsRequired} accent="muted" />
+                      <PillStat label={t('requests.requested')} value={c.interestedCount} accent="warning" />
+                      <PillStat label={t('requests.confirmed')} value={c.confirmedCount} accent="accent" />
+                      <PillStat label={t('requests.min')} value={c.minStudentsRequired} accent="muted" />
                     </div>
                     <ArrowRight className="w-4 h-4 text-muted flex-shrink-0" />
                   </div>
@@ -272,7 +269,7 @@ export default function RequestsPage() {
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <span className="text-[10px] text-muted font-medium w-16 text-right">
+                    <span className="text-[10px] text-muted font-medium w-16 text-end">
                       {c.interestedCount}/{c.minStudentsRequired}
                     </span>
                   </div>
@@ -286,7 +283,7 @@ export default function RequestsPage() {
       {/* Drawer */}
       {selected && (
         <Drawer onClose={closeDrawer}>
-          <DrawerHeader label="Request Funnel" title={selected.courseTitle} onClose={closeDrawer} />
+          <DrawerHeader label={t('requests.funnel')} title={selected.courseTitle} onClose={closeDrawer} />
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             {interestLoading || !interest ? (
               <div className="flex items-center justify-center py-12"><LoadingSpinner /></div>
@@ -295,13 +292,13 @@ export default function RequestsPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <FunnelStat
                     icon={Mail}
-                    label="Interested"
+                    label={t('requests.interested')}
                     value={interest.interestedCount}
                     threshold={interest.minStudentsRequired}
                     tone="warning"
                   />
-                  <FunnelStat icon={CheckCircle2} label="Confirmed" value={interest.confirmedCount} tone="success" />
-                  <FunnelStat icon={Users} label="Min Required" value={interest.minStudentsRequired} tone="muted" />
+                  <FunnelStat icon={CheckCircle2} label={t('requests.confirmed')} value={interest.confirmedCount} tone="success" />
+                  <FunnelStat icon={Users} label={t('requests.minRequired')} value={interest.minStudentsRequired} tone="muted" />
                 </div>
 
                 {/* Groups open by themselves now (GroupAutomationService):
@@ -310,11 +307,11 @@ export default function RequestsPage() {
                   <Send className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-foreground/85 leading-relaxed">
                     {interest.hasFormingGroup
-                      ? 'A group for this course is being prepared — follow it on the Groups page.'
+                      ? t('requests.infoPreparing')
                       : interest.canNotify
-                        ? 'The minimum is reached: a group opens automatically as soon as the trainer is available, and appears on the Groups page.'
-                        : `A group opens automatically once ${interest.minStudentsRequired - interest.interestedCount} more learner(s) ask for this course.`}
-                    {' '}The trainer schedules it, you approve the schedule, and the learners are then invited to pay.
+                        ? t('requests.infoMinReached')
+                        : t('requests.infoMore', { count: interest.minStudentsRequired - interest.interestedCount })}
+                    {' '}{t('requests.infoFlow')}
                   </p>
                 </div>
 
@@ -325,13 +322,9 @@ export default function RequestsPage() {
                   step={2}
                   icon={GitBranch}
                   tone="success"
-                  title="Form the Group"
-                  description={
-                    interest.canFormGroup
-                      ? 'Confirmed students are ready — create the group and link them with the trainer.'
-                      : 'Form a group once at least 2 students have confirmed.'
-                  }
-                  buttonLabel={`Form Group (${interest.confirmedCount})`}
+                  title={t('requests.formTheGroup')}
+                  description={interest.canFormGroup ? t('requests.formReady') : t('requests.formNotReady')}
+                  buttonLabel={t('requests.formGroupCount', { count: interest.confirmedCount })}
                   buttonIcon={GitBranch}
                   disabled={!interest.canFormGroup || actionLoading}
                   onClick={askFormGroup}
@@ -341,16 +334,16 @@ export default function RequestsPage() {
                 <div>
                   <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                     <Users className="w-4 h-4 text-accent" />
-                    Interested Students ({interest.interestedStudents?.length || 0})
+                    {t('requests.interestedStudents', { count: interest.interestedStudents?.length || 0 })}
                   </h4>
                   {interest.interestedStudents?.length > 0 ? (
                     <ul className="space-y-2">
                       {interest.interestedStudents.map((s: any, i: number) => {
                         const status = s.hasGroup
-                          ? { label: 'In Group', variant: 'success' as const }
+                          ? { label: t('requests.inGroup'), variant: 'success' as const }
                           : s.enrollmentStatus === 'confirmed'
-                          ? { label: 'Confirmed', variant: 'success' as const }
-                          : { label: 'Requested', variant: 'warning' as const };
+                          ? { label: t('requests.confirmed'), variant: 'success' as const }
+                          : { label: t('requests.requested'), variant: 'warning' as const };
                         return (
                           <StudentRow
                             key={s.studentId || i}
@@ -362,7 +355,7 @@ export default function RequestsPage() {
                       })}
                     </ul>
                   ) : (
-                    <EmptyMini icon={Clock} text="No students have expressed interest yet" />
+                    <EmptyMini icon={Clock} text={t('requests.noInterest')} />
                   )}
                 </div>
               </>
@@ -373,7 +366,7 @@ export default function RequestsPage() {
 
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-[60] px-4 py-3 rounded-xl border shadow-lg flex items-center gap-3 ${
+          className={`fixed bottom-6 end-6 z-[60] px-4 py-3 rounded-xl border shadow-lg flex items-center gap-3 ${
             toast.kind === 'success'
               ? 'bg-success/10 border-success/30 text-success'
               : 'bg-danger/10 border-danger/30 text-danger'
@@ -501,6 +494,7 @@ function FunnelStat({
     warning: 'bg-warning/12 text-warning',
     muted: 'bg-card-hover text-muted',
   };
+  const { t } = useI18n();
   const reached = threshold !== undefined && value >= threshold;
   return (
     <div className="bg-card-hover/40 border border-border rounded-xl p-3.5 flex flex-col items-start gap-2">
@@ -512,7 +506,7 @@ function FunnelStat({
         <p className="text-[10px] text-muted uppercase tracking-wider mt-1">{label}</p>
         {threshold !== undefined && (
           <p className={`text-[10px] mt-1 ${reached ? 'text-success' : 'text-muted'}`}>
-            {reached ? '✓ Min met' : `${threshold - value} more needed`}
+            {reached ? `✓ ${t('requests.minMet')}` : t('requests.moreNeeded', { count: threshold - value })}
           </p>
         )}
       </div>
@@ -617,7 +611,7 @@ function Drawer({ children, onClose }: { children: React.ReactNode; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="w-full max-w-xl h-full bg-card border-l border-border shadow-2xl flex flex-col"
+        className="w-full max-w-xl h-full bg-card border-s border-border shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

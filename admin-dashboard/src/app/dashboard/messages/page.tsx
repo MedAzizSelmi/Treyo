@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2, Lock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { useI18n } from '@/i18n/I18nProvider';
 import { connectRealtime, onRealtime, isRealtimeConnected, publishTyping } from '@/lib/realtime';
 import {
   getAdminConversations,
@@ -37,6 +38,7 @@ const POLL_MS = 15000;
 const CONV_POLL_MS = 30000;
 
 export default function AdminMessagesPage() {
+  const { t, locale } = useI18n();
   const [adminId, setAdminId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const [convLoading, setConvLoading] = useState(true);
@@ -170,7 +172,7 @@ export default function AdminMessagesPage() {
     const optimistic = {
       messageId: `tmp_${Date.now()}`,
       senderId: adminId,
-      senderName: 'You',
+      senderName: t('messages.you'),
       content: text,
       sentAt: new Date().toISOString(),
       _pending: true,
@@ -194,7 +196,7 @@ export default function AdminMessagesPage() {
       // Roll back optimistic add and restore the draft for retry.
       setMessages((prev) => prev.filter((m) => m.messageId !== optimistic.messageId));
       setDraft(text);
-      alert(err?.response?.data?.message || 'Could not send message.');
+      alert(err?.response?.data?.message || t('messages.sendFailed'));
     } finally {
       setSending(false);
     }
@@ -224,7 +226,7 @@ export default function AdminMessagesPage() {
     const optimistic = {
       messageId: optimisticId,
       senderId: adminId,
-      senderName: 'You',
+      senderName: t('messages.you'),
       content: '',
       attachmentUrl: blobUrl,
       messageType: 'image',
@@ -256,7 +258,7 @@ export default function AdminMessagesPage() {
       );
     } catch (err: any) {
       setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
-      alert(err?.response?.data?.message || err?.message || 'Could not send image.');
+      alert(err?.response?.data?.message || err?.message || t('messages.imageFailed'));
     } finally {
       // Revoke the blob URL once we're done with it — long-lived blob
       // URLs leak memory in the browser if you forget.
@@ -279,22 +281,22 @@ export default function AdminMessagesPage() {
   return (
     <div>
       <PageHeader
-        title="Messages"
-        subtitle={`${conversations.length} group conversation${conversations.length === 1 ? '' : 's'}`}
+        title={t('messages.title')}
+        subtitle={t('messages.subtitle', { count: conversations.length })}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[500px]">
         {/* ── Conversation list ── */}
         <div className={`bg-card border border-border rounded-2xl overflow-hidden flex flex-col ${selected ? 'hidden lg:flex' : ''}`}>
           <div className="px-4 py-3 border-b border-border">
-            <p className="text-sm font-semibold text-white">Groups</p>
+            <p className="text-sm font-semibold text-white">{t('messages.groups')}</p>
           </div>
           {conversations.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-center px-6">
               <div>
                 <Users className="w-10 h-10 text-muted mx-auto mb-3" />
                 <p className="text-sm text-muted">
-                  No group chats yet. Form a group from the Requested tab to start one.
+                  {t('messages.noChats')}
                 </p>
               </div>
             </div>
@@ -306,7 +308,7 @@ export default function AdminMessagesPage() {
                   <button
                     key={conv.conversationId}
                     onClick={() => setSelected(conv)}
-                    className={`w-full text-left px-4 py-3 border-b border-border flex items-start gap-3 transition ${
+                    className={`w-full text-start px-4 py-3 border-b border-border flex items-start gap-3 transition ${
                       isActive ? 'bg-accent/10' : 'hover:bg-card-hover'
                     }`}
                   >
@@ -319,11 +321,11 @@ export default function AdminMessagesPage() {
                           {conv.otherUserName}
                         </p>
                         <span className="text-[10px] text-muted flex-shrink-0">
-                          {conv.memberCount} members
+                          {t('messages.members', { count: conv.memberCount })}
                         </span>
                       </div>
                       <p className="text-xs text-muted truncate mt-0.5">
-                        {conv.lastMessage || 'No messages yet'}
+                        {conv.lastMessage || t('messages.noMessages')}
                       </p>
                     </div>
                   </button>
@@ -340,7 +342,7 @@ export default function AdminMessagesPage() {
               <div>
                 <MessageSquare className="w-12 h-12 text-muted mx-auto mb-3" />
                 <p className="text-sm text-muted">
-                  Pick a group from the left to start chatting.
+                  {t('messages.pick')}
                 </p>
               </div>
             </div>
@@ -352,7 +354,7 @@ export default function AdminMessagesPage() {
                   onClick={() => setSelected(null)}
                   className="lg:hidden p-1 text-muted hover:text-foreground"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="w-5 h-5 rtl:rotate-180" />
                 </button>
                 <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center">
                   <Users className="w-4 h-4 text-accent" />
@@ -365,10 +367,10 @@ export default function AdminMessagesPage() {
                       rather than adding a line, so the message list does
                       not shift down and back every few seconds. */}
                   {typingName ? (
-                    <p className="text-[11px] text-accent truncate">{typingName} is typing…</p>
+                    <p className="text-[11px] text-accent truncate">{t('messages.typing', { name: typingName })}</p>
                   ) : (
                     <p className="text-[11px] text-muted">
-                      {selected.memberCount} members · {selected.courseTitle}
+                      {t('messages.members', { count: selected.memberCount })} · {selected.courseTitle}
                     </p>
                   )}
                 </div>
@@ -384,9 +386,9 @@ export default function AdminMessagesPage() {
                 className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-background/30"
               >
                 {chatLoading && messages.length === 0 ? (
-                  <p className="text-center text-xs text-muted">Loading messages…</p>
+                  <p className="text-center text-xs text-muted">{t('messages.loading')}</p>
                 ) : messages.length === 0 ? (
-                  <p className="text-center text-xs text-muted">No messages yet.</p>
+                  <p className="text-center text-xs text-muted">{t('messages.noMessagesYet')}</p>
                 ) : (
                   messages.map((msg, i) => {
                     const isMine = msg.senderId === adminId;
@@ -439,7 +441,7 @@ export default function AdminMessagesPage() {
                         : `${API_BASE_URL}${msg.attachmentUrl}`
                       : null;
 
-                    const timeText = new Date(msg.sentAt || msg.createdAt).toLocaleTimeString([], {
+                    const timeText = new Date(msg.sentAt || msg.createdAt).toLocaleTimeString(locale, {
                       hour: '2-digit', minute: '2-digit',
                     });
 
@@ -488,8 +490,8 @@ export default function AdminMessagesPage() {
                           // timestamp + status pill overlaid on the photo.
                           <div className="flex flex-col min-w-0">
                             {showHeader && !isMine && (
-                              <span className="text-[11px] text-accent font-medium mb-1 ml-1">
-                                {msg.senderName || 'Member'}
+                              <span className="text-[11px] text-accent font-medium mb-1 ms-1">
+                                {msg.senderName || t('messages.member')}
                               </span>
                             )}
                             <a
@@ -504,7 +506,7 @@ export default function AdminMessagesPage() {
                                 alt="attachment"
                                 className="block max-w-[280px] max-h-[280px] object-cover"
                               />
-                              <span className="absolute bottom-1.5 right-1.5 text-[10px] text-white font-medium bg-black/55 rounded-md px-1.5 py-0.5 flex items-center gap-1">
+                              <span className="absolute bottom-1.5 end-1.5 text-[10px] text-white font-medium bg-black/55 rounded-md px-1.5 py-0.5 flex items-center gap-1">
                                 {timeText}
                                 {isMine && (pending ? '🕒' : '✓')}
                               </span>
@@ -525,7 +527,7 @@ export default function AdminMessagesPage() {
                                 continuations. */}
                             {showHeader && !isMine && (
                               <p className="text-[11px] text-accent font-semibold mb-1">
-                                {msg.senderName || 'Member'}
+                                {msg.senderName || t('messages.member')}
                               </p>
                             )}
                             {hasImage && imgUrl && (
@@ -544,7 +546,7 @@ export default function AdminMessagesPage() {
                               </p>
                             )}
                             <p
-                              className={`text-[10px] mt-1 text-right flex items-center justify-end gap-1 ${
+                              className={`text-[10px] mt-1 text-end flex items-center justify-end gap-1 ${
                                 isMine ? 'text-black/50' : 'text-muted'
                               }`}
                             >
@@ -562,7 +564,7 @@ export default function AdminMessagesPage() {
                     the header line alone was easy to miss. */}
                 {typingName && (
                   <div className="self-start flex flex-col gap-1" aria-live="polite">
-                    <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-card-hover border border-border px-4 py-3">
+                    <div className="flex items-center gap-1.5 rounded-2xl rounded-es-md bg-card-hover border border-border px-4 py-3">
                       {[0, 1, 2].map((i) => (
                         <span
                           key={i}
@@ -571,7 +573,7 @@ export default function AdminMessagesPage() {
                         />
                       ))}
                     </div>
-                    <span className="text-[11px] text-muted pl-1">{typingName} is typing…</span>
+                    <span className="text-[11px] text-muted ps-1">{typingName} is typing…</span>
                   </div>
                 )}
               </div>
@@ -593,8 +595,7 @@ export default function AdminMessagesPage() {
                 <div className="border-t border-border p-4 flex items-center justify-center gap-2 text-sm text-muted">
                   <Lock className="w-4 h-4" />
                   <span>
-                    This group has {selected?.groupStatus === 'cancelled' ? 'been cancelled' : 'finished'} —
-                    the conversation is read-only.
+                    {selected?.groupStatus === 'cancelled' ? t('messages.readOnlyCancelled') : t('messages.readOnlyFinished')}
                   </span>
                 </div>
               ) : (
@@ -613,7 +614,7 @@ export default function AdminMessagesPage() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage || !adminId}
-                  title="Send a picture"
+                  title={t('messages.sendPicture')}
                   className="w-10 h-10 rounded-xl flex items-center justify-center bg-accent/10 border border-accent/30 text-accent hover:bg-accent/15 disabled:opacity-40 transition"
                 >
                   {uploadingImage ? (
@@ -640,7 +641,7 @@ export default function AdminMessagesPage() {
                       handleSend();
                     }
                   }}
-                  placeholder="Type a message…"
+                  placeholder={t('messages.typePh')}
                   rows={1}
                   className="flex-1 resize-none bg-card-hover border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted outline-none focus:border-accent/40 max-h-32"
                   disabled={sending}

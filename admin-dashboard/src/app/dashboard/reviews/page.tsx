@@ -6,6 +6,7 @@ import { getAllReviews, setReviewVisibility } from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { Eye, EyeOff, Star, Search, Filter, MessageSquare, Loader2 } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 
 /**
  * Review moderation page.
@@ -22,6 +23,7 @@ import { Eye, EyeOff, Star, Search, Filter, MessageSquare, Loader2 } from 'lucid
 type Filter = 'all' | 'visible' | 'hidden';
 
 export default function ReviewsPage() {
+  const { t } = useI18n();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -87,40 +89,40 @@ export default function ReviewsPage() {
   return (
     <div>
       <PageHeader
-        title="Reviews"
-        subtitle="Moderate course and trainer feedback. Hidden reviews stay in the database — averages aren't affected."
+        title={t('reviews.title')}
+        subtitle={t('reviews.subtitle')}
       />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={MessageSquare} color="accent" value={reviews.length} label="Total Reviews" />
-        <StatCard icon={Eye} color="success" value={reviews.length - hiddenCount} label="Visible" />
-        <StatCard icon={EyeOff} color="warning" value={hiddenCount} label="Hidden" />
+        <StatCard icon={MessageSquare} color="accent" value={reviews.length} label={t('reviews.total')} />
+        <StatCard icon={Eye} color="success" value={reviews.length - hiddenCount} label={t('reviews.visible')} />
+        <StatCard icon={EyeOff} color="warning" value={hiddenCount} label={t('reviews.hidden')} />
         <StatCard
           icon={Star}
           color="info"
           value={averageRating(reviews)}
-          label="Avg Course Rating"
+          label={t('reviews.avgCourse')}
         />
       </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-5">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
           <input
             type="text"
-            placeholder="Search course, trainer, student, or feedback..."
+            placeholder={t('reviews.searchPh')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+            className="w-full ps-10 pe-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-4 h-4 text-muted" />
-          <Chip active={filter === 'all'} onClick={() => setFilter('all')} label="All" />
-          <Chip active={filter === 'visible'} onClick={() => setFilter('visible')} label="Visible" tone="success" />
-          <Chip active={filter === 'hidden'} onClick={() => setFilter('hidden')} label="Hidden" tone="warning" />
+          <Chip active={filter === 'all'} onClick={() => setFilter('all')} label={t('reviews.all')} />
+          <Chip active={filter === 'visible'} onClick={() => setFilter('visible')} label={t('reviews.visible')} tone="success" />
+          <Chip active={filter === 'hidden'} onClick={() => setFilter('hidden')} label={t('reviews.hidden')} tone="warning" />
         </div>
       </div>
 
@@ -154,8 +156,9 @@ function averageRating(reviews: any[]): string {
 
 function ReviewRow({ review, busy, onToggle }: { review: any; busy: boolean; onToggle: () => void }) {
   const hidden = !!review.isHidden;
+  const { t, locale } = useI18n();
   const created = review.createdAt
-    ? new Date(review.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    ? new Date(review.createdAt).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
 
   return (
@@ -174,25 +177,25 @@ function ReviewRow({ review, busy, onToggle }: { review: any; busy: boolean; onT
           {/* Header */}
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <span className="text-sm font-semibold text-foreground">
-              {review.studentName || 'Anonymous'}
+              {review.studentName || t('reviews.anonymous')}
             </span>
-            <span className="text-xs text-muted">on</span>
+            <span className="text-xs text-muted">{t('reviews.on')}</span>
             <span className="text-sm font-medium text-accent">
               {review.courseTitle || review.courseId}
             </span>
             {review.trainerName && (
               <>
                 <span className="text-xs text-muted">·</span>
-                <span className="text-xs text-muted">by {review.trainerName}</span>
+                <span className="text-xs text-muted">{t('reviews.by', { name: review.trainerName })}</span>
               </>
             )}
-            <span className="text-xs text-muted ml-auto">{created}</span>
+            <span className="text-xs text-muted ms-auto">{created}</span>
           </div>
 
           {/* Ratings */}
           <div className="flex items-center gap-4 mt-1.5">
-            <RatingChip label="Course" value={Number(review.courseRating || 0)} />
-            <RatingChip label="Trainer" value={Number(review.trainerRating || 0)} />
+            <RatingChip label={t('reviews.course')} value={Number(review.courseRating || 0)} />
+            <RatingChip label={t('reviews.trainer')} value={Number(review.trainerRating || 0)} />
           </div>
 
           {/* Feedback bodies — show course + trainer separately when
@@ -205,7 +208,7 @@ function ReviewRow({ review, busy, onToggle }: { review: any; busy: boolean; onT
         <button
           onClick={onToggle}
           disabled={busy}
-          title={hidden ? 'Show review' : 'Hide review'}
+          title={hidden ? t('reviews.showReview') : t('reviews.hideReview')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex-shrink-0 ${
             hidden
               ? 'bg-accent text-black hover:bg-accent/90'
@@ -217,12 +220,12 @@ function ReviewRow({ review, busy, onToggle }: { review: any; busy: boolean; onT
           ) : hidden ? (
             <>
               <Eye className="w-3.5 h-3.5" />
-              <span>Show</span>
+              <span>{t('reviews.show')}</span>
             </>
           ) : (
             <>
               <EyeOff className="w-3.5 h-3.5" />
-              <span>Hide</span>
+              <span>{t('reviews.hide')}</span>
             </>
           )}
         </button>
@@ -237,6 +240,7 @@ function FeedbackBlocks({ review }: { review: any }) {
   // Legacy fallback — rows written before the split only have the
   // single `feedback` column populated.
   const legacyText = !courseText && !trainerText ? review.feedback : null;
+  const { t } = useI18n();
 
   if (!courseText && !trainerText && !legacyText) {
     return (
@@ -249,13 +253,13 @@ function FeedbackBlocks({ review }: { review: any }) {
   return (
     <div className="mt-2.5 space-y-2">
       {courseText && (
-        <FeedbackBlock label="On the course" text={courseText} />
+        <FeedbackBlock label={t('reviews.onCourse')} text={courseText} />
       )}
       {trainerText && (
-        <FeedbackBlock label="On the trainer" text={trainerText} />
+        <FeedbackBlock label={t('reviews.onTrainer')} text={trainerText} />
       )}
       {legacyText && (
-        <FeedbackBlock label="Feedback" text={legacyText} muted />
+        <FeedbackBlock label={t('reviews.feedback')} text={legacyText} muted />
       )}
     </div>
   );
@@ -340,16 +344,17 @@ function Chip({
 }
 
 function EmptyState({ search, totalCount }: { search: boolean; totalCount: number }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-xl border border-dashed border-border p-12 text-center">
       <MessageSquare className="w-10 h-10 text-muted mx-auto mb-3" />
       <p className="text-sm text-foreground font-semibold mb-1">
-        {totalCount === 0 ? 'No reviews yet' : search ? 'No matching reviews' : 'No reviews in this filter'}
+        {totalCount === 0 ? t('reviews.empty') : search ? t('reviews.noMatch') : t('reviews.noneInFilter')}
       </p>
       <p className="text-xs text-muted">
         {totalCount === 0
-          ? 'Reviews will appear here once students complete courses and rate them.'
-          : 'Try a different search term or filter.'}
+          ? t('reviews.emptyBody')
+          : t('reviews.noMatchBody')}
       </p>
     </div>
   );

@@ -48,7 +48,7 @@ export function LegalDocument({
                                     line.startsWith('• ') ? (
                                         <p
                                             key={i}
-                                            className="pl-4 text-sm leading-relaxed text-muted"
+                                            className="ps-4 text-sm leading-relaxed text-muted"
                                         >
                                             {line}
                                         </p>

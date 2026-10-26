@@ -37,6 +37,7 @@ import {
   Megaphone,
 } from 'lucide-react';
 import TrainerIntroModal from '@/components/TrainerIntroModal';
+import { useI18n } from '@/i18n/I18nProvider';
 import { API_BASE_URL, openProtectedFile } from '@/lib/api';
 
 type Tab = 'students' | 'trainers' | 'pending';
@@ -47,6 +48,7 @@ interface PromoteResult {
 }
 
 export default function UsersPage() {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('students');
   const [students, setStudents] = useState<any[]>([]);
   const [trainers, setTrainers] = useState<any[]>([]);
@@ -96,7 +98,7 @@ export default function UsersPage() {
       await loadData();
     } catch (err: any) {
       console.error(err);
-      alert(err?.response?.data?.message || err.message || 'Action failed');
+      alert(err?.response?.data?.message || err.message || t('users.actionFailed'));
     }
     setDialog((d) => ({ ...d, open: false }));
   };
@@ -118,42 +120,42 @@ export default function UsersPage() {
   // ── Columns ──────────────────────────────────────────
   const studentColumns = [
     {
-      key: 'name', label: 'Name', sortable: true,
+      key: 'name', label: t('users.name'), sortable: true,
       render: (r: any) => (
         <div className="flex items-center gap-3">
           <Avatar name={r.name} color="bg-accent/15 text-accent" />
           <div>
-            <p className="font-medium text-white">{r.name || 'N/A'}</p>
+            <p className="font-medium text-white">{r.name || t('users.na')}</p>
             <p className="text-xs text-muted">{r.email}</p>
           </div>
         </div>
       ),
     },
     {
-      key: 'experienceLevel', label: 'Level',
+      key: 'experienceLevel', label: t('users.level'),
       render: (r: any) => <span className="text-foreground">{r.experienceLevel || '—'}</span>,
     },
     {
-      key: 'totalCoursesEnrolled', label: 'Enrolled', sortable: true,
+      key: 'totalCoursesEnrolled', label: t('users.enrolled'), sortable: true,
       render: (r: any) => <span className="text-foreground">{r.totalCoursesEnrolled || 0}</span>,
     },
     {
-      key: 'isActive', label: 'Status',
+      key: 'isActive', label: t('users.status'),
       render: (r: any) => (
-        <Badge variant={r.isActive ? 'success' : 'danger'}>{r.isActive ? 'Active' : 'Disabled'}</Badge>
+        <Badge variant={r.isActive ? 'success' : 'danger'}>{r.isActive ? t('users.active') : t('users.disabled')}</Badge>
       ),
     },
     {
-      key: 'actions', label: 'Actions',
+      key: 'actions', label: t('users.actions'),
       render: (r: any) => (
         <div className="flex items-center gap-2">
           <button
             onClick={() => setDialog({
               open: true,
-              title: r.isActive ? 'Disable Student' : 'Enable Student',
-              message: `Are you sure you want to ${r.isActive ? 'disable' : 'enable'} ${r.name}?`,
+              title: r.isActive ? t('users.disableStudent') : t('users.enableStudent'),
+              message: r.isActive ? t('users.disableBody', { name: r.name }) : t('users.enableBody', { name: r.name }),
               variant: r.isActive ? 'danger' : 'success',
-              confirmLabel: r.isActive ? 'Disable' : 'Enable',
+              confirmLabel: r.isActive ? t('users.disable') : t('users.enable'),
               action: () => toggleUserStatus(r.userId, 'STUDENT'),
             })}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -161,21 +163,21 @@ export default function UsersPage() {
             }`}
           >
             {r.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-            {r.isActive ? 'Disable' : 'Enable'}
+            {r.isActive ? t('users.disable') : t('users.enable')}
           </button>
           <button
             onClick={() => setDialog({
               open: true,
-              title: 'Promote to Admin',
-              message: `Promote ${r.name} (${r.email}) to admin? They will receive a temporary password.`,
+              title: t('users.promoteTitle'),
+              message: t('users.promoteBody', { name: r.name, email: r.email }),
               variant: 'success',
-              confirmLabel: 'Promote',
+              confirmLabel: t('users.promote'),
               action: () => promoteToAdmin(r.userId, 'STUDENT'),
             })}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 text-warning hover:bg-warning/20 transition"
           >
             <Crown className="w-3.5 h-3.5" />
-            Make Admin
+            {t('users.makeAdmin')}
           </button>
         </div>
       ),
@@ -184,19 +186,19 @@ export default function UsersPage() {
 
   const trainerColumns = [
     {
-      key: 'name', label: 'Name', sortable: true,
+      key: 'name', label: t('users.name'), sortable: true,
       render: (r: any) => (
         <div className="flex items-center gap-3">
           <Avatar name={r.name} color="bg-info/15 text-info" />
           <div>
-            <p className="font-medium text-white">{r.name || 'N/A'}</p>
+            <p className="font-medium text-white">{r.name || t('users.na')}</p>
             <p className="text-xs text-muted">{r.email}</p>
           </div>
         </div>
       ),
     },
     {
-      key: 'specializations', label: 'Specializations',
+      key: 'specializations', label: t('users.specializations'),
       render: (r: any) => (
         <div className="flex flex-wrap gap-1 max-w-[200px]">
           {(r.specializations || []).slice(0, 2).map((s: string, i: number) => (
@@ -209,7 +211,7 @@ export default function UsersPage() {
       ),
     },
     {
-      key: 'rating', label: 'Rating', sortable: true,
+      key: 'rating', label: t('users.rating'), sortable: true,
       render: (r: any) => (
         <span className="text-warning font-medium">
           {r.rating ? `★ ${Number(r.rating).toFixed(1)}` : '—'}
@@ -220,31 +222,31 @@ export default function UsersPage() {
       // The admin's decision on the application. verificationStatus carries
       // the trainer's approvalStatus; isVerified only means the email
       // address was confirmed, so it is deliberately not shown here.
-      key: 'verificationStatus', label: 'Approval',
+      key: 'verificationStatus', label: t('users.approval'),
       render: (r: any) => {
         const s = String(r.verificationStatus || 'PENDING').toUpperCase();
         const variant = s === 'APPROVED' ? 'success' : s === 'REJECTED' ? 'danger' : 'warning';
-        const label = s === 'APPROVED' ? 'Approved' : s === 'REJECTED' ? 'Rejected' : 'Pending';
+        const label = s === 'APPROVED' ? t('users.approved') : s === 'REJECTED' ? t('users.rejected') : t('users.pending');
         return <Badge variant={variant}>{label}</Badge>;
       },
     },
     {
-      key: 'isActive', label: 'Status',
+      key: 'isActive', label: t('users.status'),
       render: (r: any) => (
-        <Badge variant={r.isActive ? 'success' : 'danger'}>{r.isActive ? 'Active' : 'Disabled'}</Badge>
+        <Badge variant={r.isActive ? 'success' : 'danger'}>{r.isActive ? t('users.active') : t('users.disabled')}</Badge>
       ),
     },
     {
-      key: 'actions', label: 'Actions',
+      key: 'actions', label: t('users.actions'),
       render: (r: any) => (
         <div className="flex items-center gap-2">
           <button
             onClick={() => setDialog({
               open: true,
-              title: r.isActive ? 'Disable Trainer' : 'Enable Trainer',
-              message: `Are you sure you want to ${r.isActive ? 'disable' : 'enable'} ${r.name}?`,
+              title: r.isActive ? t('users.disableTrainer') : t('users.enableTrainer'),
+              message: r.isActive ? t('users.disableBody', { name: r.name }) : t('users.enableBody', { name: r.name }),
               variant: r.isActive ? 'danger' : 'success',
-              confirmLabel: r.isActive ? 'Disable' : 'Enable',
+              confirmLabel: r.isActive ? t('users.disable') : t('users.enable'),
               action: () => toggleUserStatus(r.userId, 'TRAINER'),
             })}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -252,29 +254,29 @@ export default function UsersPage() {
             }`}
           >
             {r.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
-            {r.isActive ? 'Disable' : 'Enable'}
+            {r.isActive ? t('users.disable') : t('users.enable')}
           </button>
           <button
             onClick={() => setDialog({
               open: true,
-              title: 'Promote to Admin',
-              message: `Promote ${r.name} (${r.email}) to admin? They will receive a temporary password.`,
+              title: t('users.promoteTitle'),
+              message: t('users.promoteBody', { name: r.name, email: r.email }),
               variant: 'success',
-              confirmLabel: 'Promote',
+              confirmLabel: t('users.promote'),
               action: () => promoteToAdmin(r.userId, 'TRAINER'),
             })}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-warning/10 text-warning hover:bg-warning/20 transition"
           >
             <Crown className="w-3.5 h-3.5" />
-            Make Admin
+            {t('users.makeAdmin')}
           </button>
           <button
             onClick={() => setIntroFor(r)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20 transition"
-            title="Introduce this trainer to learners in the feed"
+            title={t('users.introduceHint')}
           >
             <Megaphone className="w-3.5 h-3.5" />
-            Introduce
+            {t('users.introduce')}
           </button>
         </div>
       ),
@@ -283,19 +285,19 @@ export default function UsersPage() {
 
   const pendingColumns = [
     {
-      key: 'name', label: 'Name', sortable: true,
+      key: 'name', label: t('users.name'), sortable: true,
       render: (r: any) => (
         <div className="flex items-center gap-3">
           <Avatar name={r.name} color="bg-warning/15 text-warning" />
           <div>
-            <p className="font-medium text-white">{r.name || 'N/A'}</p>
+            <p className="font-medium text-white">{r.name || t('users.na')}</p>
             <p className="text-xs text-muted">{r.email}</p>
           </div>
         </div>
       ),
     },
     {
-      key: 'specializations', label: 'Specializations',
+      key: 'specializations', label: t('users.specializations'),
       render: (r: any) => (
         <div className="flex flex-wrap gap-1">
           {(r.specializations || []).slice(0, 3).map((s: string, i: number) => (
@@ -305,31 +307,31 @@ export default function UsersPage() {
       ),
     },
     {
-      key: 'experienceYears', label: 'Experience',
-      render: (r: any) => <span className="text-foreground">{r.experienceYears ? `${r.experienceYears} yrs` : '—'}</span>,
+      key: 'experienceYears', label: t('users.experience'),
+      render: (r: any) => <span className="text-foreground">{r.experienceYears ? t('users.yearsShort', { count: r.experienceYears }) : '—'}</span>,
     },
     {
-      key: 'actions', label: 'Actions',
+      key: 'actions', label: t('users.actions'),
       render: (r: any) => (
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setRejectNote(''); setReviewTrainer(r); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20 transition"
           >
-            <Eye className="w-3.5 h-3.5" /> Review
+            <Eye className="w-3.5 h-3.5" /> {t('users.review')}
           </button>
           <button
             onClick={() => setDialog({
               open: true,
-              title: 'Approve Trainer',
-              message: `Approve ${r.name} as a verified trainer? They'll be emailed a confirmation.`,
+              title: t('users.approveTrainer'),
+              message: t('users.approveTrainerBody', { name: r.name }),
               variant: 'success',
-              confirmLabel: 'Approve',
+              confirmLabel: t('users.approve'),
               action: () => approveTrainer(r.userId),
             })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-success/10 text-success hover:bg-success/20 transition"
           >
-            <ShieldCheck className="w-3.5 h-3.5" /> Approve
+            <ShieldCheck className="w-3.5 h-3.5" /> {t('users.approve')}
           </button>
         </div>
       ),
@@ -337,9 +339,9 @@ export default function UsersPage() {
   ];
 
   const tabs = [
-    { key: 'students' as Tab, label: 'Students', icon: GraduationCap, count: students.length },
-    { key: 'trainers' as Tab, label: 'Trainers', icon: Briefcase, count: trainers.length },
-    { key: 'pending' as Tab, label: 'Pending Approval', icon: Clock, count: pending.length },
+    { key: 'students' as Tab, label: t('users.students'), icon: GraduationCap, count: students.length },
+    { key: 'trainers' as Tab, label: t('users.trainers'), icon: Briefcase, count: trainers.length },
+    { key: 'pending' as Tab, label: t('users.pendingApproval'), icon: Clock, count: pending.length },
   ];
 
   if (loading) return <LoadingSpinner />;
@@ -347,8 +349,8 @@ export default function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="User Management"
-        subtitle={`${students.length + trainers.length} users total — ${pending.length} pending approval`}
+        title={t('users.title')}
+        subtitle={t('users.subtitle', { total: students.length + trainers.length, pending: pending.length })}
       />
 
       {/* Promoted to admin result card */}
@@ -360,24 +362,24 @@ export default function UsersPage() {
                 <Crown className="w-5 h-5 text-warning" />
               </div>
               <div>
-                <p className="font-bold text-white mb-1">User promoted to Admin!</p>
+                <p className="font-bold text-white mb-1">{t('users.promoted')}</p>
                 <p className="text-sm text-foreground mb-3">
-                  Share these credentials with <span className="text-warning font-medium">{promoteResult.adminEmail}</span>
+                  {t('users.shareWith')} <span className="text-warning font-medium">{promoteResult.adminEmail}</span>
                 </p>
                 <div className="flex items-center gap-3 bg-background border border-border rounded-xl px-4 py-3">
                   <div>
-                    <p className="text-xs text-muted mb-0.5">Temporary password</p>
+                    <p className="text-xs text-muted mb-0.5">{t('users.tempPassword')}</p>
                     <p className="font-mono text-sm font-bold text-white">{promoteResult.tempPassword}</p>
                   </div>
                   <button
                     onClick={() => copyToClipboard(promoteResult.tempPassword)}
-                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20 transition"
+                    className="ms-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20 transition"
                   >
                     {copied ? <CheckCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copied ? 'Copied!' : 'Copy'}
+                    {copied ? t('users.copied') : t('users.copy')}
                   </button>
                 </div>
-                <p className="text-xs text-muted mt-2">⚠️ This password is shown only once. Make sure to copy it.</p>
+                <p className="text-xs text-muted mt-2">⚠️ {t('users.shownOnce')}</p>
               </div>
             </div>
             <button
@@ -392,23 +394,23 @@ export default function UsersPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-6">
-        {tabs.map((t) => (
+        {tabs.map((tb) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              tab === t.key
+              tab === tb.key
                 ? 'bg-accent/15 text-accent border border-accent/30'
                 : 'text-muted hover:text-foreground border border-border'
             }`}
           >
-            <t.icon className="w-4 h-4" />
-            {t.label}
-            {t.count > 0 && (
+            <tb.icon className="w-4 h-4" />
+            {tb.label}
+            {tb.count > 0 && (
               <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${
-                tab === t.key ? 'bg-accent/20 text-accent' : 'bg-card-hover text-muted'
+                tab === tb.key ? 'bg-accent/20 text-accent' : 'bg-card-hover text-muted'
               }`}>
-                {t.count}
+                {tb.count}
               </span>
             )}
           </button>
@@ -418,7 +420,7 @@ export default function UsersPage() {
       {tab === 'students' && <DataTable columns={studentColumns} data={students} searchKeys={['name', 'email']} />}
       {tab === 'trainers' && <DataTable columns={trainerColumns} data={trainers} searchKeys={['name', 'email']} />}
       {tab === 'pending' && (
-        <DataTable columns={pendingColumns} data={pending} searchKeys={['name', 'email']} emptyMessage="No pending trainer approvals" />
+        <DataTable columns={pendingColumns} data={pending} searchKeys={['name', 'email']} emptyMessage={t('users.noPending')} />
       )}
 
       <ConfirmDialog
@@ -443,7 +445,7 @@ export default function UsersPage() {
         />
       )}
       {notice && (
-        <div className="fixed bottom-6 right-6 z-[120] px-4 py-3 rounded-xl text-sm font-medium border bg-success/15 text-success border-success/30">
+        <div className="fixed bottom-6 end-6 z-[120] px-4 py-3 rounded-xl text-sm font-medium border bg-success/15 text-success border-success/30">
           {notice}
         </div>
       )}
@@ -490,6 +492,7 @@ function TrainerReviewModal({
   onApprove: () => void | Promise<void>;
   onReject: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const cvUrl = trainer.cvUrl
     ? (String(trainer.cvUrl).startsWith('http') ? trainer.cvUrl : `${API_BASE_URL}${trainer.cvUrl}`)
     : null;
@@ -509,7 +512,7 @@ function TrainerReviewModal({
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
+          className="absolute top-4 end-4 w-9 h-9 rounded-lg bg-card-hover hover:bg-border flex items-center justify-center"
         >
           <X className="w-4 h-4 text-muted" />
         </button>
@@ -531,7 +534,7 @@ function TrainerReviewModal({
             </p>
             {trainer.experienceYears != null && (
               <p className="text-xs text-muted mt-1">
-                {trainer.experienceYears} {trainer.experienceYears === 1 ? 'year' : 'years'} of experience
+                {t('users.yearsOfExperience', { count: trainer.experienceYears })}
               </p>
             )}
           </div>
@@ -539,7 +542,7 @@ function TrainerReviewModal({
 
         {/* Specializations + skills */}
         {(trainer.specializations?.length || trainer.skills?.length) ? (
-          <Section title="Specializations & skills">
+          <Section title={t('users.specsAndSkills')}>
             {trainer.specializations?.length ? (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {trainer.specializations.map((s: string, i: number) => (
@@ -559,31 +562,31 @@ function TrainerReviewModal({
 
         {/* Bio + education + experience text */}
         {trainer.bio && (
-          <Section title="Bio">
+          <Section title={t('users.bio')}>
             <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{trainer.bio}</p>
           </Section>
         )}
         {trainer.education && (
-          <Section title="Education">
+          <Section title={t('users.education')}>
             <p className="text-sm text-foreground/85 whitespace-pre-wrap">{trainer.education}</p>
           </Section>
         )}
         {trainer.professionalExperience && (
-          <Section title="Professional experience">
+          <Section title={t('users.professionalExperience')}>
             <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{trainer.professionalExperience}</p>
           </Section>
         )}
 
         {/* Contact + location */}
-        <Section title="Contact">
+        <Section title={t('users.contact')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             {trainer.phone && (
-              <InfoRow icon={Phone} label="Phone" value={trainer.phone} />
+              <InfoRow icon={Phone} label={t('users.phone')} value={trainer.phone} />
             )}
             {(trainer.address || trainer.city || trainer.state) && (
               <InfoRow
                 icon={MapPin}
-                label="Location"
+                label={t('users.location')}
                 value={[trainer.address, trainer.city, trainer.state, trainer.postalCode]
                   .filter(Boolean).join(', ') || '—'}
               />
@@ -593,13 +596,13 @@ function TrainerReviewModal({
 
         {/* Links */}
         {(trainer.linkedinUrl || trainer.portfolioUrl || trainer.githubUrl) ? (
-          <Section title="Links">
+          <Section title={t('users.links')}>
             <div className="flex flex-wrap gap-2">
               {trainer.linkedinUrl && (
                 <LinkChip icon={Globe} label="LinkedIn" href={trainer.linkedinUrl} />
               )}
               {trainer.portfolioUrl && (
-                <LinkChip icon={Globe} label="Portfolio" href={trainer.portfolioUrl} />
+                <LinkChip icon={Globe} label={t('users.portfolio')} href={trainer.portfolioUrl} />
               )}
               {trainer.githubUrl && (
                 <LinkChip icon={Globe} label="GitHub" href={trainer.githubUrl} />
@@ -609,26 +612,26 @@ function TrainerReviewModal({
         ) : null}
 
         {/* CV */}
-        <Section title="CV / resume">
+        <Section title={t('users.cv')}>
           {cvUrl ? (
             <button
               type="button"
-              onClick={() => openProtectedFile(cvUrl).catch(() => alert('Could not open the CV.'))}
+              onClick={() => openProtectedFile(cvUrl).catch(() => alert(t('users.cvFailed')))}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-accent text-black text-sm font-semibold hover:bg-accent/90"
             >
-              <FileText className="w-4 h-4" /> Open CV
+              <FileText className="w-4 h-4" /> {t('users.openCv')}
             </button>
           ) : (
-            <p className="text-sm text-muted italic">No CV attached.</p>
+            <p className="text-sm text-muted italic">{t('users.noCv')}</p>
           )}
         </Section>
 
         {/* Rejection note */}
-        <Section title="Rejection note (optional)">
+        <Section title={t('users.rejectionNote')}>
           <textarea
             value={note}
             onChange={(e) => onNoteChange(e.target.value)}
-            placeholder="If you reject this trainer, this note gets emailed to them verbatim — explain what to improve before re-applying."
+            placeholder={t('users.rejectionNotePh')}
             className="w-full min-h-[80px] rounded-lg bg-card-hover border border-border p-3 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
           />
         </Section>
@@ -639,13 +642,13 @@ function TrainerReviewModal({
             onClick={onReject}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-danger/10 text-danger hover:bg-danger/20 transition"
           >
-            <ShieldX className="w-4 h-4" /> Reject
+            <ShieldX className="w-4 h-4" /> {t('users.reject')}
           </button>
           <button
             onClick={onApprove}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-success text-black hover:bg-success/90 transition"
           >
-            <ShieldCheck className="w-4 h-4" /> Approve
+            <ShieldCheck className="w-4 h-4" /> {t('users.approve')}
           </button>
         </div>
       </div>

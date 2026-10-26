@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Badge from '@/components/Badge';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import { useI18n } from '@/i18n/I18nProvider';
 import { Plus, Search, Pencil, Eye, EyeOff, Trash2, X, Sparkles } from 'lucide-react';
 
 type Toast = { kind: 'success' | 'error'; text: string } | null;
@@ -28,6 +29,7 @@ const errText = (e: any, fallback: string) =>
  * cannot be deleted, only hidden from new learners, so their profiles keep it.
  */
 export default function SkillsPage() {
+  const { t } = useI18n();
   const [fields, setFields] = useState<{ key: string; label: string }[]>([]);
   const [skills, setSkills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,8 @@ export default function SkillsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const label = (key: string) => fields.find((f) => f.key === key)?.label || key;
+  // The field keys are fixed (SkillOptionService.FIELDS); the server's English name is the fallback.
+  const label = (key: string) => t(`skills.field_${key}`, { defaultValue: fields.find((f) => f.key === key)?.label || key });
   const q = search.trim().toLowerCase();
   const visible = skills.filter((s) =>
     (field === 'all' || s.field === field) &&
@@ -71,18 +74,18 @@ export default function SkillsPage() {
 
   const save = async () => {
     if (!draft) return;
-    if (!draft.field) { showToast({ kind: 'error', text: 'Choose a field' }); return; }
-    if (!draft.name.trim()) { showToast({ kind: 'error', text: 'The skill needs a name' }); return; }
+    if (!draft.field) { showToast({ kind: 'error', text: t('skills.chooseField') }); return; }
+    if (!draft.name.trim()) { showToast({ kind: 'error', text: t('skills.needName') }); return; }
     const body = { field: draft.field, name: draft.name, nameFr: draft.nameFr, nameAr: draft.nameAr, nameEs: draft.nameEs };
     setSaving(true);
     try {
       if (draft.skillId) await updateSkill(draft.skillId, body);
       else await createSkill(body);
-      showToast({ kind: 'success', text: draft.skillId ? 'Skill updated' : `"${draft.name.trim()}" added — new learners can choose it now` });
+      showToast({ kind: 'success', text: draft.skillId ? t('skills.updated') : t('skills.added', { name: draft.name.trim() }) });
       setDraft(null);
       await load();
     } catch (e) {
-      showToast({ kind: 'error', text: errText(e, 'Could not save the skill') });
+      showToast({ kind: 'error', text: errText(e, t('skills.saveFailed')) });
     } finally {
       setSaving(false);
     }
@@ -91,24 +94,24 @@ export default function SkillsPage() {
   const toggle = async (s: any) => {
     try {
       await updateSkill(s.skillId, { isActive: !s.isActive });
-      showToast({ kind: 'success', text: s.isActive ? `"${s.name}" hidden from new learners` : `"${s.name}" offered again` });
+      showToast({ kind: 'success', text: s.isActive ? t('skills.hiddenToast', { name: s.name }) : t('skills.offeredToast', { name: s.name }) });
       await load();
     } catch (e) {
-      showToast({ kind: 'error', text: errText(e, 'Could not change it') });
+      showToast({ kind: 'error', text: errText(e, t('skills.changeFailed')) });
     }
   };
 
   const askDelete = (s: any) => setConfirm({
     open: true,
-    title: 'Delete this skill',
-    message: `"${s.name}" will be removed from ${label(s.field)}. No learner chose it.`,
+    title: t('skills.deleteTitle'),
+    message: t('skills.deleteBody', { name: s.name, field: label(s.field) }),
     action: async () => {
       try {
         await deleteSkill(s.skillId);
-        showToast({ kind: 'success', text: 'Deleted' });
+        showToast({ kind: 'success', text: t('skills.deleted') });
         await load();
       } catch (e) {
-        showToast({ kind: 'error', text: errText(e, 'Could not delete it') });
+        showToast({ kind: 'error', text: errText(e, t('skills.deleteFailed')) });
       }
     },
   });
@@ -119,20 +122,20 @@ export default function SkillsPage() {
   return (
     <div>
       <PageHeader
-        title="Skills"
-        subtitle="What learners can choose to develop at onboarding, under each field"
+        title={t('skills.title')}
+        subtitle={t('skills.subtitle')}
         action={
           <button
             onClick={() => setDraft({ ...EMPTY, field: field === 'all' ? '' : field })}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-black hover:opacity-90 transition"
           >
-            <Plus className="w-4 h-4" /> Add a skill
+            <Plus className="w-4 h-4" /> {t('skills.add')}
           </button>
         }
       />
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        {[{ key: 'all', label: 'All fields' }, ...fields].map((f) => (
+        {[{ key: 'all', label: t('skills.allFields') }, ...fields].map((f) => (
           <button
             key={f.key}
             onClick={() => setField(f.key)}
@@ -140,8 +143,8 @@ export default function SkillsPage() {
               field === f.key ? 'bg-accent/15 text-accent border-accent/40' : 'border-border text-muted hover:text-white'
             }`}
           >
-            {f.label}
-            <span className="ml-1.5 opacity-70">
+            {f.key === 'all' ? f.label : label(f.key)}
+            <span className="ms-1.5 opacity-70">
               {f.key === 'all' ? skills.length : skills.filter((s) => s.field === f.key).length}
             </span>
           </button>
@@ -149,13 +152,13 @@ export default function SkillsPage() {
       </div>
 
       <div className="relative max-w-sm mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
         <input
           type="text"
-          placeholder="Search a skill, in any language..."
+          placeholder={t('skills.searchPh')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+          className="w-full ps-10 pe-3 py-2 rounded-lg bg-card border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
         />
       </div>
 
@@ -164,10 +167,8 @@ export default function SkillsPage() {
       ) : skills.length === 0 ? (
         <div className="bg-card border border-border rounded-2xl p-12 text-center">
           <Sparkles className="w-10 h-10 text-muted mx-auto mb-3" />
-          <p className="text-white font-medium">No skills yet</p>
-          <p className="text-xs text-muted mt-1">
-            Run the 2026-10-25_skill_options.sql migration to load the skills the app used to list, or add them here.
-          </p>
+          <p className="text-white font-medium">{t('skills.empty')}</p>
+          <p className="text-xs text-muted mt-1">{t('skills.emptyBody')}</p>
         </div>
       ) : (
         <div className="space-y-5">
@@ -175,25 +176,23 @@ export default function SkillsPage() {
             <div key={g.key} className="bg-card border border-border rounded-2xl overflow-hidden">
               <div className="px-5 py-3 border-b border-border flex items-center justify-between">
                 <div>
-                  <p className="text-white font-semibold">{g.label}</p>
+                  <p className="text-white font-semibold">{label(g.key)}</p>
                   {g.key === 'general' && (
-                    <p className="text-xs text-muted">
-                      Suggested while people type their CV skills (Communication, C#…); never offered as a skill to develop.
-                    </p>
+                    <p className="text-xs text-muted">{t('skills.generalHint')}</p>
                   )}
                 </div>
                 <button
                   onClick={() => setDraft({ ...EMPTY, field: g.key })}
                   className="text-xs text-accent hover:underline flex items-center gap-1"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add to {g.label}
+                  <Plus className="w-3.5 h-3.5" /> {t('skills.addTo', { field: label(g.key) })}
                 </button>
               </div>
               {g.skills.length === 0 ? (
                 <p className="px-5 py-4 text-sm text-muted">
                   {g.key === 'general'
-                    ? 'No general skills yet.'
-                    : 'No skills in this field — learners who pick it will have nothing to choose.'}
+                    ? t('skills.noGeneral')
+                    : t('skills.noneInField')}
                 </p>
               ) : (
                 <ul className="divide-y divide-border">
@@ -202,26 +201,26 @@ export default function SkillsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-white text-sm font-medium">{s.name}</p>
-                          {!s.isActive && <Badge variant="muted">Hidden</Badge>}
+                          {!s.isActive && <Badge variant="muted">{t('skills.hidden')}</Badge>}
                         </div>
                         <p className="text-xs text-muted truncate">
                           {[s.nameFr && `FR ${s.nameFr}`, s.nameAr && `AR ${s.nameAr}`, s.nameEs && `ES ${s.nameEs}`]
-                            .filter(Boolean).join(' · ') || 'Same name in every language'}
+                            .filter(Boolean).join(' · ') || t('skills.sameName')}
                         </p>
                       </div>
-                      <span className="text-xs text-muted w-24 text-right">
-                        {s.field === 'general' ? '' : `${s.learners} learner${s.learners === 1 ? '' : 's'}`}
+                      <span className="text-xs text-muted w-24 text-end">
+                        {s.field === 'general' ? '' : t('skills.learners', { count: s.learners })}
                       </span>
                       <button
                         onClick={() => setDraft({ skillId: s.skillId, field: s.field, name: s.name, nameFr: s.nameFr || '', nameAr: s.nameAr || '', nameEs: s.nameEs || '', learners: s.learners })}
-                        className="p-2 rounded-lg border border-border text-muted hover:text-white transition" title="Edit"
+                        className="p-2 rounded-lg border border-border text-muted hover:text-white transition" title={t('skills.edit')}
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => toggle(s)}
                         className="p-2 rounded-lg border border-border text-muted hover:text-white transition"
-                        title={s.isActive ? 'Hide from new learners' : 'Offer again'}
+                        title={s.isActive ? t('skills.hideHint') : t('skills.offerAgain')}
                       >
                         {s.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
@@ -229,7 +228,7 @@ export default function SkillsPage() {
                         onClick={() => askDelete(s)}
                         disabled={s.learners > 0}
                         className="p-2 rounded-lg border border-border text-muted hover:text-danger hover:border-danger/40 transition disabled:opacity-30 disabled:hover:text-muted disabled:hover:border-border"
-                        title={s.learners > 0 ? 'Learners chose it — hide it instead' : 'Delete'}
+                        title={s.learners > 0 ? t('skills.inUseHint') : t('skills.delete')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -248,39 +247,39 @@ export default function SkillsPage() {
           <div className="absolute inset-0 bg-black/70" onClick={() => setDraft(null)} />
           <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-              <p className="text-white font-semibold">{draft.skillId ? 'Edit skill' : 'Add a skill'}</p>
+              <p className="text-white font-semibold">{draft.skillId ? t('skills.editTitle') : t('skills.add')}</p>
               <button onClick={() => setDraft(null)} className="p-1 text-muted hover:text-white"><X className="w-5 h-5" /></button>
             </div>
             <div className="px-5 py-4 space-y-3">
               <label className="block">
-                <span className="text-xs text-muted">Field</span>
+                <span className="text-xs text-muted">{t('skills.field')}</span>
                 <select
                   value={draft.field}
                   onChange={(e) => setDraft({ ...draft, field: e.target.value })}
                   className="mt-1 w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-sm focus:border-accent outline-none"
                 >
-                  <option value="">Choose a field…</option>
-                  {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  <option value="">{t('skills.chooseFieldPh')}</option>
+                  {fields.map((f) => <option key={f.key} value={f.key}>{label(f.key)}</option>)}
                 </select>
               </label>
-              <TextField label="Name (English — stored on learners' profiles)" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} placeholder="e.g. Power BI" />
+              <TextField label={t('skills.nameLabel')} value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} placeholder={t('skills.namePh')} />
               {renamed && (
                 <p className="text-xs text-warning">
-                  {draft.learners} learner(s) chose this skill under its current name and keep that name on their profile.
+                  {t('skills.renameWarning', { count: draft.learners })}
                 </p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <TextField label="French (optional)" value={draft.nameFr} onChange={(v) => setDraft({ ...draft, nameFr: v })} />
-                <TextField label="Arabic (optional)" value={draft.nameAr} onChange={(v) => setDraft({ ...draft, nameAr: v })} dir="rtl" />
-                <TextField label="Spanish (optional)" value={draft.nameEs} onChange={(v) => setDraft({ ...draft, nameEs: v })} />
+                <TextField label={t('skills.french')} value={draft.nameFr} onChange={(v) => setDraft({ ...draft, nameFr: v })} />
+                <TextField label={t('skills.arabic')} value={draft.nameAr} onChange={(v) => setDraft({ ...draft, nameAr: v })} dir="rtl" />
+                <TextField label={t('skills.spanish')} value={draft.nameEs} onChange={(v) => setDraft({ ...draft, nameEs: v })} />
               </div>
-              <p className="text-xs text-muted">Leave a translation empty when the name is the same in that language (React, Figma…).</p>
+              <p className="text-xs text-muted">{t('skills.translationHint')}</p>
             </div>
             <div className="px-5 py-4 border-t border-border flex justify-end gap-2">
-              <button onClick={() => setDraft(null)} className="px-4 py-2 rounded-lg text-sm border border-border text-muted hover:text-white">Cancel</button>
+              <button onClick={() => setDraft(null)} className="px-4 py-2 rounded-lg text-sm border border-border text-muted hover:text-white">{t('common.cancel')}</button>
               <button onClick={save} disabled={saving}
                       className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent text-black hover:opacity-90 disabled:opacity-50">
-                {saving ? 'Saving…' : draft.skillId ? 'Save' : 'Add'}
+                {saving ? t('common.saving') : draft.skillId ? t('common.save') : t('skills.addShort')}
               </button>
             </div>
           </div>
@@ -291,14 +290,14 @@ export default function SkillsPage() {
         open={confirm.open}
         title={confirm.title}
         message={confirm.message}
-        confirmLabel="Delete"
+        confirmLabel={t('skills.delete')}
         variant="danger"
         onConfirm={async () => { const a = confirm.action; setConfirm((c) => ({ ...c, open: false })); await a(); }}
         onCancel={() => setConfirm((c) => ({ ...c, open: false }))}
       />
 
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-[120] px-4 py-3 rounded-xl text-sm font-medium border ${
+        <div className={`fixed bottom-6 end-6 z-[120] px-4 py-3 rounded-xl text-sm font-medium border ${
           toast.kind === 'success' ? 'bg-success/15 text-success border-success/30' : 'bg-danger/15 text-danger border-danger/30'
         }`}>
           {toast.text}
