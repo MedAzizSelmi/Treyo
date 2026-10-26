@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, String> {
@@ -72,4 +73,7 @@ public interface MessageRepository extends JpaRepository<Message, String> {
     @Query("SELECT m FROM Message m WHERE m.conversationId = :convId "
             + "AND m.isDeleted = false ORDER BY m.createdAt ASC")
     List<Message> findGroupMessages(@Param("convId") String conversationId);
+
+    /** The newest message in a conversation, for the list's preview. */
+    Optional<Message> findFirstByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(String conversationId);
 }

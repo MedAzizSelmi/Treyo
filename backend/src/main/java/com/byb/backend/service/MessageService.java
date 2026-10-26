@@ -532,9 +532,8 @@ public class MessageService {
                     groupIds.add(g.getGroupId());
                 }
             }
-            // Student? Pick up groups via enrollments.
-            for (Enrollment e : enrollmentRepository.findAll()) {
-                if (!userId.equals(e.getStudentId())) continue;
+            // Student? Pick up groups via their own enrollments.
+            for (Enrollment e : enrollmentRepository.findByStudentId(userId)) {
                 if (e.getGroupId() == null) continue;
                 groupIds.add(e.getGroupId());
             }
@@ -573,10 +572,8 @@ public class MessageService {
     private Set<String> resolveGroupMemberIds(Group group) {
         Set<String> ids = new HashSet<>();
         ids.add(group.getTrainerId());
-        for (Enrollment e : enrollmentRepository.findAll()) {
-            if (group.getGroupId().equals(e.getGroupId())) {
-                ids.add(e.getStudentId());
-            }
+        for (Enrollment e : enrollmentRepository.findByGroupId(group.getGroupId())) {
+            ids.add(e.getStudentId());
         }
         for (Admin a : adminRepository.findAll()) {
             ids.add(a.getAdminId());
@@ -592,9 +589,11 @@ public class MessageService {
      */
     private ConversationResponse buildGroupConversation(Group group) {
         String convId = groupConversationId(group.getGroupId());
-        List<Message> msgs = messageRepository.findGroupMessages(convId);
-
-        Message last = msgs.isEmpty() ? null : msgs.get(msgs.size() - 1);
+        // Only the newest message: the list shows one line of it, and
+        // loading the whole history of every group on each refresh made
+        // the list slower with every message sent.
+        Message last = messageRepository
+                .findFirstByConversationIdAndIsDeletedFalseOrderByCreatedAtDesc(convId).orElse(null);
         // Preview text for the conversation list. Image-only messages
         // have an empty content string — without this branch the preview
         // would be blank and the mobile list would wrongly show its
@@ -622,10 +621,9 @@ public class MessageService {
         // Member count we show in the UI: students + trainer. Admins are
         // moderators and are intentionally NOT counted in the visible
         // total (avoids cluttering the badge with admin headcount).
-        int students = 0;
-        for (Enrollment e : enrollmentRepository.findAll()) {
-            if (group.getGroupId().equals(e.getGroupId())) students++;
-        }
+        // Counted in the database: this ran once per group on every refresh
+        // of the list, and used to load every enrollment there is to do it.
+        int students = (int) enrollmentRepository.countByGroupId(group.getGroupId());
         int memberCount = students + 1; // +1 for the trainer
 
         return ConversationResponse.builder()

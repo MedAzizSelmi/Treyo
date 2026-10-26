@@ -41,6 +41,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, String> 
      *  down to each member's enrollment row. */
     List<Enrollment> findByGroupId(String groupId);
 
+    long countByGroupId(String groupId);
+
     Optional<Enrollment> findByStudentIdAndCourseId(String studentId, String courseId);
 
     long countByEnrollmentStatus(String status);
