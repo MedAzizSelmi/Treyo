@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,7 +91,7 @@ public class FeedGenerationService {
             case FUN_FACT -> "#FFD700";
             case DOMAIN_TIP -> "#7cce06";
             case MOTIVATION -> "#9b87ff";
-            case NEWS -> "#7cce06";
+            case NEWS, NEW_TRAINER -> "#7cce06";
         };
     }
 
@@ -100,6 +101,7 @@ public class FeedGenerationService {
             case DOMAIN_TIP -> "rocket";
             case MOTIVATION -> "heart";
             case NEWS -> "newspaper";
+            case NEW_TRAINER -> "person-add";
         };
     }
 
@@ -127,7 +129,9 @@ public class FeedGenerationService {
      */
     public synchronized int generateIfTodayIsEmpty() {
         LocalDateTime startOfToday = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
-        long todayCount = feedPostRepository.countByPublishedAtAfter(startOfToday);
+        // A trainer introduction is not one of today's posts: counting it
+        // would skip the AI batch on a day an administrator posted early.
+        long todayCount = feedPostRepository.countByPublishedAtAfterAndCategoryNot(startOfToday, FeedPost.Category.NEW_TRAINER);
         if (todayCount >= 3) {
             log.info("Feed: today already has {} posts, skipping generation", todayCount);
             return 0;
@@ -201,6 +205,24 @@ public class FeedGenerationService {
         return saved;
     }
 
+    /**
+     * Translates one post written by an administrator — in whatever
+     * language they wrote it — into English, French, Arabic and Spanish.
+     * Failures are logged; readers then see the text as written.
+     */
+    public void translateWrittenPost(FeedPost post) {
+        Map<String, String> languages = new LinkedHashMap<>();
+        languages.put("en", "English");
+        languages.putAll(TARGET_LANGUAGES);
+        for (Map.Entry<String, String> lang : languages.entrySet()) {
+            try {
+                translateBatch(List.of(post), lang.getKey(), lang.getValue());
+            } catch (Exception e) {
+                log.warn("Feed: translating {} to {} failed — {}", post.getPostId(), lang.getKey(), e.getMessage());
+            }
+        }
+    }
+
     /** Translate one batch of posts into the target language and
      *  persist the results. Sends the whole batch in a single Gemini
      *  request so we can index responses by the post's ordinal. */
@@ -218,7 +240,8 @@ public class FeedGenerationService {
         String inputJson = objectMapper.writeValueAsString(input);
 
         String prompt = "Translate every title and body in the JSON below into " + langName +
-                ". Preserve meaning, tone, and length. Do NOT translate proper nouns " +
+                ". The input may be in any language, or already in " + langName + ". " +
+                "Preserve meaning, tone, and length. Do NOT translate proper nouns " +
                 "(brand names, product names, technologies like 'JavaScript' or 'React').\n\n" +
                 "Reply with ONLY a JSON array of objects, each with `id`, `title`, " +
                 "and `body`. Same `id`s as the input. No prose, no markdown fences.\n\n" +
@@ -303,11 +326,17 @@ public class FeedGenerationService {
             if (lastFence >= 0) s = s.substring(0, lastFence);
         }
         // If there's still prose around the JSON, trim to the outer
-        // braces.
+        // brackets or braces — whichever opens first. Trimming to braces
+        // alone cut a bare array, which the translation prompt asks for,
+        // down to its first object, so every translation reply was thrown
+        // away as "not an array".
         int firstBrace = s.indexOf('{');
-        int lastBrace = s.lastIndexOf('}');
-        if (firstBrace >= 0 && lastBrace > firstBrace) {
-            s = s.substring(firstBrace, lastBrace + 1);
+        int firstBracket = s.indexOf('[');
+        boolean array = firstBracket >= 0 && (firstBrace < 0 || firstBracket < firstBrace);
+        int open = array ? firstBracket : firstBrace;
+        int close = array ? s.lastIndexOf(']') : s.lastIndexOf('}');
+        if (open >= 0 && close > open) {
+            s = s.substring(open, close + 1);
         }
         return s.trim();
     }

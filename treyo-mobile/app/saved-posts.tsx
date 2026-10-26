@@ -9,6 +9,7 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { TrainerIntro } from '../components/TrainerIntro';
 import { authService, feedService } from '../services/api';
 
 /**
@@ -64,6 +65,7 @@ export default function SavedPostsScreen() {
             case 'DOMAIN_TIP': return t('feed.categoryDomainTip');
             case 'MOTIVATION': return t('feed.categoryMotivation');
             case 'NEWS': return t('feed.categoryNews');
+            case 'NEW_TRAINER': return t('feed.categoryNewTrainer');
             default: return category;
         }
     };
@@ -129,8 +131,13 @@ export default function SavedPostsScreen() {
                                     </TouchableOpacity>
                                 </View>
 
-                                <Text style={styles.cardTitle}>{post.title}</Text>
+                                <Text style={styles.cardTitle}>
+                                    {post.category === 'NEW_TRAINER' && post.trainer
+                                        ? t('feed.meetTrainer', { name: post.trainer.name })
+                                        : post.title}
+                                </Text>
                                 <Text style={styles.cardBody}>{post.body}</Text>
+                                {post.category === 'NEW_TRAINER' && post.trainer && <TrainerIntro trainer={post.trainer} />}
 
                                 <View style={styles.cardFooter}>
                                     {post.domain && (

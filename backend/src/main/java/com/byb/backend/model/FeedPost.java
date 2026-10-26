@@ -40,7 +40,9 @@ public class FeedPost extends BaseEntity {
         /** Inspirational quote or general learning advice. */
         MOTIVATION,
         /** Industry news or trend summary. */
-        NEWS
+        NEWS,
+        /** An administrator introducing a new trainer (TrainerIntroService). */
+        NEW_TRAINER
     }
 
     @Id
@@ -87,4 +89,13 @@ public class FeedPost extends BaseEntity {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    /** The trainer a NEW_TRAINER post introduces; its card opens their profile. */
+    @Column(name = "trainer_id", length = 50)
+    private String trainerId;
+
+    /** Shown above everything else until then. Introductions stay first for
+     *  three days, or the four AI posts each morning would bury them. */
+    @Column(name = "pinned_until")
+    private LocalDateTime pinnedUntil;
 }

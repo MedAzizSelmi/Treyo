@@ -575,7 +575,13 @@
         "byTreyoAi": "par Treyo AI",
         "shareLine": "{{title}} — via Treyo",
         "refresh": "Actualiser",
-        "generated": "Nouvelles publications chargées"
+        "generated": "Nouvelles publications chargées",
+        "categoryNewTrainer": "Nouveau formateur",
+        "meetTrainer": "Découvrez {{name}}",
+        "seeTrainer": "Voir son profil",
+        "trainerCourses_one": "{{count}} cours",
+        "trainerCourses_other": "{{count}} cours",
+        "trainerCourses": "{{count}} cours"
     },
     "notificationSettings": {
         "title": "Notifications",

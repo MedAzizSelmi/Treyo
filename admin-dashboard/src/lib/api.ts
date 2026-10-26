@@ -179,6 +179,12 @@ export const createSkill = (body: SkillBody) => api.post('/admin/skills', body);
 export const updateSkill = (id: string, body: SkillBody) => api.put(`/admin/skills/${id}`, body);
 export const deleteSkill = (id: string) => api.delete(`/admin/skills/${id}`);
 
+// ── Introducing new trainers in the learners' feed (backend TrainerIntroService) ──
+export const getTrainerIntro = (trainerId: string) => api.get(`/admin/feed/trainer-intro/${trainerId}`);
+export const publishTrainerIntro = (trainerId: string, intro: string) =>
+  api.post('/admin/feed/trainer-intro', { trainerId, intro });
+export const removeFeedPost = (postId: string) => api.delete(`/admin/feed/posts/${postId}`);
+
 // ── Promote to Admin ──
 export const promoteToAdmin = (userId: string, userType: string) =>
   api.post(`/admin/users/${userId}/promote-to-admin`, null, { params: { userType } });

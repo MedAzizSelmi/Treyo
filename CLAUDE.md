@@ -186,6 +186,20 @@ admins' Skills list only (all groups, plus a `general` group that is never
 offered at onboarding step 2), shows them in the app's language, saves the
 English name, and still accepts a typed skill — CV skills are open-ended.
 
+**New trainers are introduced in the feed, not by notification.** A
+notification per trainer teaches learners to ignore notifications, the
+group and payment ones included. An admin presses "Introduce" on the
+dashboard's Trainers tab and writes a short introduction; the server
+(`TrainerIntroService`) allows it only for an approved trainer with at
+least one published course, once while it is up. The `NEW_TRAINER` post is
+pinned first for three days (`pinned_until`), translated into all four
+languages — admins may write in any of them — and its card opens the
+trainer's profile. No push. Introductions don't count as the day's posts,
+or the morning AI batch would skip a day an admin posted early.
+Feed translations had never worked until October 2026: the reply cleaner
+cut Gemini's bare JSON array to its first object, so `feed_post_translations`
+was empty and everyone read the feed in English.
+
 ## Conventions
 
 Commit messages explain **why**, in prose, not bullet lists of what changed.

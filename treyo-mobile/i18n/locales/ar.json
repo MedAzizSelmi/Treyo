@@ -575,7 +575,13 @@
         "byTreyoAi": "بواسطة Treyo AI",
         "shareLine": "{{title}} — عبر Treyo",
         "refresh": "تحديث",
-        "generated": "تم تحميل منشورات جديدة"
+        "generated": "تم تحميل منشورات جديدة",
+        "categoryNewTrainer": "مدرّب جديد",
+        "meetTrainer": "تعرّف على {{name}}",
+        "seeTrainer": "عرض ملفه",
+        "trainerCourses_one": "دورة واحدة",
+        "trainerCourses_other": "{{count}} دورات",
+        "trainerCourses": "{{count}} دورات"
     },
     "notificationSettings": {
         "title": "الإشعارات",

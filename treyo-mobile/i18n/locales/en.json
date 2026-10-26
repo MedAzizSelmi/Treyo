@@ -575,7 +575,13 @@
         "byTreyoAi": "by Treyo AI",
         "shareLine": "{{title}} — via Treyo",
         "refresh": "Refresh",
-        "generated": "Fresh posts loaded"
+        "generated": "Fresh posts loaded",
+        "categoryNewTrainer": "New trainer",
+        "meetTrainer": "Meet {{name}}",
+        "seeTrainer": "See their profile",
+        "trainerCourses_one": "{{count}} course",
+        "trainerCourses_other": "{{count}} courses",
+        "trainerCourses": "{{count}} courses"
     },
     "notificationSettings": {
         "title": "Notifications",

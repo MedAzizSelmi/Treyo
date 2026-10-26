@@ -34,7 +34,9 @@ import {
   MapPin,
   Globe,
   Eye,
+  Megaphone,
 } from 'lucide-react';
+import TrainerIntroModal from '@/components/TrainerIntroModal';
 import { API_BASE_URL, openProtectedFile } from '@/lib/api';
 
 type Tab = 'students' | 'trainers' | 'pending';
@@ -55,6 +57,9 @@ export default function UsersPage() {
   // Trainer being reviewed in the pending-approval detail panel.
   // Null = panel closed. Populated when the admin clicks "Review".
   const [reviewTrainer, setReviewTrainer] = useState<any | null>(null);
+  // Introducing a trainer in the learners' feed, and what happened.
+  const [introFor, setIntroFor] = useState<any | null>(null);
+  const [notice, setNotice] = useState('');
   const [rejectNote, setRejectNote] = useState('');
   const [dialog, setDialog] = useState<{
     open: boolean;
@@ -263,6 +268,14 @@ export default function UsersPage() {
             <Crown className="w-3.5 h-3.5" />
             Make Admin
           </button>
+          <button
+            onClick={() => setIntroFor(r)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20 transition"
+            title="Introduce this trainer to learners in the feed"
+          >
+            <Megaphone className="w-3.5 h-3.5" />
+            Introduce
+          </button>
         </div>
       ),
     },
@@ -417,6 +430,23 @@ export default function UsersPage() {
         onConfirm={handleAction}
         onCancel={() => setDialog((d) => ({ ...d, open: false }))}
       />
+
+      {introFor && (
+        <TrainerIntroModal
+          trainer={introFor}
+          onClose={() => setIntroFor(null)}
+          onDone={(text) => {
+            setIntroFor(null);
+            setNotice(text);
+            setTimeout(() => setNotice(''), 4000);
+          }}
+        />
+      )}
+      {notice && (
+        <div className="fixed bottom-6 right-6 z-[120] px-4 py-3 rounded-xl text-sm font-medium border bg-success/15 text-success border-success/30">
+          {notice}
+        </div>
+      )}
 
       {/* Trainer review modal — opened by "Review" on a pending row.
           Shows the trainer's full onboarding submission so the admin

@@ -32,6 +32,8 @@ public class FeedService {
     private final FeedPostRepository feedPostRepository;
     private final FeedReactionRepository feedReactionRepository;
     private final FeedPostTranslationRepository feedPostTranslationRepository;
+    private final com.byb.backend.repository.TrainerRepository trainerRepository;
+    private final com.byb.backend.repository.CourseRepository courseRepository;
 
     /** Paged feed for the mobile client.
      *  @param userId if supplied, response includes per-user liked/saved state
@@ -57,7 +59,9 @@ public class FeedService {
         // them into each post on the way out. Missing translations fall
         // back to the English source — never an empty title.
         Map<String, FeedPostTranslation> translations = new HashMap<>();
-        if (lang != null && !lang.isBlank() && !"en".equalsIgnoreCase(lang) && !posts.isEmpty()) {
+        // English too: posts an administrator wrote, perhaps in French, have
+        // an English translation; the AI's own posts are English already.
+        if (lang != null && !lang.isBlank() && !posts.isEmpty()) {
             List<String> ids = posts.stream().map(FeedPost::getPostId).toList();
             for (FeedPostTranslation tr : feedPostTranslationRepository.findByPostIdInAndLanguage(ids, lang.toLowerCase())) {
                 translations.put(tr.getPostId(), tr);
@@ -78,6 +82,7 @@ public class FeedService {
             m.put("likesCount", p.getLikesCount() == null ? 0 : p.getLikesCount());
             m.put("liked", likedPostIds.contains(p.getPostId()));
             m.put("saved", savedPostIds.contains(p.getPostId()));
+            addIntroduction(m, p);
             return m;
         }).toList();
 
@@ -98,7 +103,7 @@ public class FeedService {
         if (ids.isEmpty()) return List.of();
 
         Map<String, FeedPostTranslation> translations = new HashMap<>();
-        if (lang != null && !lang.isBlank() && !"en".equalsIgnoreCase(lang)) {
+        if (lang != null && !lang.isBlank()) {
             for (FeedPostTranslation tr : feedPostTranslationRepository.findByPostIdInAndLanguage(ids, lang.toLowerCase())) {
                 translations.put(tr.getPostId(), tr);
             }
@@ -118,8 +123,29 @@ public class FeedService {
                     m.put("icon", p.getIcon());
                     m.put("publishedAt", p.getPublishedAt());
                     m.put("likesCount", p.getLikesCount() == null ? 0 : p.getLikesCount());
+                    addIntroduction(m, p);
                     return m;
                 }).toList();
+    }
+
+    /**
+     * A NEW_TRAINER post carries the trainer it introduces — what its card
+     * shows and opens — and whether it is still pinned.
+     */
+    private void addIntroduction(Map<String, Object> m, FeedPost p) {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        m.put("pinned", p.getPinnedUntil() != null && p.getPinnedUntil().isAfter(now));
+        if (p.getCategory() != FeedPost.Category.NEW_TRAINER || p.getTrainerId() == null) return;
+        trainerRepository.findByTrainerId(p.getTrainerId()).ifPresent(t -> {
+            Map<String, Object> tr = new LinkedHashMap<>();
+            tr.put("trainerId", t.getTrainerId());
+            tr.put("name", t.getName());
+            tr.put("profilePictureUrl", t.getProfilePictureUrl());
+            tr.put("specializations", t.getSpecializations());
+            tr.put("averageRating", t.getAverageRating());
+            tr.put("courses", TrainerIntroService.publishedCourses(courseRepository, t.getTrainerId()));
+            m.put("trainer", tr);
+        });
     }
 
     /** Toggle a reaction. Idempotent — calling twice clears the row,

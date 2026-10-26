@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScreenBackground } from '../components/ScreenBackground';
+import { TrainerIntro } from '../components/TrainerIntro';
 import { authService, feedService } from '../services/api';
 
 /**
@@ -153,6 +154,7 @@ export default function FeedScreen() {
             case 'DOMAIN_TIP': return t('feed.categoryDomainTip');
             case 'MOTIVATION': return t('feed.categoryMotivation');
             case 'NEWS': return t('feed.categoryNews');
+            case 'NEW_TRAINER': return t('feed.categoryNewTrainer');
             default: return category;
         }
     };
@@ -270,8 +272,12 @@ function FeedCard({
     shareLabel: string; saveLabel: string;
 }) {
     const accent = post.accentColor || '#7cce06';
+    const { t } = useTranslation();
+    // An administrator introducing a new trainer: titled in the app's
+    // language, and leading to the trainer.
+    const intro = post.category === 'NEW_TRAINER' && post.trainer;
     return (
-        <View style={styles.card}>
+        <View style={[styles.card, intro && styles.introCard]}>
             <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
 
             {/* Category pill + date */}
@@ -285,10 +291,12 @@ function FeedCard({
                 <Text style={styles.dateLabel}>{dateLabel}</Text>
             </View>
 
-            <Text style={styles.cardTitle}>{post.title}</Text>
+            <Text style={styles.cardTitle}>{intro ? t('feed.meetTrainer', { name: post.trainer.name }) : post.title}</Text>
             <Text style={styles.cardBody}>{post.body}</Text>
 
-            {post.domain && (
+            {intro && <TrainerIntro trainer={post.trainer} />}
+
+            {post.domain && !intro && (
                 <View style={styles.domainChip}>
                     <Ionicons name="pricetag-outline" size={11} color="rgba(255,255,255,0.55)" />
                     <Text style={styles.domainText}>{post.domain}</Text>
@@ -371,6 +379,7 @@ const styles = StyleSheet.create({
     categoryText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
     dateLabel: { fontSize: 11, color: 'rgba(255,255,255,0.4)' },
 
+    introCard: { borderColor: 'rgba(124,206,6,0.45)' },
     cardTitle: {
         fontSize: 18, fontWeight: '700', color: '#ffffff',
         marginBottom: 8, lineHeight: 24,
