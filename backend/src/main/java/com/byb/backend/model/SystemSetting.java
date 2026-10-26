@@ -11,7 +11,8 @@ import lombok.NoArgsConstructor;
  * warrant their own dedicated column somewhere. Kept intentionally
  * shallow — one row per setting, string value. Callers deserialize.
  *
- * Current users: revenue currency code (key = "revenue.currency").
+ * No current users: its one setting, the revenue currency, only relabelled
+ * dinars and was removed in October 2026.
  */
 @Entity
 @Table(name = "system_settings")

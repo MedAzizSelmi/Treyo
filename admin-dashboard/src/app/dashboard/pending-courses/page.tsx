@@ -6,7 +6,6 @@ import {
   listPendingTrainerCourses,
   approveTrainerCourse,
   rejectTrainerCourse,
-  getRevenueCurrency,
   API_BASE_URL,
   openProtectedFile,
 } from '@/lib/api';
@@ -22,8 +21,10 @@ import { useI18n } from '@/i18n/I18nProvider';
  * modal, reads the fields + opens the attached course plan, then hits
  * Approve or Reject. Rejection accepts an optional note that goes
  * into the email verbatim.
+ *
+ * Prices and daily rates are in dinars: ClicToPay charges every card in
+ * TND, so a currency picker here only mislabelled what learners paid.
  */
-const CURRENCY_CHOICES = ['TND', 'USD', 'EUR', 'GBP', 'MAD', 'DZD', 'EGP', 'SAR', 'AED'];
 
 export default function PendingCoursesPage() {
   const { t } = useI18n();
@@ -37,8 +38,6 @@ export default function PendingCoursesPage() {
   // The trainer's pay per day taught. Asked for here because a course
   // approved without one paid its trainer nothing, silently.
   const [dailyRate, setDailyRate] = useState('');
-  const [priceCurrency, setPriceCurrency] = useState<string>('TND');
-  const [defaultCurrency, setDefaultCurrency] = useState<string>('TND');
   const [priceError, setPriceError] = useState('');
   const [search, setSearch] = useState('');
 
@@ -57,16 +56,6 @@ export default function PendingCoursesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    getRevenueCurrency()
-      .then(r => {
-        const c = r.data.currency || 'TND';
-        setDefaultCurrency(c);
-        setPriceCurrency(c);
-      })
-      .catch(() => { /* default already TND */ });
-  }, []);
-
   const handleApprove = async () => {
     if (!reviewing || busy) return;
     const priceNum = Number(price);
@@ -82,12 +71,11 @@ export default function PendingCoursesPage() {
     setPriceError('');
     setBusy(true);
     try {
-      await approveTrainerCourse(reviewing.courseId, priceNum, priceCurrency, rateNum);
+      await approveTrainerCourse(reviewing.courseId, priceNum, rateNum);
       setReviewing(null);
       setRejectNote('');
       setPrice('');
       setDailyRate('');
-      setPriceCurrency(defaultCurrency);
       await load();
     } catch (e: any) {
       setPriceError(e?.response?.data?.error || t('pending.approveFailed'));
@@ -163,7 +151,6 @@ export default function PendingCoursesPage() {
                 setRejectNote('');
                 setPrice('');
                 setDailyRate('');
-                setPriceCurrency(defaultCurrency);
                 setPriceError('');
                 setReviewing(c);
               }}
@@ -290,18 +277,12 @@ export default function PendingCoursesPage() {
                       placeholder={t('pending.pricePh')}
                       className="flex-1 rounded-lg bg-card-hover border border-border p-2.5 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
                     />
-                    <select
-                      value={priceCurrency}
-                      onChange={(e) => setPriceCurrency(e.target.value)}
-                      className="rounded-lg bg-card-hover border border-border px-3 text-sm text-foreground focus:border-accent outline-none"
-                    >
-                      {CURRENCY_CHOICES.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                    <span className="flex items-center rounded-lg bg-card-hover border border-border px-3 text-sm font-semibold text-muted">
+                      TND
+                    </span>
                   </div>
                   <label className="block text-xs text-muted mt-4 mb-1.5">
-                    {t('pending.rateLabel', { currency: priceCurrency })}
+                    {t('pending.rateLabel', { currency: 'TND' })}
                   </label>
                   <input
                     type="number"

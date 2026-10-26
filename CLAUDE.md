@@ -91,6 +91,13 @@ VAT — `VatPolicy`, driven by `receipt.vat.*`. The server sends `vatRate` and
 Payments before October 2026 were charged the bare price; their receipts
 still come out right because the breakdown is derived from what was paid.
 
+**Prices and revenue are in TND, only.** ClicToPay charges every card in
+dinars (currency 788). A currency picked at course approval once showed
+learners "100 EUR" and charged 100 TND, and a dashboard "revenue currency"
+relabelled a total of dinars as euros — both were removed
+(`2026-10-28_courses_tnd_only.sql`), as the app's own currency setting was.
+Don't bring a currency choice back without a gateway that charges in it.
+
 **Card data is never stored.** ClicToPay's anti-fraud terms are stricter than
 PCI-DSS: no number, no CVV, **no expiry date**. Only brand and last four, taken
 from the mask the gateway applies. The card is typed on ClicToPay's hosted page

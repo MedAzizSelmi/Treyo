@@ -218,12 +218,12 @@ export const archiveModule = (moduleId: string) =>
 
 // ── Trainer-submitted courses awaiting admin review ──
 export const listPendingTrainerCourses = () => api.get('/admin/courses/pending-trainer');
+/** Price and daily rate in TND, the only currency the card is charged in. */
 export const approveTrainerCourse = (
   courseId: string,
   price: number,
-  currency: string,
   trainerDailyRevenue: number,
-) => api.put(`/admin/courses/${courseId}/approve-trainer`, { price, currency, trainerDailyRevenue });
+) => api.put(`/admin/courses/${courseId}/approve-trainer`, { price, trainerDailyRevenue });
 export const rejectTrainerCourse = (courseId: string, note?: string) =>
   api.put(`/admin/courses/${courseId}/reject-trainer`, note ? { note } : {});
 
@@ -244,15 +244,6 @@ export const updateReportStatus = (
   status: 'OPEN' | 'REVIEWED' | 'DISMISSED',
   adminNote?: string,
 ) => api.put(`/admin/reports/${reportId}/status`, { status, adminNote });
-
-// ── System settings (admin-tunable globals) ──
-// Currently just the revenue display currency. Read is public so
-// screens that display prices anywhere can pick up the code without
-// admin auth.
-export const getRevenueCurrency = () =>
-  api.get<{ currency: string }>('/settings/revenue-currency');
-export const setRevenueCurrency = (currency: string) =>
-  api.put<{ currency: string }>('/admin/settings/revenue-currency', { currency });
 
 // ── Reviews moderation ──
 // Reviews are submitted by students at the end of a course. The

@@ -142,14 +142,13 @@ public class AdminController {
             @PathVariable String courseId,
             @RequestBody Map<String, Object> body) {
         Object rawPrice = body == null ? null : body.get("price");
-        Object rawCurrency = body == null ? null : body.get("currency");
         java.math.BigDecimal price;
         try {
             price = new java.math.BigDecimal(String.valueOf(rawPrice));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Price is required."));
         }
-        String currency = rawCurrency == null ? null : String.valueOf(rawCurrency);
+        // A "currency" sent by an older dashboard is ignored: prices are TND.
         // Required with the price: a course approved without a daily rate
         // paid its trainer nothing for every session they taught, and
         // nothing said so until they asked.
@@ -161,7 +160,7 @@ public class AdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "The trainer's daily rate is required."));
         }
         try {
-            adminService.approveTrainerCourse(courseId, price, currency, dailyRate);
+            adminService.approveTrainerCourse(courseId, price, dailyRate);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

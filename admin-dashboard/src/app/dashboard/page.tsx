@@ -16,7 +16,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { getDashboardStats, getRevenueCurrency } from '@/lib/api';
+import { getDashboardStats } from '@/lib/api';
 import StatCard from '@/components/StatCard';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -25,18 +25,15 @@ import { useI18n } from '@/i18n/I18nProvider';
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [currency, setCurrency] = useState<string>('TND');
+  // Every card is charged in dinars, so revenue is dinars.
+  const currency = 'TND';
   const { t, locale } = useI18n();
 
   useEffect(() => {
     (async () => {
       try {
-        const [statsRes, currencyRes] = await Promise.all([
-          getDashboardStats(),
-          getRevenueCurrency(),
-        ]);
+        const statsRes = await getDashboardStats();
         setStats(statsRes.data);
-        setCurrency(currencyRes.data.currency || 'TND');
       } catch (err) {
         console.error('Failed to load stats', err);
       } finally {
@@ -120,8 +117,8 @@ export default function DashboardPage() {
           gateway, so this is what was actually collected — not the old
           SUM(price × total_enrolled), which measured "what everyone would
           owe if they all paid" and read zero regardless, since
-          total_enrolled is never maintained. Currency stays admin-tunable
-          via /dashboard/settings.
+          total_enrolled is never maintained. In TND, the only currency
+          ClicToPay charges in.
         */}
         <StatCard
           label={t('home.revenue', { currency })}
@@ -311,8 +308,7 @@ export default function DashboardPage() {
 }
 
 /**
- * Format a numeric revenue value using the admin's chosen currency
- * code, grouped the way the dashboard's language writes numbers. Falls
+ * Format a numeric revenue value with its currency code, grouped the way the dashboard's language writes numbers. Falls
  * back to a plain "0" when the backend hasn't computed anything yet.
  */
 function formatMoney(value: unknown, currency: string, locale: string): string {

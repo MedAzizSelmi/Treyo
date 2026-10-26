@@ -244,14 +244,13 @@ public class AdminService {
      * Approve a pending course + set its price at the same time.
      *
      * Trainers submit courses without a price — pricing is the admin's
-     * call so we can't approve without one. Both {@code price} and
-     * {@code currency} are required. Currency is normalized to upper-
-     * case. Idempotent for already-approved rows if the caller re-
-     * submits identical values, but a fresh price on an approved row
-     * will still overwrite.
+     * call so we can't approve without one. The price is in dinars, the
+     * only currency the card is charged in. Idempotent for already-approved
+     * rows if the caller re-submits identical values, but a fresh price on
+     * an approved row will still overwrite.
      */
     @Transactional
-    public void approveTrainerCourse(String courseId, java.math.BigDecimal price, String currency,
+    public void approveTrainerCourse(String courseId, java.math.BigDecimal price,
                                      java.math.BigDecimal trainerDailyRevenue) {
         if (price == null || price.signum() < 0) {
             throw new IllegalArgumentException("Price is required and must be non-negative.");
@@ -259,13 +258,9 @@ public class AdminService {
         if (trainerDailyRevenue == null || trainerDailyRevenue.signum() < 0) {
             throw new IllegalArgumentException("The trainer's daily rate is required and must be non-negative.");
         }
-        if (currency == null || currency.isBlank()) {
-            throw new IllegalArgumentException("Currency is required.");
-        }
-        String normalized = currency.trim().toUpperCase();
         courseRepository.findByCourseId(courseId).ifPresent(c -> {
             c.setPrice(price);
-            c.setCurrency(normalized);
+            c.setCurrency(Course.TND);
             c.setTrainerDailyRevenue(trainerDailyRevenue);
             c.setApprovalStatus("APPROVED");
             c.setApprovalNote(null);

@@ -67,8 +67,15 @@ public class Course extends BaseEntity {
     @Column(precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;
 
+    /** The only currency: ClicToPay charges every card in dinars. */
+    public static final String TND = "TND";
+
+    /**
+     * Always TND. It was once chosen at approval, which showed learners
+     * "100 EUR" while ClicToPay charged their card 100 TND.
+     */
     @Column(length = 10)
-    private String currency = "TND";
+    private String currency = TND;
 
     /**
      * How much the trainer earns per day they train this course, in

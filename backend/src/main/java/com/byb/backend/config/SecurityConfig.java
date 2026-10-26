@@ -55,7 +55,6 @@ public class SecurityConfig {
                             "/api/auth/**",
                             "/api/files/download/**",
                             "/api/trainers",
-                            "/api/settings/revenue-currency",
                             "/api/modules",
                             // The payment webhook is server-to-server and
                             // has no JWT — it has to be permitAll. The

@@ -202,7 +202,7 @@ public class CourseTemplateService {
         c.setPrerequisites(t.getPrerequisites());
         c.setLearningOutcomes(t.getLearningOutcomes());
         c.setPrice(t.getPrice());
-        c.setCurrency(t.getCurrency());
+        c.setCurrency(Course.TND);
         c.setHasCertificate(t.getHasCertificate());
         c.setMinStudentsRequired(t.getMinStudentsRequired());
         c.setMaxStudentsPerGroup(t.getMaxStudentsPerGroup());
