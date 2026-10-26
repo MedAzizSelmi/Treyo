@@ -22,6 +22,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CourseService {
 
+    /**
+     * Whether learners can see a course and ask to join it: published,
+     * active, and approved (null for courses from before the review
+     * workflow). The one rule for every learner-facing count and list.
+     */
+    public static boolean isOpenToLearners(com.byb.backend.model.Course c) {
+        return Boolean.TRUE.equals(c.getIsPublished()) && !Boolean.FALSE.equals(c.getIsActive())
+                && (c.getApprovalStatus() == null || "APPROVED".equalsIgnoreCase(c.getApprovalStatus()));
+    }
+
+    /** How many of a trainer's courses learners can open. */
+    public static long openCourseCount(CourseRepository courses, String trainerId) {
+        return courses.findByTrainerId(trainerId).stream().filter(CourseService::isOpenToLearners).count();
+    }
+
     private final CourseRepository courseRepository;
     private final TrainerRepository trainerRepository;
     private final InteractionRepository interactionRepository;
@@ -199,8 +214,19 @@ public class CourseService {
     }
 
     public List<CourseResponse> getCoursesByTrainer(String trainerId) {
+        return getCoursesByTrainer(trainerId, true);
+    }
+
+    /**
+     * A trainer's courses. {@code all} for the trainer themselves and
+     * administrators, drafts and rejected ones included; otherwise only
+     * those learners can open — a trainer's page used to receive every
+     * course and rely on the app to hide the rest.
+     */
+    public List<CourseResponse> getCoursesByTrainer(String trainerId, boolean all) {
         return courseRepository.findByTrainerId(trainerId)
                 .stream()
+                .filter(course -> all || isOpenToLearners(course))
                 .map(course -> {
                     Trainer trainer = trainerRepository.findByTrainerId(trainerId)
                             .orElse(null);

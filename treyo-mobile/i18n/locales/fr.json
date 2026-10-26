@@ -474,7 +474,11 @@
         "viewCourses": "Voir les cours",
         "follow": "Suivre",
         "following": "Suivi",
-        "viewAll": "Tout voir"
+        "viewAll": "Tout voir",
+        "yearsExp": "Ans d'exp.",
+        "noCourses": "Aucun cours publié pour l'instant",
+        "notFound": "Formateur introuvable",
+        "untitled": "Sans titre"
     },
     "help": {
         "title": "Aide & Support",

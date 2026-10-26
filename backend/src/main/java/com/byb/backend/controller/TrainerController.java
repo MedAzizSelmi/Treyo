@@ -40,7 +40,12 @@ public class TrainerController {
     @GetMapping("/{trainerId}")
     @Operation(summary = "Get a trainer's public profile by ID")
     public ResponseEntity<Map<String, Object>> getTrainerById(@PathVariable String trainerId) {
-        return trainerRepository.findById(trainerId).map(t -> {
+        return trainerRepository.findById(trainerId)
+                // An applicant's page opens only once approved — except to
+                // administrators, and to the trainer themselves.
+                .filter(t -> "APPROVED".equalsIgnoreCase(t.getApprovalStatus())
+                        || callerGuard.isAdmin() || t.getTrainerId().equals(callerGuard.current().getUserId()))
+                .map(t -> {
             Map<String, Object> map = new java.util.LinkedHashMap<>();
             map.put("trainerId", t.getTrainerId());
             map.put("name", t.getName());
@@ -53,7 +58,9 @@ public class TrainerController {
             map.put("averageRating", t.getAverageRating());
             map.put("linkedinUrl", t.getLinkedinUrl());
             map.put("portfolioUrl", t.getPortfolioUrl());
-            long coursesCount = courseRepository.countByTrainerId(t.getTrainerId());
+            // Courses a learner can open, as the trainer's page lists — not
+            // every course ever created, drafts and rejected ones included.
+            long coursesCount = com.byb.backend.service.CourseService.openCourseCount(courseRepository, t.getTrainerId());
             map.put("coursesCount", coursesCount);
             return ResponseEntity.ok(map);
         }).orElse(ResponseEntity.notFound().build());
@@ -62,19 +69,26 @@ public class TrainerController {
     @GetMapping
     @Operation(summary = "Get all active trainers")
     public ResponseEntity<List<Map<String, Object>>> getAllTrainers() {
-        List<Trainer> trainers = trainerRepository.findByIsActiveTrue();
+        // Public, even without signing in. Approved trainers only: pending and
+        // rejected applicants were listed to learners, and in Top Trainers.
+        List<Trainer> trainers = trainerRepository.findByIsActiveTrue().stream()
+                .filter(t -> "APPROVED".equalsIgnoreCase(t.getApprovalStatus()))
+                .toList();
         List<Map<String, Object>> result = trainers.stream().map(t -> {
             Map<String, Object> map = new java.util.LinkedHashMap<>();
             map.put("trainerId", t.getTrainerId());
             map.put("name", t.getName());
-            map.put("email", t.getEmail());
+            // No email: this list is open to anyone, and no screen used it —
+            // it only made every trainer's address easy to collect.
             map.put("profilePictureUrl", t.getProfilePictureUrl());
             map.put("specializations", t.getSpecializations());
             map.put("skills", t.getSkills());
             map.put("experienceYears", t.getExperienceYears());
             map.put("bio", t.getBio());
             map.put("isVerified", t.getIsVerified());
-            long coursesCount = courseRepository.countByTrainerId(t.getTrainerId());
+            // Courses a learner can open, as the trainer's page lists — not
+            // every course ever created, drafts and rejected ones included.
+            long coursesCount = com.byb.backend.service.CourseService.openCourseCount(courseRepository, t.getTrainerId());
             map.put("coursesCount", coursesCount);
             return map;
         }).collect(java.util.stream.Collectors.toList());

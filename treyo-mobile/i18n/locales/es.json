@@ -474,7 +474,11 @@
         "viewCourses": "Ver cursos",
         "follow": "Seguir",
         "following": "Siguiendo",
-        "viewAll": "Ver todo"
+        "viewAll": "Ver todo",
+        "yearsExp": "Años exp.",
+        "noCourses": "Aún no hay cursos publicados",
+        "notFound": "Formador no encontrado",
+        "untitled": "Sin título"
     },
     "help": {
         "title": "Ayuda y soporte",

@@ -96,7 +96,11 @@ public class CourseController {
     @GetMapping("/trainer/{trainerId}")
     @Operation(summary = "Get courses by trainer")
     public ResponseEntity<List<CourseResponse>> getCoursesByTrainer(@PathVariable String trainerId) {
-        List<CourseResponse> courses = courseService.getCoursesByTrainer(trainerId);
+        // The trainer's own screens list every course they made; anyone
+        // else — a learner on their page — only what is open to learners.
+        var caller = callerGuard.current();
+        boolean all = caller.isAdmin() || trainerId.equals(caller.getUserId());
+        List<CourseResponse> courses = courseService.getCoursesByTrainer(trainerId, all);
         return ResponseEntity.ok(courses);
     }
 }

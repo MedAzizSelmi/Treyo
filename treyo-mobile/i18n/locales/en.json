@@ -474,7 +474,11 @@
         "viewCourses": "View Courses",
         "follow": "Follow",
         "following": "Following",
-        "viewAll": "View all"
+        "viewAll": "View all",
+        "yearsExp": "Yrs exp",
+        "noCourses": "No published courses yet",
+        "notFound": "Trainer not found",
+        "untitled": "Untitled"
     },
     "help": {
         "title": "Help & Support",

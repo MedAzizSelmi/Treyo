@@ -42,10 +42,14 @@ export default function TrainerProfileScreen() {
                 courseService.getTrainerCourses(trainerId),
             ]);
             setTrainer(t);
-            setCourses(Array.isArray(c) ? c.filter((x: any) => {
-                const s = (x.status || x.courseStatus || '').toUpperCase();
-                return s === 'PUBLISHED' || s === 'ACTIVE';
-            }) : []);
+            // Courses carry isPublished / isActive / approvalStatus. This
+            // filtered on a `status` field courses do not have, so every
+            // trainer's page said they had none. The server sends learners
+            // only these already; the check stays for the trainer viewing
+            // their own page.
+            setCourses(Array.isArray(c) ? c.filter((x: any) =>
+                x.isPublished === true && x.isActive !== false
+                && (!x.approvalStatus || String(x.approvalStatus).toUpperCase() === 'APPROVED')) : []);
         } catch (e) {
             console.log('Trainer profile load error', e);
         } finally {
@@ -81,7 +85,7 @@ export default function TrainerProfileScreen() {
                 </View>
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                     <Ionicons name="person-outline" size={48} color="rgba(255,255,255,0.2)" />
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', marginTop: 12, fontSize: 16 }}>Trainer not found</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', marginTop: 12, fontSize: 16 }}>{t('trainerProfile.notFound')}</Text>
                 </View>
             </ScreenBackground>
         );
@@ -148,7 +152,7 @@ export default function TrainerProfileScreen() {
                             <View style={styles.statItem}>
                                 <Ionicons name="briefcase" size={16} color="#7cce06" />
                                 <Text style={styles.statValue}>{trainer.experienceYears}</Text>
-                                <Text style={styles.statLabel}>Yrs exp</Text>
+                                <Text style={styles.statLabel}>{t('trainerProfile.yearsExp')}</Text>
                             </View>
                         )}
                         {typeof trainer.coursesCount === 'number' && (
@@ -172,7 +176,7 @@ export default function TrainerProfileScreen() {
                             {trainer.portfolioUrl && (
                                 <TouchableOpacity style={styles.linkBtn} onPress={() => Linking.openURL(trainer.portfolioUrl)} activeOpacity={0.8}>
                                     <Ionicons name="globe-outline" size={15} color="#7cce06" />
-                                    <Text style={styles.linkBtnText}>Portfolio</Text>
+                                    <Text style={styles.linkBtnText}>{t('course.portfolio')}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -210,7 +214,7 @@ export default function TrainerProfileScreen() {
                     {courses.length === 0 ? (
                         <View style={styles.emptyCoursesWrap}>
                             <Ionicons name="book-outline" size={36} color="rgba(124,206,6,0.3)" />
-                            <Text style={styles.emptyCoursesText}>No published courses yet</Text>
+                            <Text style={styles.emptyCoursesText}>{t('trainerProfile.noCourses')}</Text>
                         </View>
                     ) : (
                         courses.map((course: any) => (
@@ -226,7 +230,7 @@ export default function TrainerProfileScreen() {
                                         <Ionicons name="book" size={20} color="#7cce06" />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.courseTitle} numberOfLines={2}>{course.title || 'Untitled'}</Text>
+                                        <Text style={styles.courseTitle} numberOfLines={2}>{course.title || t('trainerProfile.untitled')}</Text>
                                         <View style={styles.courseMeta}>
                                             {!!course.level && (
                                                 <Text style={styles.courseMetaText}>{levelLabel(t, course.level)}</Text>
