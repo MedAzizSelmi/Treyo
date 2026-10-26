@@ -392,7 +392,10 @@
     "sendPicture": "إرسال صورة",
     "typePh": "اكتب رسالة…",
     "you": "أنت",
-    "member": "عضو"
+    "member": "عضو",
+    "searchPh": "ابحث بالمجموعة أو الدورة أو المدرّب…",
+    "clearSearch": "مسح البحث",
+    "noMatch": "لا توجد مجموعة تطابق «{{query}}»."
   },
   "suggestions": {
     "status_new": "للمراجعة",

@@ -48,4 +48,5 @@ public class ConversationResponse {
     private Boolean readOnly;
     private String courseTitle;   // shown as the conversation subtitle
     private Integer memberCount;  // students + trainer (admins not counted in the visible total)
+    private String trainerName;   // groups only; the dashboard searches by it
 }

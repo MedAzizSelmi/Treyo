@@ -646,6 +646,8 @@ public class MessageService {
                 .readOnly(isGroupReadOnly(group))
                 .courseTitle(courseTitle)
                 .memberCount(memberCount)
+                .trainerName(group.getTrainerId() == null ? null
+                        : trainerRepository.findByTrainerId(group.getTrainerId()).map(Trainer::getName).orElse(null))
                 .build();
     }
 

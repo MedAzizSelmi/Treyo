@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2, Lock } from 'lucide-react';
+import { Send, Users, MessageSquare, ChevronLeft, ImageIcon, Loader2, Lock, Search, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -37,10 +37,17 @@ import {
 const POLL_MS = 15000;
 const CONV_POLL_MS = 30000;
 
+/** Lower case without accents, so "medecine" finds "Médecine". */
+function fold(s: unknown): string {
+  return String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
 export default function AdminMessagesPage() {
   const { t, locale } = useI18n();
   const [adminId, setAdminId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
+  // Finds a group by its name, its course or its trainer.
+  const [search, setSearch] = useState('');
   const [convLoading, setConvLoading] = useState(true);
   const [selected, setSelected] = useState<any | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -278,6 +285,12 @@ export default function AdminMessagesPage() {
 
   if (!adminId || convLoading) return <LoadingSpinner />;
 
+  const q = fold(search);
+  const shown = q
+    ? conversations.filter((c) =>
+        [c.otherUserName, c.courseTitle, c.trainerName].some((f) => fold(f).includes(q)))
+    : conversations;
+
   return (
     <div>
       <PageHeader
@@ -290,6 +303,29 @@ export default function AdminMessagesPage() {
         <div className={`bg-card border border-border rounded-2xl overflow-hidden flex flex-col ${selected ? 'hidden lg:flex' : ''}`}>
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-semibold text-white">{t('messages.groups')}</p>
+            {conversations.length > 0 && (
+              <div className="relative mt-2.5">
+                <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t('messages.searchPh')}
+                  aria-label={t('messages.searchPh')}
+                  className="w-full ps-9 pe-8 py-2 rounded-lg bg-card-hover border border-border text-foreground text-sm placeholder:text-muted focus:border-accent outline-none"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    aria-label={t('messages.clearSearch')}
+                    className="absolute end-2 top-1/2 -translate-y-1/2 p-1 rounded text-muted hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {conversations.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-center px-6">
@@ -300,9 +336,16 @@ export default function AdminMessagesPage() {
                 </p>
               </div>
             </div>
+          ) : shown.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-center px-6">
+              <div>
+                <Search className="w-10 h-10 text-muted mx-auto mb-3" />
+                <p className="text-sm text-muted">{t('messages.noMatch', { query: search.trim() })}</p>
+              </div>
+            </div>
           ) : (
             <div className="flex-1 overflow-y-auto">
-              {conversations.map((conv) => {
+              {shown.map((conv) => {
                 const isActive = selected?.groupId === conv.groupId;
                 return (
                   <button
@@ -324,6 +367,13 @@ export default function AdminMessagesPage() {
                           {t('messages.members', { count: conv.memberCount })}
                         </span>
                       </div>
+                      {/* While searching, show what matched besides the name. */}
+                      {q && (conv.courseTitle || conv.trainerName) && (
+                        <p className="text-[11px] text-accent/80 truncate mt-0.5">
+                          {[conv.courseTitle !== conv.otherUserName ? conv.courseTitle : null, conv.trainerName]
+                            .filter(Boolean).join(' · ')}
+                        </p>
+                      )}
                       <p className="text-xs text-muted truncate mt-0.5">
                         {conv.lastMessage || t('messages.noMessages')}
                       </p>

@@ -392,7 +392,10 @@
     "sendPicture": "Enviar una foto",
     "typePh": "Escribe un mensaje…",
     "you": "Tú",
-    "member": "Miembro"
+    "member": "Miembro",
+    "searchPh": "Buscar por grupo, curso o formador…",
+    "clearSearch": "Borrar la búsqueda",
+    "noMatch": "Ningún grupo coincide con «{{query}}»."
   },
   "suggestions": {
     "status_new": "Por revisar",

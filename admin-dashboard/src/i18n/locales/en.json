@@ -392,7 +392,10 @@
     "sendPicture": "Send a picture",
     "typePh": "Type a message…",
     "you": "You",
-    "member": "Member"
+    "member": "Member",
+    "searchPh": "Search by group, course or trainer…",
+    "clearSearch": "Clear the search",
+    "noMatch": "No group matches “{{query}}”."
   },
   "suggestions": {
     "status_new": "To review",
