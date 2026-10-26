@@ -73,6 +73,11 @@ export default function RootLayout() {
                     router.push({ pathname: '/group-offer' as any, params: { groupId: data.entityId } });
                 } else if (data.type === 'COURSE_SUGGESTION_PUBLISHED' && data.entityId) {
                     router.push({ pathname: '/course-detail' as any, params: { courseId: data.entityId } });
+                } else if ((data.type === 'GROUP_REPORT_REQUEST' || data.type === 'GROUP_REPORT_REMINDER')
+                    && data.entityId) {
+                    router.push({ pathname: '/group-report' as any, params: { groupId: data.entityId } });
+                } else if (data.type === 'COURSE_COMPLETED') {
+                    router.push('/my-attestations' as any);
                 } else if ((data.type === 'GROUP_SCHEDULE_REQUEST' || data.type === 'GROUP_SCHEDULE_REMINDER')
                     && data.entityId) {
                     router.push({ pathname: '/schedule-sessions' as any, params: { groupId: data.entityId } });
@@ -113,7 +118,8 @@ export default function RootLayout() {
                 <Stack.Screen name="edit-profile" />
                 <Stack.Screen name="theme-settings" />
                 <Stack.Screen name="notification-settings" />
-                <Stack.Screen name="certificates" />
+                <Stack.Screen name="my-attestations" />
+                <Stack.Screen name="group-report" />
                 <Stack.Screen name="help-support" />
                 <Stack.Screen name="course-search" />
                 <Stack.Screen name="course-detail" />

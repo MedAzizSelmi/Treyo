@@ -55,6 +55,8 @@ export default function TrainerNotificationsScreen() {
             case 'GROUP_SCHEDULE_REQUEST': return 'calendar';
             case 'GROUP_SCHEDULE_REMINDER': return 'alarm';
             case 'GROUP_SCHEDULE_APPROVED': return 'checkmark-done-circle';
+            case 'GROUP_REPORT_REQUEST': return 'document-text';
+            case 'GROUP_REPORT_REMINDER': return 'alarm';
             case 'GROUP_CLOSED': return 'close-circle';
             case 'SESSION_CONFIRMED': return 'calendar';
             case 'NEW_MESSAGE': return 'mail';
@@ -72,6 +74,8 @@ export default function TrainerNotificationsScreen() {
             case 'GROUP_SCHEDULE_REQUEST': return '#7cce06';
             case 'GROUP_SCHEDULE_REMINDER': return '#FFA500';
             case 'GROUP_SCHEDULE_APPROVED': return '#7cce06';
+            case 'GROUP_REPORT_REQUEST': return '#7cce06';
+            case 'GROUP_REPORT_REMINDER': return '#FFA500';
             case 'GROUP_CLOSED': return '#aaaaaa';
             case 'SESSION_CONFIRMED': return '#3b5bdb';
             case 'NEW_MESSAGE': return '#FFA500';
@@ -159,6 +163,14 @@ export default function TrainerNotificationsScreen() {
                 titleKey: 'notifications.groupClosedTitle',
                 messageKey: 'notifications.groupClosedTrainerMessage',
             },
+            GROUP_REPORT_REQUEST: {
+                titleKey: 'notifications.reportRequestTitle',
+                messageKey: 'notifications.reportRequestMessage',
+            },
+            GROUP_REPORT_REMINDER: {
+                titleKey: 'notifications.reportReminderTitle',
+                messageKey: 'notifications.reportRequestMessage',
+            },
             ONE_TO_ONE_OFFER: {
                 titleKey: 'notifications.oneToOneTitle',
                 messageKey: 'notifications.oneToOneMessage',
@@ -172,7 +184,8 @@ export default function TrainerNotificationsScreen() {
         if (!entry) return { title: notif.title, message: notif.message };
 
         const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'ONE_TO_ONE_OFFER', 'GROUP_SCHEDULE_REQUEST',
-            'GROUP_SCHEDULE_REMINDER', 'GROUP_SCHEDULE_APPROVED', 'GROUP_CLOSED'].includes(notif.notificationType);
+            'GROUP_SCHEDULE_REMINDER', 'GROUP_SCHEDULE_APPROVED', 'GROUP_CLOSED',
+            'GROUP_REPORT_REQUEST', 'GROUP_REPORT_REMINDER'].includes(notif.notificationType);
         if (needsCourse && !params.course) {
             return { title: notif.title, message: notif.message };
         }
@@ -307,6 +320,20 @@ export default function TrainerNotificationsScreen() {
                                                     ? t('notifications.viewSchedule')
                                                     : t('notifications.scheduleNow')}
                                             </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    {['GROUP_REPORT_REQUEST', 'GROUP_REPORT_REMINDER'].includes(openNotif.notificationType)
+                                        && openNotif.relatedEntityId && (
+                                        <TouchableOpacity
+                                            style={modalStyles.actionBtn}
+                                            activeOpacity={0.85}
+                                            onPress={() => {
+                                                const groupId = openNotif.relatedEntityId;
+                                                setOpenNotif(null);
+                                                router.push({ pathname: '/group-report' as any, params: { groupId } });
+                                            }}
+                                        >
+                                            <Text style={modalStyles.actionText}>{t('notifications.writeReport')}</Text>
                                         </TouchableOpacity>
                                     )}
                                     {openNotif.relatedEntityType === 'group' && openNotif.relatedEntityId

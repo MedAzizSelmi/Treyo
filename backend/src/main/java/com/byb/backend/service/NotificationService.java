@@ -187,6 +187,26 @@ public class NotificationService {
                 "course_suggestion", suggestionId, "normal", Map.of("topic", topic));
     }
 
+    /** Trainer: the group's sessions are over — send the end-of-course report. */
+    @Transactional
+    public void sendReportRequest(String trainerId, String groupId, String courseTitle, boolean reminder) {
+        sendForGroup(trainerId, "trainer", reminder ? "GROUP_REPORT_REMINDER" : "GROUP_REPORT_REQUEST",
+                (reminder ? "Reminder: report on " : "Your report on ") + courseTitle,
+                "The sessions for '" + courseTitle + "' are over. Send your end-of-course report: "
+                        + "learners who completed receive their attestation once it is in.",
+                groupId, "high", Map.of("course", courseTitle));
+    }
+
+    /** Learner: the trainer marked them as having completed the course; the attestation is ready. */
+    @Transactional
+    public void sendCourseCompleted(String studentId, String groupId, String enrollmentId, String courseTitle) {
+        sendForGroup(studentId, "student", "COURSE_COMPLETED",
+                "Congratulations on completing " + courseTitle + "!",
+                "You completed '" + courseTitle + "'. Your attestation de participation is ready to download, "
+                        + "and we have emailed it to you.",
+                groupId, "high", Map.of("course", courseTitle, "enrollmentId", enrollmentId));
+    }
+
     /** Administrator: something in a group needs a person. Also recorded so it is sent once. */
     @Transactional
     public void sendAdminGroupAlert(String adminId, String type, String groupId, String title, String message,

@@ -8,6 +8,7 @@ import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.GroupRepository;
 import com.byb.backend.repository.TrainerRepository;
 import com.byb.backend.security.CallerGuard;
+import com.byb.backend.service.GroupReportService;
 import com.byb.backend.service.TrainerService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +37,7 @@ public class TrainerController {
     private final GroupRepository groupRepository;
     private final ObjectMapper objectMapper;
     private final CallerGuard callerGuard;
+    private final GroupReportService groupReportService;
 
     @GetMapping("/{trainerId}")
     @Operation(summary = "Get a trainer's public profile by ID")
@@ -187,6 +189,9 @@ public class TrainerController {
      * taught came out at 0 with nothing saying why. They are now counted
      * in unratedSessions so the app can say the rate is missing. Currency
      * assumes courses share a currency — takes the first non-null one.
+     *
+     * Sessions the trainer's end-of-course report says were not held are
+     * not paid; until the report is in, every scheduled session counts.
      */
     @GetMapping("/{trainerId}/earnings")
     public ResponseEntity<Map<String, Object>> getEarnings(
@@ -220,6 +225,7 @@ public class TrainerController {
             Course course = courseRepository.findByCourseId(g.getCourseId()).orElse(null);
             if (course == null) continue;
             if (currency == null && course.getCurrency() != null) currency = course.getCurrency();
+            java.util.Set<String> notHeld = groupReportService.notHeldKeys(g.getGroupId());
 
             for (Map<String, Object> s : sessions) {
                 Object dateRaw = s.get("date");
@@ -238,6 +244,10 @@ public class TrainerController {
                     startTime = java.time.LocalTime.parse(tm.length() == 5 ? tm + ":00" : tm);
                 } catch (Exception e) { startTime = java.time.LocalTime.MIDNIGHT; }
                 if (d.atTime(startTime).isAfter(now)) continue;
+                // The report said it did not take place.
+                String hhmm = String.valueOf(s.get("time"));
+                if (hhmm.length() > 5) hhmm = hhmm.substring(0, 5);
+                if (notHeld.contains(date + "|" + hhmm)) continue;
 
                 String key = date + "|" + course.getCourseId();
                 if (course.getTrainerDailyRevenue() == null) {

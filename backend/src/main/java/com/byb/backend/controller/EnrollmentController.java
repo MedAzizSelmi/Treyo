@@ -11,6 +11,7 @@ import com.byb.backend.security.AuthenticatedUser;
 import com.byb.backend.security.CallerGuard;
 import com.byb.backend.service.EnrollmentService;
 import com.byb.backend.service.FileAccessService;
+import com.byb.backend.service.GroupReportService;
 import com.byb.backend.service.ReceiptDeliveryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +44,7 @@ public class EnrollmentController {
     private final TrainerRepository trainerRepository;
     private final ObjectMapper objectMapper;
     private final CallerGuard callerGuard;
+    private final GroupReportService groupReportService;
 
     @GetMapping("/course/{courseId}")
     @Operation(summary = "Get all enrollments for a course (trainer view)")
@@ -124,9 +126,13 @@ public class EnrollmentController {
         trainerRepository.findAllById(courses.values().stream().map(Course::getTrainerId)
                         .filter(java.util.Objects::nonNull).collect(Collectors.toSet()))
                 .forEach(t -> trainerNames.put(t.getTrainerId(), t.getName()));
+        // Which of them the trainer's report marked completed: those have an attestation.
+        java.util.Set<String> attested = groupReportService.withAttestation(
+                enrollments.stream().map(Enrollment::getEnrollmentId).collect(Collectors.toSet()));
 
         return enrollments.stream().map(e -> {
             Map<String, Object> m = objectMapper.convertValue(e, new TypeReference<Map<String, Object>>() {});
+            m.put("hasAttestation", attested.contains(e.getEnrollmentId()));
             Course course = courses.get(e.getCourseId());
             if (course != null) {
                 m.put("courseTitle", course.getTitle());
@@ -199,6 +205,38 @@ public class EnrollmentController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
+    }
+
+    /**
+     * Download the attestation de participation, once the trainer's report
+     * marked this learner as having completed the course.
+     *
+     * Rendered on demand like the receipt. Readable by the learner it
+     * belongs to and by an administrator; the same 404 for "not yours" and
+     * "none", so it cannot be used to probe for enrolments.
+     */
+    @GetMapping("/{enrollmentId}/attestation")
+    @Operation(summary = "Download the attestation de participation for a completed enrollment")
+    public ResponseEntity<?> downloadAttestation(@PathVariable String enrollmentId) {
+        AuthenticatedUser caller = fileAccessService.caller().orElse(null);
+        if (caller == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Not signed in"));
+        }
+        Enrollment enrollment = enrollmentRepository.findById(enrollmentId).orElse(null);
+        if (enrollment == null
+                || (!caller.isAdmin() && !caller.getUserId().equals(enrollment.getStudentId()))) {
+            return ResponseEntity.status(404).body(Map.of("error", "No attestation for that enrollment"));
+        }
+        GroupReportService.Attestation a = groupReportService.attestation(enrollmentId).orElse(null);
+        if (a == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "No attestation",
+                    "message", "The attestation is issued once the trainer's report marks the course completed."));
+        }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, org.springframework.http.ContentDisposition.attachment()
+                        .filename(a.filename(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(a.pdf());
     }
 
 }

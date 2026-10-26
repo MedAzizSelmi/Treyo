@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { ScreenBackground } from '../../components/ScreenBackground';
-import { authService, notificationService, enrollmentService, interactionService, paymentService } from '../../services/api';
+import { authService, notificationService, enrollmentService, interactionService, paymentService, downloadAttestation } from '../../services/api';
 
 export default function NotificationsScreen() {
     const { t } = useTranslation();
@@ -175,6 +175,27 @@ export default function NotificationsScreen() {
         });
     };
 
+    /** COURSE_COMPLETED: the attestation, shared like a receipt. */
+    const openAttestation = async (notif: any) => {
+        let data: any = {};
+        try {
+            data = typeof notif.actionData === 'string' ? JSON.parse(notif.actionData) : (notif.actionData || {});
+        } catch (_) {}
+        if (!data.enrollmentId) {
+            router.push('/my-attestations' as any);
+            return;
+        }
+        setProcessingId(notif.notificationId);
+        try {
+            const shared = await downloadAttestation(data.enrollmentId);
+            if (!shared) Alert.alert(t('attestations.title'), t('attestations.noShare'));
+        } catch (_) {
+            Alert.alert(t('attestations.title'), t('attestations.failed'));
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     const handleMarkAllRead = async () => {
         const unread = notifications.filter(n => !n.isRead);
         await Promise.allSettled(unread.map(n => notificationService.markAsRead(n.notificationId)));
@@ -195,6 +216,7 @@ export default function NotificationsScreen() {
             case 'ENROLLMENT_CONFIRMED': return 'school';
             case 'NEW_MESSAGE': return 'mail';
             case 'ADMIN_BROADCAST': return 'megaphone';
+            case 'COURSE_COMPLETED': return 'ribbon';
             default: return 'notifications';
         }
     };
@@ -213,6 +235,7 @@ export default function NotificationsScreen() {
             case 'ENROLLMENT_CONFIRMED': return '#FFA500';
             case 'NEW_MESSAGE': return '#FFA500';
             case 'ADMIN_BROADCAST': return '#ff4444';
+            case 'COURSE_COMPLETED': return '#7cce06';
             default: return '#aaaaaa';
         }
     };
@@ -343,6 +366,10 @@ export default function NotificationsScreen() {
                 titleKey: 'notifications.newMessageTitle',
                 messageKey: '',
             },
+            COURSE_COMPLETED: {
+                titleKey: 'notifications.courseCompletedTitle',
+                messageKey: 'notifications.courseCompletedMessage',
+            },
         };
 
         const entry = typeMap[notif.notificationType];
@@ -352,7 +379,7 @@ export default function NotificationsScreen() {
         // give up on translation for this row and show the original
         // English text — better than literal "{{course}}" placeholders.
         const needsCourse = ['GROUP_FORMING', 'GROUP_READY', 'GROUP_PAYMENT_OPEN', 'GROUP_PAYMENT_REMINDER',
-            'GROUP_CLOSED', 'GROUP_MISSED', 'ONE_TO_ONE_OFFER']
+            'GROUP_CLOSED', 'GROUP_MISSED', 'ONE_TO_ONE_OFFER', 'COURSE_COMPLETED']
             .includes(notif.notificationType);
         if (needsCourse && !params.course) {
             return { title: notif.title, message: notif.message };
@@ -584,6 +611,20 @@ export default function NotificationsScreen() {
                                                 activeOpacity={0.85}
                                             >
                                                 <Text style={modalStyles.confirmText}>{t('notifications.seeCourse')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                    {openNotif.notificationType === 'COURSE_COMPLETED' && (
+                                        <View style={modalStyles.actions}>
+                                            <TouchableOpacity
+                                                style={modalStyles.confirmBtn}
+                                                onPress={() => openAttestation(openNotif)}
+                                                disabled={processingId === openNotif.notificationId}
+                                                activeOpacity={0.85}
+                                            >
+                                                {processingId === openNotif.notificationId
+                                                    ? <ActivityIndicator size="small" color="#0a0520" />
+                                                    : <Text style={modalStyles.confirmText}>{t('notifications.downloadAttestation')}</Text>}
                                             </TouchableOpacity>
                                         </View>
                                     )}

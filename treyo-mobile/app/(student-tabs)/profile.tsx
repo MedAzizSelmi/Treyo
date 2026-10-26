@@ -208,6 +208,26 @@ export default function ProfileScreen() {
                     </View>
                 )}
 
+                {/* Attestations de participation, one per course the
+                    trainer's report marked completed. */}
+                <View style={styles.sectionWrap}>
+                    <TouchableOpacity
+                        style={styles.settingsRow}
+                        onPress={() => router.push('/my-attestations' as any)}
+                        activeOpacity={0.8}
+                    >
+                        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                        <View style={styles.settingsIconWrap}>
+                            <Ionicons name="ribbon-outline" size={22} color="#7cce06" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.settingsTitle}>{t('profile.myAttestations')}</Text>
+                            <Text style={styles.settingsSubtitle}>{t('profile.myAttestationsSubtitle')}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
+                </View>
+
                 {/* Saved posts — anything the student bookmarked from
                     the daily AI feed lands here. Mirrors the same row
                     style as Settings & Privacy below so the section

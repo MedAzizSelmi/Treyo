@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useState, useCallback } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { authService, courseService, notificationService, groupService, trainerService } from '../../services/api';
+import { authService, courseService, notificationService, groupService, trainerService, groupReportService } from '../../services/api';
 import api from '../../services/api';
 import { ScreenBackground } from '../../components/ScreenBackground';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,8 @@ export default function TrainerHomeScreen() {
     const [loading, setLoading] = useState(true);
     const [courses, setCourses] = useState<any[]>([]);
     const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+    // Finished groups whose end-of-course report is still to send.
+    const [reportsDue, setReportsDue] = useState<any[]>([]);
     const [unreadNotifCount, setUnreadNotifCount] = useState(0);
     const [stats, setStats] = useState({ students: 0, courses: 0, rating: 0, revenue: 0 });
     const [currency, setCurrency] = useState<string>('TND');
@@ -77,6 +79,13 @@ export default function TrainerHomeScreen() {
                     setUpcomingSessions(Array.isArray(sessions) ? sessions : []);
                 } catch (_) {
                     setUpcomingSessions([]);
+                }
+
+                try {
+                    const due = await groupReportService.pending();
+                    setReportsDue(Array.isArray(due) ? due : []);
+                } catch (_) {
+                    setReportsDue([]);
                 }
 
                 try {
@@ -190,6 +199,26 @@ export default function TrainerHomeScreen() {
                     </View>
                 ) : (
                     <>
+                        {/* ── Reports due ── first, because learners wait on
+                            them for their attestation. */}
+                        {reportsDue.map((r: any) => (
+                            <TouchableOpacity
+                                key={r.groupId}
+                                style={styles.reportDue}
+                                activeOpacity={0.85}
+                                onPress={() => router.push({ pathname: '/group-report' as any, params: { groupId: r.groupId } })}
+                            >
+                                <Ionicons name="document-text" size={22} color="#7cce06" />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.reportDueTitle}>{t('trainerHome.reportDue')}</Text>
+                                    <Text style={styles.reportDueBody} numberOfLines={1}>
+                                        {[r.courseTitle, r.groupName].filter(Boolean).join(' · ')}
+                                    </Text>
+                                </View>
+                                <Text style={styles.reportDueAction}>{t('trainerHome.writeReport')}</Text>
+                            </TouchableOpacity>
+                        ))}
+
                         {/* ── Stats Grid ── */}
                         <View style={styles.statsRow}>
                             <StatCard title={t('trainerHome.statStudents')} value={String(stats.students)} icon="people" color="#7cce06" />
@@ -431,6 +460,14 @@ const styles = StyleSheet.create({
 
     // Sections
     section: { marginTop: 24 },
+    reportDue: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        borderRadius: 14, borderWidth: 1, borderColor: 'rgba(124,206,6,0.45)',
+        backgroundColor: 'rgba(124,206,6,0.08)', padding: 14, marginBottom: 12,
+    },
+    reportDueTitle: { fontSize: 14, fontWeight: '700', color: '#ffffff' },
+    reportDueBody: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
+    reportDueAction: { fontSize: 12, fontWeight: '700', color: '#7cce06' },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
     sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff' },
     seeAll: { fontSize: 13, fontWeight: '600', color: '#7cce06' },

@@ -323,6 +323,24 @@ public class EmailService {
         send(toEmail, subject, html, receiptPdf, receiptFilename);
     }
 
+    /** The attestation de participation, attached, once the trainer's report marks the course completed. */
+    public void sendAttestationEmail(String toEmail, String learnerName, String courseTitle,
+                                     byte[] attestationPdf, String filename) {
+        String course = courseTitle == null ? "your course" : courseTitle;
+        String subject = "Congratulations — your attestation for " + course;
+        String html = simpleTemplate(
+                "Course completed",
+                "Hi " + (learnerName == null || learnerName.isBlank() ? "there" : learnerName) + ",",
+                "Congratulations on completing " + course + ".\n\n"
+                        + "Your attestation de participation from LeanConsulting is attached as a PDF. "
+                        + "You can also download it again from the app, under My attestations.",
+                null,
+                null,
+                "Keep this email: the attached attestation is your proof of participation."
+        );
+        send(toEmail, subject, html, attestationPdf, filename);
+    }
+
     private void send(String toEmail, String subject, String html) {
         send(toEmail, subject, html, null, null);
     }

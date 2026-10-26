@@ -30,4 +30,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Stri
     boolean existsByNotificationTypeAndRelatedEntityId(String notificationType, String relatedEntityId);
 
     List<Notification> findByNotificationTypeAndRelatedEntityId(String notificationType, String relatedEntityId);
+
+    List<Notification> findByNotificationType(String notificationType);
 }

@@ -1012,6 +1012,64 @@ export async function downloadReceipt(enrollmentId: string): Promise<boolean> {
     return true;
 }
 
+/**
+ * Save a completed course's attestation de participation and hand it to
+ * the OS share sheet — the receipt's way, for the same reasons: the
+ * endpoint is behind the bearer token, and the server can draw it again.
+ */
+export async function downloadAttestation(enrollmentId: string): Promise<boolean> {
+    const token = await SecureStore.getItemAsync('jwt_token');
+    const res = await fetch(`${API_URL}/enrollments/${enrollmentId}/attestation`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+        throw new Error(res.status === 404 ? 'No attestation for this course yet.' : 'Could not fetch the attestation.');
+    }
+
+    const [{ File, Paths }, Sharing] = await Promise.all([
+        import('expo-file-system'),
+        import('expo-sharing'),
+    ]);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const file = new File(Paths.cache, `Attestation-${enrollmentId}.pdf`);
+    try {
+        if (file.exists) file.delete();
+    } catch (_) {
+        // As for receipts: create() below overwrites or says why it can't.
+    }
+    file.create({ overwrite: true });
+    file.write(bytes);
+
+    if (!(await Sharing.isAvailableAsync())) return false;
+    await Sharing.shareAsync(file.uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Attestation de participation',
+        UTI: 'com.adobe.pdf',
+    });
+    return true;
+}
+
+/**
+ * The trainer's end-of-course report. The server checks that the caller is
+ * the group's trainer; nothing here names a user.
+ */
+export const groupReportService = {
+    /** The form (sessions, learners), or the report once sent. */
+    get: async (groupId: string) => {
+        const response = await api.get(`/group-reports/group/${groupId}`);
+        return response.data;
+    },
+    submit: async (groupId: string, report: any) => {
+        const response = await api.post(`/group-reports/group/${groupId}`, report);
+        return response.data;
+    },
+    /** The signed-in trainer's finished groups still waiting for a report. */
+    pending: async () => {
+        const response = await api.get('/group-reports/mine/pending');
+        return response.data;
+    },
+};
+
 export const twoFactorService = {
     /** Whether 2FA is on, and how many recovery codes are left. */
     status: async (): Promise<{ enabled: boolean; recoveryCodesRemaining: number }> => {

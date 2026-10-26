@@ -147,6 +147,34 @@ double as the "already sent" record. Groups formed by hand before this
 (enrolments confirmed with no group) keep the dashboard's Form Group.
 `GroupFlowTest` walks the whole flow.
 
+**A finished group gets a report, and the report decides attestations.**
+When a group's last session is over (`CourseLifecycleService` publishes
+`GroupCompleted`) its trainer is asked for the end-of-course report
+(`GroupReportService`, app screen `group-report`, also a "Report due" card
+on the trainer home): per learner, sessions attended and Completed /
+Partly completed / Did not follow (starting at "all attended, completed");
+then whether every session was held, how much of the course plan was
+covered, level and prerequisites, comments. Sent once, never edited — an
+attestation once given is not taken back. **Completed needs at least 80% of
+the sessions held** (LeanConsulting's rule; `sessionsNeededToComplete`,
+rounded up, sessions marked not held left out of the count) — the server
+refuses less and the form greys the option out. Learners marked Completed are
+congratulated (notification, push) and get an **attestation de
+participation**: LeanConsulting's own Canva design
+(`resources/attestation/background.pdf`, the original with only the
+sample name and the placeholder sentence removed) with name, course and
+"du … au …" written in by `AttestationService` — always in French. The
+name is Pinyon Script (Anastasia Script, the original font, is personal-use
+only), Amiri for Arabic names; licences sit beside the fonts. Emailed, and
+downloadable from Profile → My attestations. Sessions marked not held are
+not paid (`TrainerController` earnings). Reminders at 2 days, admins at 5;
+groups that finished before reports existed are never asked. The trainer's
+notes are for admins only, which is why results live in
+`group_report_learners`, not on enrollments.
+A course's "certificate" box means **it prepares for a certification**,
+which LeanConsulting may organise a test for — Treyo issues no
+certificate. The admin's report view lists who completed, to invite.
+
 **Course suggestions turn away noise in layers, not by detecting it.** A
 learner who cannot find a course suggests it (from an empty search, or the
 profile); admins look for a trainer and link the course, which tells every

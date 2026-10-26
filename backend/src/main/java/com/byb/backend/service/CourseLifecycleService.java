@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,13 @@ public class CourseLifecycleService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher events;
+
+    /**
+     * Published when a group's last session is over. GroupReportService asks
+     * the trainer for the end-of-course report once it is committed.
+     */
+    public record GroupCompleted(String groupId) {}
 
     /**
      * Mark a single group as completed if all its sessions have ended.
@@ -155,6 +163,7 @@ public class CourseLifecycleService {
                 courseRepository.save(course);
             });
         }
+        events.publishEvent(new GroupCompleted(g.getGroupId()));
     }
 
     /**

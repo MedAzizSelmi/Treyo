@@ -2,7 +2,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getAllGroups, approveGroupSchedule, getGroupCallList, saveGroupSchedule } from '@/lib/api';
+import { getAllGroups, approveGroupSchedule, getGroupCallList, saveGroupSchedule, getGroupReport, saveGroupReportNote } from '@/lib/api';
 import PageHeader from '@/components/PageHeader';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import Badge from '@/components/Badge';
@@ -27,9 +27,20 @@ import {
   Trash2,
   CalendarCheck,
   AlertTriangle,
+  FileText,
+  Award,
 } from 'lucide-react';
 
-type StatusFilter = 'all' | 'review' | 'payment' | 'active' | 'ready' | 'completed';
+type StatusFilter = 'all' | 'review' | 'payment' | 'active' | 'ready' | 'completed' | 'report';
+
+/**
+ * A finished group whose trainer was asked for the end-of-course report and
+ * has not sent it. Groups that finished before reports existed were never
+ * asked (no reportRequestedAt) and are not counted as missing one.
+ */
+function reportMissing(g: any): boolean {
+  return (g.groupStatus || '').toLowerCase() === 'completed' && !!g.reportRequestedAt && !g.reportSubmittedAt;
+}
 
 /**
  * Where a group being prepared is in the automated flow (backend
@@ -121,6 +132,7 @@ export default function GroupsPage() {
 
   const toReview = groups.filter((g) => g.stage === 'awaiting_review').length;
   const toCall = groups.filter(needsCalls).length;
+  const reportsMissing = groups.filter(reportMissing).length;
 
   const totalMembers = groups.reduce((s, g) => s + (g.members?.length || 0), 0);
   const paidMembers = groups.reduce(
@@ -132,7 +144,8 @@ export default function GroupsPage() {
   const filtered = groups.filter((g) => {
     if (filter === 'review' && g.stage !== 'awaiting_review') return false;
     if (filter === 'payment' && g.stage !== 'open_for_payment') return false;
-    if (!['all', 'review', 'payment'].includes(filter) && (g.groupStatus || '').toLowerCase() !== filter) return false;
+    if (filter === 'report' && !reportMissing(g)) return false;
+    if (!['all', 'review', 'payment', 'report'].includes(filter) && (g.groupStatus || '').toLowerCase() !== filter) return false;
     if (search) {
       const s = search.toLowerCase();
       return (
@@ -152,7 +165,7 @@ export default function GroupsPage() {
       />
 
       {/* What needs a person: the rest of the flow runs on its own. */}
-      {(toReview > 0 || toCall > 0) && (
+      {(toReview > 0 || toCall > 0 || reportsMissing > 0) && (
         <div className="mb-5 rounded-xl border border-warning/30 bg-warning/[0.06] p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="text-sm text-foreground/90 space-y-1">
@@ -161,6 +174,9 @@ export default function GroupsPage() {
             )}
             {toCall > 0 && (
               <p><strong className="text-white">{toCall}</strong> {t('groups.toCall', { count: toCall })}</p>
+            )}
+            {reportsMissing > 0 && (
+              <p><strong className="text-white">{reportsMissing}</strong> {t('groups.reportsMissing', { count: reportsMissing })}</p>
             )}
           </div>
         </div>
@@ -194,6 +210,7 @@ export default function GroupsPage() {
           <FilterChip active={filter === 'active'} onClick={() => setFilter('active')} label={t('groups.status_active')} tone="success" />
           <FilterChip active={filter === 'ready'} onClick={() => setFilter('ready')} label={t('groups.status_ready')} tone="warning" />
           <FilterChip active={filter === 'completed'} onClick={() => setFilter('completed')} label={t('groups.status_completed')} tone="info" />
+          <FilterChip active={filter === 'report'} onClick={() => setFilter('report')} label={t('groups.filterReportMissing')} tone="warning" />
         </div>
       </div>
 
@@ -233,6 +250,8 @@ export default function GroupsPage() {
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="font-medium text-white truncate">{g.groupName}</p>
                         <Badge variant={statusVariant(status)}>{stageLabel(g, status)}</Badge>
+                        {g.reportSubmittedAt && <Badge variant="success">{t('groups.reportSent')}</Badge>}
+                        {reportMissing(g) && <Badge variant="warning">{t('groups.reportMissing')}</Badge>}
                         {g.stage === 'open_for_payment' && (
                           <span className={`text-[11px] font-semibold ${needsCalls(g) ? 'text-warning' : 'text-muted'}`}>
                             {t('groups.paidOf', { paid: g.joinedCount ?? 0, min: g.minStudents ?? '?' })}
@@ -359,6 +378,11 @@ export default function GroupsPage() {
               </div>
             )}
 
+            {/* The trainer's end-of-course report, once the group is over. */}
+            {(open.groupStatus || '').toLowerCase() === 'completed' && (
+              <ReportSection group={open} onNoteSaved={loadGroups} />
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <FunnelStat icon={GraduationCap} label={t('groups.members')} value={open.members?.length || 0} tone="success" />
               <FunnelStat icon={Users} label={t('groups.capacity')} value={open.maxSize || 0} tone="muted" />
@@ -410,6 +434,179 @@ export default function GroupsPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ─────── end-of-course report ───────
+
+const RESULT_VARIANT: Record<string, 'success' | 'warning' | 'muted'> = {
+  COMPLETED: 'success',
+  PARTIAL: 'warning',
+  DID_NOT_FOLLOW: 'muted',
+};
+
+/**
+ * The trainer's report (backend GroupReportService): each learner's
+ * attendance and result, with their contacts; the sessions not held; the
+ * plan covered; the level and prerequisites; comments. For a course that
+ * prepares for a certification, who completed — the people to invite to the
+ * test. Administrators add an internal note; the report itself is the
+ * trainer's and is not edited here.
+ */
+function ReportSection({ group, onNoteSaved }: { group: any; onNoteSaved: () => void }) {
+  const { t, locale } = useI18n();
+  const [data, setData] = useState<any | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setData(null);
+    setFailed(false);
+    getGroupReport(group.groupId)
+      .then((r) => {
+        if (!live) return;
+        setData(r.data);
+        setNote(r.data?.report?.adminNote || '');
+      })
+      .catch(() => live && setFailed(true));
+    return () => { live = false; };
+  }, [group.groupId, group.reportSubmittedAt]);
+
+  const date = (iso?: string) =>
+    iso ? new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+  const saveNote = async () => {
+    if (!data?.report) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      await saveGroupReportNote(data.report.reportId, note);
+      setSaved(true);
+      onNoteSaved();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const heading = (
+    <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+      <FileText className="w-4 h-4 text-accent" />
+      {t('groups.reportTitle')}
+    </h4>
+  );
+
+  if (failed) return <div>{heading}<EmptyMini icon={FileText} text={t('groups.reportLoadFailed')} /></div>;
+  if (!data) return <div>{heading}<LoadingSpinner /></div>;
+
+  const r = data.report;
+  const total = (data.sessions || []).length;
+  if (!r) {
+    return (
+      <div>
+        {heading}
+        <EmptyMini
+          icon={Clock}
+          text={group.reportRequestedAt
+            ? t('groups.reportNotYet', { date: date(group.reportRequestedAt) })
+            : t('groups.reportNotAsked')}
+        />
+      </div>
+    );
+  }
+
+  const completed = (data.learners || []).filter((l: any) => l.result === 'COMPLETED');
+  return (
+    <div className="space-y-4">
+      {heading}
+      <p className="text-xs text-muted -mt-2">{t('groups.reportSentOn', { date: date(r.submittedAt) })}</p>
+
+      {data.preparesCertification && (
+        <div className="rounded-xl border border-accent/30 bg-accent/[0.06] p-3">
+          <p className="text-xs font-semibold text-white flex items-center gap-2 mb-1.5">
+            <Award className="w-4 h-4 text-accent" />
+            {t('groups.certificationInvite', { count: completed.length })}
+          </p>
+          <p className="text-[11px] text-muted mb-2">{t('groups.certificationExplain')}</p>
+          {completed.length > 0 && (
+            <ul className="text-xs text-foreground/90 space-y-0.5">
+              {completed.map((l: any) => (
+                <li key={l.enrollmentId}>{l.name}{l.email ? ` · ${l.email}` : ''}{l.phone ? ` · ${l.phone}` : ''}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <ul className="space-y-2">
+        {(data.learners || []).map((l: any) => (
+          <li key={l.enrollmentId} className="px-3 py-2.5 rounded-lg bg-card-hover/40 border border-border">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm text-white flex-1 min-w-0 truncate">{l.name}</p>
+              <span className="text-[11px] text-muted">{t('groups.attendedOf', { n: l.sessionsAttended ?? 0, total })}</span>
+              <Badge variant={RESULT_VARIANT[l.result] || 'muted'}>{t(`groups.result_${l.result}`, { defaultValue: l.result })}</Badge>
+            </div>
+            {l.note && <p className="text-[11px] text-foreground/80 mt-1">“{l.note}”</p>}
+            {(l.email || l.phone) && (
+              <p className="text-[11px] text-muted mt-0.5">{[l.email, l.phone].filter(Boolean).join(' · ')}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <dl className="rounded-xl border border-border bg-card-hover/40 p-3 space-y-2.5 text-xs">
+        <ReportFact label={t('groups.reportSessions')}>
+          {r.allSessionsHeld ? t('groups.allSessionsHeld', { count: total }) : (
+            <ul className="space-y-0.5">
+              {(r.sessionsNotHeld || []).map((n: any) => (
+                <li key={`${n.date}|${n.time}`}>
+                  <span className="text-warning font-semibold">{t('groups.notHeldOn', { date: date(n.date), time: n.time })}</span> — {n.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+        </ReportFact>
+        <ReportFact label={t('groups.reportPlan')}>
+          {t(`groups.coverage_${r.planCoverage}`, { defaultValue: r.planCoverage })}
+          {r.planLeftOut && <span className="block text-muted mt-0.5">{r.planLeftOut}</span>}
+        </ReportFact>
+        <ReportFact label={t('groups.reportLevel')}>{t(`groups.level_${r.levelFit}`, { defaultValue: r.levelFit })}</ReportFact>
+        <ReportFact label={t('groups.reportPrereq')}>{t(`groups.prereq_${r.prerequisites}`, { defaultValue: r.prerequisites })}</ReportFact>
+        {r.comments && <ReportFact label={t('groups.reportComments')}>{r.comments}</ReportFact>}
+      </dl>
+
+      <div>
+        <label className="block text-xs font-semibold text-muted mb-1.5">{t('groups.adminNote')}</label>
+        <textarea
+          value={note}
+          onChange={(e) => { setNote(e.target.value.slice(0, 2000)); setSaved(false); }}
+          rows={3}
+          placeholder={t('groups.adminNotePh')}
+          className="w-full rounded-lg bg-card-hover border border-border p-2.5 text-sm text-foreground placeholder:text-muted focus:border-accent outline-none"
+        />
+        <div className="flex items-center justify-end gap-3 mt-2">
+          {saved && <span className="text-xs text-success">{t('groups.noteSaved')}</span>}
+          <button
+            onClick={saveNote}
+            disabled={saving || note === (r.adminNote || '')}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-black hover:bg-accent/90 disabled:opacity-50"
+          >
+            {saving ? t('groups.savingNote') : t('groups.saveNote')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportFact({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-muted mb-0.5">{label}</dt>
+      <dd className="text-foreground">{children}</dd>
     </div>
   );
 }

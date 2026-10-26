@@ -142,6 +142,10 @@ export const updateTrainerDailyRevenue = (courseId: string, amount: number | nul
 export const getRequestedCourses = () => api.get('/admin/requests');
 export const cleanupStaleRequests = () => api.post('/admin/requests/cleanup');
 export const getAllGroups = () => api.get('/admin/groups');
+/** A group's end-of-course report, with its learners and their contacts (admins). */
+export const getGroupReport = (groupId: string) => api.get(`/group-reports/group/${groupId}`);
+export const saveGroupReportNote = (reportId: string, note: string) =>
+  api.put(`/group-reports/${reportId}/note`, { note });
 export const getCourseInterest = (courseId: string) =>
   api.get(`/admin/courses/${courseId}/interest`);
 // The automated group flow (backend GroupAutomationService): groups open

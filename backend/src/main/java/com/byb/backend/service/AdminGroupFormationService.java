@@ -3,13 +3,16 @@ package com.byb.backend.service;
 import com.byb.backend.model.Course;
 import com.byb.backend.model.Enrollment;
 import com.byb.backend.model.Group;
+import com.byb.backend.model.GroupReport;
 import com.byb.backend.model.Interaction;
 import com.byb.backend.model.Student;
 import com.byb.backend.model.Trainer;
 import com.byb.backend.repository.CourseRepository;
 import com.byb.backend.repository.EnrollmentRepository;
+import com.byb.backend.repository.GroupReportRepository;
 import com.byb.backend.repository.GroupRepository;
 import com.byb.backend.repository.InteractionRepository;
+import com.byb.backend.repository.NotificationRepository;
 import com.byb.backend.repository.StudentRepository;
 import com.byb.backend.repository.TrainerRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +47,8 @@ public class AdminGroupFormationService {
 
     private final CourseRepository courseRepository;
     private final GroupRepository groupRepository;
+    private final GroupReportRepository groupReportRepository;
+    private final NotificationRepository notificationRepository;
     private final InteractionRepository interactionRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final StudentRepository studentRepository;
@@ -193,9 +198,19 @@ public class AdminGroupFormationService {
         // (and isActive = false) before the filter below runs them
         // out of the admin's "active groups" view.
         groupRepository.findAll().forEach(courseLifecycleService::checkAndCompleteOne);
+        // Finished groups are listed too, for their end-of-course report;
+        // the page's "Completed" filter had nothing to show without them.
+        Map<String, GroupReport> reports = groupReportRepository.findAll().stream()
+                .collect(Collectors.toMap(GroupReport::getGroupId, r -> r, (a, b) -> a));
+        // When the trainer was asked for it. Groups that finished before
+        // reports existed were never asked, and are not shown as missing one.
+        Map<String, java.time.LocalDateTime> reportAsked = new java.util.HashMap<>();
+        notificationRepository.findByNotificationType("GROUP_REPORT_REQUEST")
+                .forEach(n -> reportAsked.merge(n.getRelatedEntityId(), n.getCreatedAt(),
+                        (a, b) -> a.isBefore(b) ? a : b));
 
         return groupRepository.findAll().stream()
-                .filter(g -> Boolean.TRUE.equals(g.getIsActive()))
+                .filter(g -> Boolean.TRUE.equals(g.getIsActive()) || "completed".equalsIgnoreCase(g.getGroupStatus()))
                 .map(g -> {
                     Course course = courseRepository.findByCourseId(g.getCourseId()).orElse(null);
                     Trainer trainer = trainerRepository.findByTrainerId(g.getTrainerId()).orElse(null);
@@ -247,6 +262,9 @@ public class AdminGroupFormationService {
                     r.put("minStudents", course != null ? course.getMinStudentsRequired() : null);
                     r.put("courseDurationHours", course != null ? course.getDurationHours() : null);
                     r.put("createdAt", g.getCreatedAt());
+                    GroupReport report = reports.get(g.getGroupId());
+                    r.put("reportSubmittedAt", report == null ? null : report.getCreatedAt());
+                    r.put("reportRequestedAt", reportAsked.get(g.getGroupId()));
                     return r;
                 })
                 .collect(Collectors.toList());
