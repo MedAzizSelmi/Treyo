@@ -39,6 +39,7 @@ public class AdminService {
     private final AdminGroupFormationService groupFormationService;
     private final PasswordEncoder passwordEncoder;
     private final PushNotificationService pushNotificationService;
+    private final GroupAutomationService groupAutomation;
 
     /**
      * Get dashboard overview statistics
@@ -454,9 +455,35 @@ public class AdminService {
      * Send a notification to a specific user, all students, all trainers, or everyone.
      */
     @Transactional
-    public void sendAdminNotification(SendNotificationRequest req) {
+    /** @return how many people it was sent to */
+    public int sendAdminNotification(SendNotificationRequest req) {
         String type = req.getRecipientType();
         List<String> recipients = new java.util.ArrayList<>();
+
+        if ("GROUP".equalsIgnoreCase(type)) {
+            // The learners of one running group — ready or active — and its
+            // trainer unless left out. Not a group still being prepared or
+            // paid for, nor one that has ended or closed.
+            if (req.getTargetGroupId() == null || req.getTargetGroupId().isBlank()) {
+                throw new IllegalArgumentException("targetGroupId is required when recipientType is GROUP.");
+            }
+            Group g = groupRepository.findById(req.getTargetGroupId())
+                    .orElseThrow(() -> new IllegalArgumentException("Group not found."));
+            if (!"started".equals(groupAutomation.stage(g))) {
+                throw new IllegalArgumentException("Only a running group can be sent a notification.");
+            }
+            for (Enrollment e : groupAutomation.members(g)) {
+                if (recipients.contains(e.getStudentId())) continue;
+                saveNotification(e.getStudentId(), "student", req.getTitle(), req.getMessage(), req.getPriority(), g.getGroupId());
+                recipients.add(e.getStudentId());
+            }
+            if (!Boolean.FALSE.equals(req.getIncludeTrainer()) && g.getTrainerId() != null) {
+                saveNotification(g.getTrainerId(), "trainer", req.getTitle(), req.getMessage(), req.getPriority(), g.getGroupId());
+                recipients.add(g.getTrainerId());
+            }
+            pushToAll(recipients, req);
+            return recipients.size();
+        }
 
         if ("SPECIFIC".equalsIgnoreCase(type)) {
             // Fail loudly with a usable message instead of letting a null
@@ -470,7 +497,7 @@ public class AdminService {
                     req.getTitle(), req.getMessage(), req.getPriority());
             recipients.add(req.getTargetUserId());
             pushToAll(recipients, req);
-            return;
+            return 1;
         }
 
         if ("ALL".equalsIgnoreCase(type) || "STUDENTS".equalsIgnoreCase(type)) {
@@ -490,6 +517,7 @@ public class AdminService {
         }
 
         pushToAll(recipients, req);
+        return recipients.size();
     }
 
     /**
@@ -516,6 +544,12 @@ public class AdminService {
 
     private void saveNotification(String userId, String userType,
                                    String title, String message, String priority) {
+        saveNotification(userId, userType, title, message, priority, null);
+    }
+
+    /** With the group it was sent to, when it was sent to one. */
+    private void saveNotification(String userId, String userType,
+                                   String title, String message, String priority, String groupId) {
         Notification notification = new Notification();
         notification.setNotificationId("NOT_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
         notification.setUserId(userId);
@@ -525,6 +559,10 @@ public class AdminService {
         notification.setMessage(message);
         notification.setPriority(priority != null ? priority : "normal");
         notification.setCreatedAt(LocalDateTime.now());
+        if (groupId != null) {
+            notification.setRelatedEntityType("group");
+            notification.setRelatedEntityId(groupId);
+        }
         notificationRepository.save(notification);
     }
 

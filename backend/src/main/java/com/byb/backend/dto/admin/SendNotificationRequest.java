@@ -9,8 +9,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SendNotificationRequest {
 
-    /** "ALL", "STUDENTS", "TRAINERS", "SPECIFIC" */
+    /** "ALL", "STUDENTS", "TRAINERS", "SPECIFIC", "GROUP" */
     private String recipientType;
+
+    /** Only used when recipientType == "GROUP": a running group (ready or active). */
+    private String targetGroupId;
+
+    /** With "GROUP": also send it to the trainer who runs the group. Default true. */
+    private Boolean includeTrainer;
 
     /** Only used when recipientType == "SPECIFIC" */
     private String targetUserId;

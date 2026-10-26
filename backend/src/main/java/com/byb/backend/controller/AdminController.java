@@ -380,10 +380,10 @@ public class AdminController {
      */
     @PostMapping("/notifications/send")
     @Operation(summary = "Send admin notification")
-    public ResponseEntity<Map<String, String>> sendNotification(
+    public ResponseEntity<Map<String, Object>> sendNotification(
             @RequestBody SendNotificationRequest request
     ) {
-        adminService.sendAdminNotification(request);
-        return ResponseEntity.ok(Map.of("message", "Notification sent successfully"));
+        int sent = adminService.sendAdminNotification(request);
+        return ResponseEntity.ok(Map.of("message", "Notification sent successfully", "recipients", sent));
     }
 }

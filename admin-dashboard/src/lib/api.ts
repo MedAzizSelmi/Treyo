@@ -311,9 +311,12 @@ export async function uploadMessageAttachment(file: File): Promise<{ fileUrl: st
 }
 
 export interface SendNotificationPayload {
-  recipientType: 'ALL' | 'STUDENTS' | 'TRAINERS' | 'SPECIFIC';
+  recipientType: 'ALL' | 'STUDENTS' | 'TRAINERS' | 'SPECIFIC' | 'GROUP';
   targetUserId?: string;
   targetUserType?: string;
+  /** With GROUP: a running group, and whether its trainer gets it too. */
+  targetGroupId?: string;
+  includeTrainer?: boolean;
   title: string;
   message: string;
   priority: 'normal' | 'high' | 'urgent';
