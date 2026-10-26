@@ -1091,5 +1091,14 @@
         "placeholder": "Tapez une compétence — ex. C#, Communication",
         "remove": "Retirer {{skill}}",
         "addTyped": "Ajouter « {{skill}} »"
+    },
+    "myEnrollments": {
+        "title": "Mes inscriptions",
+        "current": "En cours",
+        "past": "Terminées",
+        "empty": "Aucune inscription pour le moment",
+        "emptyBody": "Les cours que vous rejoignez apparaîtront ici, avec leur statut.",
+        "browse": "Parcourir les cours",
+        "enrolledOn": "Depuis le {{date}}"
     }
 }

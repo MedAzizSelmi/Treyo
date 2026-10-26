@@ -1091,5 +1091,14 @@
         "placeholder": "Type a skill — e.g. C#, Communication",
         "remove": "Remove {{skill}}",
         "addTyped": "Add “{{skill}}”"
+    },
+    "myEnrollments": {
+        "title": "My Enrollments",
+        "current": "Current",
+        "past": "Past",
+        "empty": "No enrollments yet",
+        "emptyBody": "Courses you join will show up here, with their status.",
+        "browse": "Browse courses",
+        "enrolledOn": "Since {{date}}"
     }
 }

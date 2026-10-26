@@ -137,6 +137,7 @@ export default function RootLayout() {
                 <Stack.Screen name="user-profile" />
                 <Stack.Screen name="schedule-sessions" />
                 <Stack.Screen name="my-schedule" />
+                <Stack.Screen name="my-enrollments" />
                 <Stack.Screen name="course-review" />
                 <Stack.Screen name="forgot-password" />
                 <Stack.Screen name="reset-password" />

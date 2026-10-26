@@ -1091,5 +1091,14 @@
         "placeholder": "Escribe una habilidad, p. ej. C#, Comunicación",
         "remove": "Quitar {{skill}}",
         "addTyped": "Añadir «{{skill}}»"
+    },
+    "myEnrollments": {
+        "title": "Mis inscripciones",
+        "current": "En curso",
+        "past": "Anteriores",
+        "empty": "Aún no tienes inscripciones",
+        "emptyBody": "Los cursos a los que te unas aparecerán aquí, con su estado.",
+        "browse": "Explorar cursos",
+        "enrolledOn": "Desde el {{date}}"
     }
 }

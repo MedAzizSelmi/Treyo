@@ -342,7 +342,7 @@ export default function StudentHomeScreen() {
                     <View style={styles.section}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>{t('home.myEnrollments')}</Text>
-                            <TouchableOpacity onPress={() => router.push('/my-schedule' as any)}>
+                            <TouchableOpacity onPress={() => router.push('/my-enrollments' as any)}>
                                 <Text style={styles.seeAll}>{t('common.seeAll')}</Text>
                             </TouchableOpacity>
                         </View>
@@ -360,11 +360,11 @@ export default function StudentHomeScreen() {
                                 <View style={styles.sessionBody}>
                                     <View style={styles.sessionTop}>
                                         <Text style={styles.sessionTitle} numberOfLines={1}>
-                                            {enrollment.courseTitle || enrollment.courseName || 'Course'}
+                                            {enrollment.courseTitle || enrollment.courseName || t('home.course')}
                                         </Text>
                                         {enrollment.enrollmentStatus === 'active' && (
                                             <View style={styles.soonBadge}>
-                                                <Text style={styles.soonText}>Active</Text>
+                                                <Text style={styles.soonText}>{t('home.active')}</Text>
                                             </View>
                                         )}
                                     </View>
@@ -372,7 +372,12 @@ export default function StudentHomeScreen() {
                                     <View style={styles.sessionMeta}>
                                         <View style={styles.metaChip}>
                                             <Ionicons name="school-outline" size={13} color="#aaaaaa" />
-                                            <Text style={styles.metaText}>{enrollment.enrollmentStatus || 'enrolled'}</Text>
+                                            <Text style={styles.metaText}>
+                                                {enrollment.enrollmentStatus
+                                                    ? t(`enrollmentStatus.${String(enrollment.enrollmentStatus).toLowerCase()}`,
+                                                        { defaultValue: enrollment.enrollmentStatus })
+                                                    : t('home.enrolled')}
+                                            </Text>
                                         </View>
                                         {enrollment.progressPercentage != null && (
                                             <View style={styles.metaChip}>
@@ -385,7 +390,7 @@ export default function StudentHomeScreen() {
                                 <View style={styles.sessionRight}>
                                     <View style={styles.sessionTypeBadge}>
                                         <Ionicons name="book-outline" size={12} color="#aaaaaa" />
-                                        <Text style={styles.sessionTypeText}>Course</Text>
+                                        <Text style={styles.sessionTypeText}>{t('home.course')}</Text>
                                     </View>
                                     <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.2)" style={{ marginTop: 8 }} />
                                 </View>
